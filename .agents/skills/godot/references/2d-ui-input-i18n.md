@@ -168,6 +168,9 @@ Test contrast, focus visibility, disabled states, hover/pressed, high text scale
 
 Use `RichTextLabel` for BBCode/styled text, not every label. Its image API changed in 4.7: use float dimensions and `ImageUnit` (`PIXEL`, `PERCENT`, `EM`). Use `Popup`/`PopupPanel`/`ConfirmationDialog`/`AcceptDialog` for modal workflows and parent them to the correct Window/UI root. Pause/process mode must match the desired modal behavior.
 
+- `RichTextLabel.selection_enabled = true` makes static text selectable and copyable with the mouse (drag a range; desktop and web then offer Copy). A plain `Label` can never be selected, so any text a user may want to quote -- verses, licenses, paths, values shown as text -- belongs in a `RichTextLabel`.
+- `[url=...]...[/url]` in BBCode fires `meta_clicked`; connect it to `OS.shell_open` so in-text links open in the browser. Keep the visible label meaningful (say where it goes), not a raw URL.
+
 ## Input design
 
 ### InputMap actions
@@ -274,6 +277,8 @@ Use named placeholders and translator context. `tr_n` is for nonnegative integer
 - Override `text_direction`, `layout_direction`, or structured-text BiDi handling for files, URLs, code, and other high-level order cases.
 - Use localized number formatting/parsing through `TextServer` for non-Western digits.
 - Pseudolocalization catches untranslated strings, missing glyphs, and insufficient space; it is not a complete CJK/RTL test.
+- Verify glyph coverage before typing a symbol into any string. Frequently used UI glyphs (`▶` `●` `♪` `✓`) are missing from many text fonts -- Vazirmatn and Amiri carry none of the four -- and the engine renders a missing glyph as a tofu box without any warning. Inspect the font's cmap (fontTools `getBestCmap()`) or test-render every non-alphanumeric symbol you ship.
+- When a font lacks an icon, draw it (`draw_colored_polygon`, `draw_arc`, `draw_polyline` inside a `_draw()` override) instead of hunting for a covering font or shipping an icon font for three shapes.
 - Test with `godot --language <locale> --path <project>` and reset any committed locale test override.
 
 ## Official sources

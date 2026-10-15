@@ -125,6 +125,8 @@ Without threads, no `SharedArrayBuffer` requirement applies, but performance and
 
 Always test the final hosted build over HTTPS, not only a local file/server shortcut.
 
+- Slim a platform pack with the export preset's `exclude_filter` (semicolon-separated globs matched against the export list). Excluding `*.mp3` from a web preset cut one project's `.pck` from 13 MB to 935 KB; the audio ships as plain files beside `index.html` and is fetched at runtime from the site that served the build. Anything the platform can fetch from its own origin does not need to ride inside the `.pck`.
+
 ## Dedicated servers
 
 A headless server can run:

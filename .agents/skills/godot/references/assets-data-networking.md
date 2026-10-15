@@ -213,6 +213,8 @@ The high-level API does not secure gameplay. A server must authenticate/authoriz
 - Godot uses OS certificate bundles with a Mozilla fallback. `TLSOptions.client()` validates certificates; `client_unsafe()` disables common-name validation and should not be used except controlled testing. Keep TLS private keys on servers.
 - `WebSocketPeer` must be polled; use TLS for `wss://`.
 - Browser/Web export has CORS, secure-context, storage, permissions, and single-thread/sample-audio constraints. Never assume `user://` persistence is guaranteed in private browsing/iframes.
+- A web export only reaches services that answer cross-origin requests, and a static site cannot change another origin's policy. One project's OAuth Device Flow works on desktop but fails in the browser because `github.com/login/oauth/*` sends no CORS headers, while `api.github.com` allows them. Gate with `OS.has_feature("web")` and route to an equivalent path over the same data (a pasted token against the same API) as a first-class flow, not as an error message.
+- Resolve runtime-fetched media against the serving origin (`JavaScriptBridge.eval("location.href")`) instead of hard-coding a host, so the same build works from any mirror or page path.
 
 ## PCK, ZIP, and mods
 

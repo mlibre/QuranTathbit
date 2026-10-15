@@ -21,3 +21,6 @@ quran-cards-2026-10-14.apkg
 node_modules/
 npm-debug.log*
 .npm/
+
+# The skill index builder leaves these behind; the repo does not need them.
+.agents/skills/godot/scripts/__pycache__/
