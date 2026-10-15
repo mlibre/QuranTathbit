@@ -26,6 +26,10 @@ from one codebase.
 - **Sync is your own GitHub repo.** Sign in with GitHub's OAuth device flow
   (or paste a personal token) and the deck lives in your private repository as
   the same folders and files. Phone, laptop and browser stay in step.
+- **The browser stays light.** The web build ships the deck's text in its .pck
+  (under a megabyte) and streams each recitation from `decks/quran/` beside
+  `index.html` on demand, so the page opens fast and the audio is where it
+  needs to be, when it needs to be.
 
 ## The deck on disk
 
@@ -71,6 +75,12 @@ alone.
 Tokens are stored in the platform's user-data folder. The card content itself
 is never encrypted — that is the point of a deck you can read.
 
+While a sync runs a small overlay covers the screen with a plain phase ("Signing
+in to GitHub", "Fetching what changed", …) and a progress bar that knows how
+far along it is — so the first sync, which can take a minute against a fresh
+repo, never looks frozen. A sync where nothing moved says so plainly instead of
+silently finishing.
+
 ### Signing in
 
 Sign-in is wired to the project's own OAuth app out of the box: the device-flow
@@ -102,6 +112,7 @@ the constant in `scripts/net/github_auth.gd`.
 | `scripts/ui/card_view.gd` | renders a card side |
 | `scripts/ui/home.gd` | the one front door |
 | `scripts/ui/study.gd` | a session: question, answer, four buttons |
+| `scripts/ui/sync_overlay.gd` | the calm progress screen shown while sync runs |
 | `scripts/ui/settings_screen.gd` | connect, name the repo, sync |
 
 ## Running it
@@ -145,7 +156,10 @@ markdown and media must be byte-identical, and `deck.json` may differ only by
 the deck's name label. CI runs it before every deploy and release, so a deck
 that drifted from the package — by hand or by accident — fails the build
 instead of shipping. Needs `zstandard` (`pip install zstandard`) like the
-converter.
+converter. The 12 MB `.apkg` itself is intentionally not committed; the deck
+was proven byte-identical at introduction and `deck.json` records the source.
+With the package absent, the script prints a single `skip` line and exits 0;
+drop the developer's local copy back into the root to re-run the proof.
 
 ## Converting an Anki deck
 

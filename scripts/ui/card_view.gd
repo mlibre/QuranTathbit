@@ -12,9 +12,18 @@ const MarkdownScript := preload("res://scripts/ui/markdown.gd")
 const AUDIO_EXTENSIONS := ["mp3", "ogg", "wav", "m4a"]
 const IMAGE_EXTENSIONS := ["png", "jpg", "jpeg", "webp", "svg"]
 
+## Where a deck folder sits under the site that served the web build, so a
+## browser can stream the recitations that a desktop build carries inside.
+const WEB_DECK_MARKER := "decks/"
+
+## Recitations fetched from the site, kept for the session: a browser build
+## has no deck audio on disk, and each file is heard many times.
+static var _web_cache := {}
+
 var _player: AudioStreamPlayer
 var _folder := ""
 var _buttons: Array = []
+var _fetching := false
 
 func _init(p_player: AudioStreamPlayer) -> void:
         _player = p_player
@@ -100,14 +109,74 @@ func _add_image(path: String) -> void:
         add_child(rect)
 
 func _play_audio(path: String, button: Button) -> void:
-        if not FileAccess.file_exists(path):
-                push_warning("CardView: audio missing %s" % path)
+        if FileAccess.file_exists(path):
+                _start_stream(FileAccess.get_file_as_bytes(path), button)
+                return
+        # A browser build carries the deck's text but streams its audio from
+        # the site it was served from, next to index.html under decks/.
+        if OS.has_feature("web"):
+                _stream_from_site(path, button)
+                return
+        push_warning("CardView: audio missing %s" % path)
+
+
+func _start_stream(bytes: PackedByteArray, button: Button) -> void:
+        if bytes.is_empty():
+                button.text = "audio unavailable"
                 return
         var stream := AudioStreamMP3.new()
-        stream.data = FileAccess.get_file_as_bytes(path)
+        stream.data = bytes
         _player.stream = stream
         _player.play()
         _highlight(button)
+
+
+func _stream_from_site(path: String, button: Button) -> void:
+        if _fetching:
+                return
+        if _web_cache.has(path):
+                _start_stream(_web_cache[path], button)
+                return
+        _fetching = true
+        var label := button.text
+        button.text = "…  " + label.get_basename()
+        button.disabled = true
+        var fetcher := HTTPRequest.new()
+        add_child(fetcher)
+        var err := fetcher.request(_site_url(path))
+        var bytes := PackedByteArray()
+        if err == OK:
+                var outcome: Array = await fetcher.request_completed
+                if int(outcome[1]) == 200:
+                        bytes = outcome[3]
+        fetcher.queue_free()
+        button.disabled = false
+        if bytes.is_empty():
+                button.text = "audio unavailable"
+        else:
+                button.text = label
+                _web_cache[path] = bytes
+                _start_stream(bytes, button)
+        _fetching = false
+
+
+## The deck path under user:// mapped onto the site that served this build:
+## user://decks/quran/001/verse.mp3 -> <site>/decks/quran/001/verse.mp3.
+static func _site_url(path: String) -> String:
+        var base := ""
+        if OS.has_feature("web"):
+                base = str(JavaScriptBridge.eval("location.href.split('#')[0].split('?')[0]", true))
+        var slash := base.rfind("/")
+        if slash >= 0:
+                base = base.substr(0, slash + 1)
+        var rel := path
+        var at := path.find(WEB_DECK_MARKER)
+        if at >= 0:
+                rel = path.substr(at)
+        var encoded := PackedStringArray()
+        for part in rel.split("/"):
+                encoded.append(part.uri_encode())
+        return base + "/".join(encoded)
 
 func _highlight(button: Button) -> void:
         for other in _buttons:

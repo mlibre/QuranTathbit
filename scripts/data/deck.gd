@@ -29,107 +29,112 @@ const DECK_META := "deck.json"
 
 var name := ""
 var folder := ""
+var source := ""  # where the deck's content comes from, when it says
 var cards: Array[CardScript] = []
 var progress_path := ""
 var dirty := false
 
 static func load(path: String):
-	var deck = (load("res://scripts/data/deck.gd") as GDScript).new()
-	deck.folder = path
-	var meta_path := path.path_join(DECK_META)
-	if not FileAccess.file_exists(meta_path):
-		push_error("Deck.load: no %s in %s" % [DECK_META, path])
-		return null
-	var meta: Variant = JSON.parse_string(FileAccess.get_file_as_string(meta_path))
-	if typeof(meta) != TYPE_DICTIONARY or int((meta as Dictionary).get("format", 0)) != FORMAT:
-		push_error("Deck.load: %s is not a deck this app understands" % meta_path)
-		return null
-	deck.name = str((meta as Dictionary).get("name", "Deck"))
-	deck.progress_path = path.path_join(PROGRESS)
+        var deck = (load("res://scripts/data/deck.gd") as GDScript).new()
+        deck.folder = path
+        var meta_path := path.path_join(DECK_META)
+        if not FileAccess.file_exists(meta_path):
+                push_error("Deck.load: no %s in %s" % [DECK_META, path])
+                return null
+        var meta: Variant = JSON.parse_string(FileAccess.get_file_as_string(meta_path))
+        if typeof(meta) != TYPE_DICTIONARY or int((meta as Dictionary).get("format", 0)) != FORMAT:
+                push_error("Deck.load: %s is not a deck this app understands" % meta_path)
+                return null
+        deck.name = str((meta as Dictionary).get("name", "Deck"))
+        deck.source = str((meta as Dictionary).get("source", ""))
+        deck.progress_path = path.path_join(PROGRESS)
 
-	# Cards are the numbered folders on disk. deck.json may list them -- but
-	# a deck shared from another machine can arrive with folders this list
-	# has never seen, so the folders are the truth and the list is the order.
-	var ids: Array = []
-	for entry in DirAccess.get_directories_at(path):
-		if entry.is_valid_int():
-			ids.append(entry)
-	ids.sort()
-	if not ids.is_empty():
-		var listed: Array = (meta as Dictionary).get("cards", [])
-		if not listed.is_empty():
-			var ordered: Array = []
-			for id in listed:
-				if ids.has(str(id)):
-					ordered.append(str(id))
-			for id in ids:
-				if not ordered.has(id):
-					ordered.append(id)
-			ids = ordered
-	for id in ids:
-		var card := _load_card(path, str(id))
-		if card == null:
-			return null
-		deck.cards.append(card)
-	if deck.cards.is_empty():
-		push_error("Deck.load: %s has no cards" % path)
-		return null
+        # Cards are the numbered folders on disk. deck.json may list them -- but
+        # a deck shared from another machine can arrive with folders this list
+        # has never seen, so the folders are the truth and the list is the order.
+        var ids: Array = []
+        for entry in DirAccess.get_directories_at(path):
+                if entry.is_valid_int():
+                        ids.append(entry)
+        ids.sort()
+        if not ids.is_empty():
+                var listed: Array = (meta as Dictionary).get("cards", [])
+                if not listed.is_empty():
+                        var ordered: Array = []
+                        for id in listed:
+                                if ids.has(str(id)):
+                                        ordered.append(str(id))
+                        for id in ids:
+                                if not ordered.has(id):
+                                        ordered.append(id)
+                        ids = ordered
+        for id in ids:
+                var card := _load_card(path, str(id))
+                if card == null:
+                        return null
+                deck.cards.append(card)
+        if deck.cards.is_empty():
+                push_error("Deck.load: %s has no cards" % path)
+                return null
 
-	deck._load_progress()
-	return deck
+        deck._load_progress()
+        return deck
 
 static func _load_card(deck_path: String, id: String) -> CardScript:
-	var folder := deck_path.path_join(id)
-	var card := CardScript.new(id, folder)
-	var front_path := folder.path_join("front.md")
-	var back_path := folder.path_join("back.md")
-	if not FileAccess.file_exists(front_path) or not FileAccess.file_exists(back_path):
-		push_error("Deck: card %s is missing front.md or back.md" % id)
-		return null
-	card.front = FileAccess.get_file_as_string(front_path)
-	card.back = FileAccess.get_file_as_string(back_path)
-	for entry in DirAccess.get_files_at(folder):
-		if entry.get_extension() != "md":
-			card.media[entry] = folder.path_join(entry)
-	return card
+        var folder := deck_path.path_join(id)
+        var card := CardScript.new(id, folder)
+        var front_path := folder.path_join("front.md")
+        var back_path := folder.path_join("back.md")
+        if not FileAccess.file_exists(front_path) or not FileAccess.file_exists(back_path):
+                push_error("Deck: card %s is missing front.md or back.md" % id)
+                return null
+        card.front = FileAccess.get_file_as_string(front_path)
+        card.back = FileAccess.get_file_as_string(back_path)
+        for entry in DirAccess.get_files_at(folder):
+                # Godot's .import and .uid sidecars are editor metadata, not
+                # media a card can reference or sync can carry.
+                if entry.get_extension() in ["md", "import", "uid"] or entry == ".gdignore":
+                        continue
+                card.media[entry] = folder.path_join(entry)
+        return card
 
 func _load_progress() -> void:
-	if not FileAccess.file_exists(progress_path):
-		return
-	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(progress_path))
-	if typeof(data) != TYPE_DICTIONARY:
-		push_warning("Deck: progress.json unreadable; starting fresh")
-		return
-	var entries: Dictionary = (data as Dictionary).get("cards", {})
-	for card in cards:
-		var saved: Variant = entries.get(card.id)
-		if typeof(saved) != TYPE_DICTIONARY:
-			continue
-		# Trust the file's keys, but repair the ones the scheduler needs.
-		var state := SchedulerScript.new_state()
-		for key in state.keys():
-			if (saved as Dictionary).has(key):
-				state[key] = (saved as Dictionary)[key]
-		if (saved as Dictionary).has("relearning"):
-			state["relearning"] = bool((saved as Dictionary).relearning)
-		card.state = state
+        if not FileAccess.file_exists(progress_path):
+                return
+        var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(progress_path))
+        if typeof(data) != TYPE_DICTIONARY:
+                push_warning("Deck: progress.json unreadable; starting fresh")
+                return
+        var entries: Dictionary = (data as Dictionary).get("cards", {})
+        for card in cards:
+                var saved: Variant = entries.get(card.id)
+                if typeof(saved) != TYPE_DICTIONARY:
+                        continue
+                # Trust the file's keys, but repair the ones the scheduler needs.
+                var state := SchedulerScript.new_state()
+                for key in state.keys():
+                        if (saved as Dictionary).has(key):
+                                state[key] = (saved as Dictionary)[key]
+                if (saved as Dictionary).has("relearning"):
+                        state["relearning"] = bool((saved as Dictionary).relearning)
+                card.state = state
 
 func save_progress() -> bool:
-	var entries: Dictionary = {}
-	for card in cards:
-		var state: Dictionary = card.state
-		if state["status"] == "new" and int(state.get("reps", 0)) == 0:
-			continue  # untouched cards stay out of the file
-		entries[card.id] = state
-	var file := FileAccess.open(progress_path, FileAccess.WRITE)
-	if file == null:
-		push_error("Deck.save_progress: cannot write %s (%s)" % [progress_path, error_string(FileAccess.get_open_error())])
-		return false
-	file.store_string(JSON.stringify({"format": FORMAT, "cards": entries}, "\t") + "\n")
-	file.close()
-	dirty = false
-	return true
+        var entries: Dictionary = {}
+        for card in cards:
+                var state: Dictionary = card.state
+                if state["status"] == "new" and int(state.get("reps", 0)) == 0:
+                        continue  # untouched cards stay out of the file
+                entries[card.id] = state
+        var file := FileAccess.open(progress_path, FileAccess.WRITE)
+        if file == null:
+                push_error("Deck.save_progress: cannot write %s (%s)" % [progress_path, error_string(FileAccess.get_open_error())])
+                return false
+        file.store_string(JSON.stringify({"format": FORMAT, "cards": entries}, "\t") + "\n")
+        file.close()
+        dirty = false
+        return true
 
 func answer(card: CardScript, button: String, now: int) -> void:
-	card.state = SchedulerScript.apply(SchedulerScript.id_seed(card.id), card.state, button, now)
-	dirty = true
+        card.state = SchedulerScript.apply(SchedulerScript.id_seed(card.id), card.state, button, now)
+        dirty = true

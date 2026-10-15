@@ -12,13 +12,13 @@ godot --headless --path . --script tests/regression_<name>.gd   # one suite
 
 ## The suites
 
-| suite                  | what it holds the app to                                                                                                                                                                                  |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `regression_scheduler` | Anki's SM-2, with Anki's own numbers: interval bands, fuzz bounds, step delays, lapse/relearn round trips, ease moves, queue caps                                                                         |
-| `regression_deck`      | the deck as folders and files: load, card discovery, media resolution, progress round-trip, and repair of a hand-corrupted or partial `progress.json`                                                     |
-| `regression_sync`      | sync against a fake GitHub: first push, second device pulling, local-edit-wins vs remote-follows, progress merge by card, failed transfers retrying, foreign repo files untouched, a shared deck arriving |
-| `regression_markdown`  | the card markdown subset, and the Arabic/Persian/Latin script detection that dresses each block                                                                                                           |
-| `regression_boot`      | a cold first run: the bundled deck installs itself into `user://`, home shows the real numbers, a session renders a real card and records its answer, settings opens and returns                          |
+| suite                  | what it holds the app to                                                                                                                                                                                                                             |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `regression_scheduler` | Anki's SM-2, with Anki's own numbers: interval bands, fuzz bounds, step delays, lapse/relearn round trips, ease moves, queue caps                                                                                                                                    |
+| `regression_deck`      | the deck as folders and files: load, card discovery, media resolution, progress round-trip, and repair of a hand-corrupted or partial `progress.json`                                                                                                              |
+| `regression_sync`      | sync against a fake GitHub: first push, second device pulling, local-edit-wins vs remote-follows, progress merge by card, single-commit batches, ref-conflict retry, failed transfers retrying, foreign repo files untouched, a shared deck arriving, editor metadata never travelling, web builds skipping media |
+| `regression_markdown`  | the card markdown subset, and the Arabic/Persian/Latin script detection that dresses each block                                                                                                                                                                     |
+| `regression_boot`      | a cold first run: the bundled deck installs itself into `user://`, home shows the real numbers, a session renders a real card and records its answer, settings opens and returns                                                                                   |
 
 ## Why the battery runs twice
 
@@ -42,6 +42,7 @@ They cost nothing, store nothing, and never need credentials to pass:
 ```bash
 godot --headless --path . --script tools/live_http_check.gd   # the HTTP pipeline
 godot --headless --path . --script tools/live_auth_check.gd   # the sign-in path
+godot --headless --path . --script tools/live_sync_check.gd   # the sync engine
 ```
 
 `live_http_check` sends one request through the app's own `HttpClient` and
@@ -51,7 +52,14 @@ genuine device/user code pair, polls once and expects the specific
 `authorization_pending` answer (a bad id would return `invalid_client`
 instead), and — if you export `QURAN_TATHBIT_LIVE_TOKEN` with a classic token
 first — ends with the same `whoami` call every sign-in path finishes with.
-The token is read from the environment and never written anywhere.
+`live_sync_check` exercises the full sync path: it creates a scratch private
+repo (named `quran-tathbit-smoke`, or `QURAN_TATHBIT_LIVE_REPO`), pushes the
+bundled deck as a single commit, reads the tree back to confirm every file
+landed with no editor metadata riding along, then runs a quiet second sync
+that moves nothing. Setting `QURAN_TATHBIT_LIVE_CLEANUP=1` deletes the scratch
+repo at the end, leaving the account as it was found. Tokens are read from the
+environment and never written anywhere except the in-memory settings used by
+the engine.
 
 ## Adding a suite
 
@@ -111,3 +119,11 @@ python3 tools/verify_deck.py
 CI runs it before every Pages deploy and release build, so a deck that
 drifted from the package — edited by hand, mangled by a tool, or written
 from memory — fails the build instead of reaching a user.
+
+The 12 MB `.apkg` itself is intentionally absent from the repo: the deck
+was proven byte-identical at the commit that introduced it, and the
+`source` field in `deck.json` still records where every byte came from.
+When the package is missing, `verify_deck.py` prints a single `skip`
+line and exits 0 — CI keeps moving. Drop the developer's local copy of
+`quran-cards-2026-10-14.apkg` back into the root to run the proof again
+and catch any drift.

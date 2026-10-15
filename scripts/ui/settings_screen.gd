@@ -85,6 +85,8 @@ func _build() -> void:
         column.add_child(_github_body())
         column.add_child(_section("Deck"))
         column.add_child(_deck_body())
+        column.add_child(_section("Data source"))
+        column.add_child(_source_body())
         column.add_child(_about())
 
 func _section(title: String) -> Control:
@@ -244,6 +246,15 @@ func _github_body() -> Control:
         sync.add_theme_stylebox_override("focus", ThemeScript.outline_stylebox(ThemeScript.GREEN))
         sync.pressed.connect(func() -> void: sync_requested.emit())
         box.add_child(sync)
+
+        var note := Label.new()
+        note.name = "SyncNote"
+        note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        note.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
+        note.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+        note.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
+        box.add_child(note)
         return card
 
 func _deck_body() -> Control:
@@ -287,6 +298,64 @@ func _deck_body() -> Control:
         box.add_child(note)
         return card
 
+func _source_body() -> Control:
+        var card := PanelContainer.new()
+        card.name = "DataSource"
+        card.add_theme_stylebox_override("panel", ThemeScript.card_stylebox())
+        var pad := MarginContainer.new()
+        pad.name = "Padding"
+        pad.add_theme_constant_override("margin_left", ThemeScript.PAD)
+        pad.add_theme_constant_override("margin_right", ThemeScript.PAD)
+        pad.add_theme_constant_override("margin_top", 16)
+        pad.add_theme_constant_override("margin_bottom", 16)
+        card.add_child(pad)
+        var box := VBoxContainer.new()
+        box.name = "Box"
+        box.add_theme_constant_override("separation", 8)
+        pad.add_child(box)
+
+        var what := Label.new()
+        what.name = "What"
+        what.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        what.text = "The deck's verses, Persian translation and recitations come from quran.makarem.ir, carried unchanged from the deck package."
+        what.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
+        what.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+        what.add_theme_color_override("font_color", ThemeScript.INK)
+        box.add_child(what)
+
+        var open := Button.new()
+        open.name = "Open"
+        open.text = "Open quran.makarem.ir"
+        open.custom_minimum_size = Vector2(0, 42)
+        open.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
+        open.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+        open.add_theme_color_override("font_color", ThemeScript.GOLD)
+        open.add_theme_color_override("font_hover_color", ThemeScript.GOLD)
+        open.add_theme_stylebox_override("normal", ThemeScript.outline_stylebox(ThemeScript.GOLD, 1, 21))
+        open.add_theme_stylebox_override("hover", ThemeScript.soft_stylebox(ThemeScript.GOLD_SOFT, 21))
+        open.add_theme_stylebox_override("pressed", ThemeScript.soft_stylebox(ThemeScript.GOLD_SOFT, 21))
+        open.add_theme_stylebox_override("focus", ThemeScript.outline_stylebox(ThemeScript.GOLD, 1, 21))
+        # The deck's source is read when the button is pressed: the screen
+        # builds before its setup() brings the deck in.
+        open.pressed.connect(func() -> void:
+                var url := "https://quran.makarem.ir/"
+                if _deck != null and not _deck.source.is_empty():
+                        url = _deck.source
+                OS.shell_open(url)
+        )
+        box.add_child(open)
+
+        if OS.has_feature("web"):
+                var note := Label.new()
+                note.name = "WebNote"
+                note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                note.text = "In the browser, recitations stream from this site while you study."
+                note.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
+                note.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+                note.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
+                box.add_child(note)
+        return card
+
 func _about() -> Control:
         var label := Label.new()
         label.name = "About"
@@ -299,6 +368,13 @@ func _about() -> Control:
         return label
 
 # --- state ---------------------------------------------------------------------
+
+## The main screen reports how a sync went while Settings is the screen on
+## top; the note sits under the Sync button and clears when asked again.
+func note_sync_result(text: String) -> void:
+        var note: Label = get_node_or_null("Margin/Scroll/Column/GitHub/Padding/Box/SyncNote")
+        if note != null:
+                note.text = text
 
 func _refresh() -> void:
         var state: Label = get_node("Margin/Scroll/Column/GitHub/Padding/Box/State")
@@ -318,6 +394,7 @@ func _refresh() -> void:
         var folder: Label = get_node("Margin/Scroll/Column/DeckInfo/Padding/Box/Folder")
         name.text = "%s — %d cards" % [_deck.name, _deck.cards.size()]
         folder.text = _deck.folder
+        note_sync_result("")
 
 # --- the device flow ------------------------------------------------------------
 

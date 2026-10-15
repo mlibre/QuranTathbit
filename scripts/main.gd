@@ -6,6 +6,7 @@ const SchedulerScript := preload("res://scripts/data/scheduler.gd")
 const HttpClientScript := preload("res://scripts/net/http_client.gd")
 const GitHubAuthScript := preload("res://scripts/net/github_auth.gd")
 const GitHubSyncScript := preload("res://scripts/net/github_sync.gd")
+const SyncOverlayScript := preload("res://scripts/ui/sync_overlay.gd")
 const ThemeScript := preload("res://scripts/ui/theme.gd")
 const HomeScript := preload("res://scripts/ui/home.gd")
 const StudyScript := preload("res://scripts/ui/study.gd")
@@ -130,6 +131,14 @@ func _on_settings_pressed() -> void:
 
 func _on_account_changed() -> void:
         _settings = SettingsScript.load_settings()
+        if _screen is HomeScript:
+                var home: HomeScript = _screen
+                home.setup(_deck, SchedulerScript.counts(_deck, _now()), _sync_line(), _settings.has_token())
+        # Connecting is itself the request for a first sync: the user just
+        # chose to keep their deck on GitHub, so carry it there without
+        # making them find the button and wonder whether anything happened.
+        if _settings.has_token() and _settings.last_sync == 0:
+                await _run_sync()
 
 
 func _on_sync_pressed() -> void:
@@ -139,18 +148,17 @@ func _on_sync_pressed() -> void:
         await _run_sync()
 
 
-## Sync, with a small word on screen while it works. The app stays usable
-## when it fails -- the deck is local first, always.
+## Sync, with its own quiet screen while it works: a phase in plain words, a
+## bar that knows how far along it is, and the promise that the deck is safe
+## on this machine whatever the network does. The app stays usable when it
+## fails -- the deck is local first, always.
 func _run_sync() -> void:
-        var overlay := _sync_overlay()
+        var overlay := SyncOverlayScript.new()
+        overlay.name = "SyncOverlay"
         add_child(overlay)
-        var result: Dictionary = await _sync.sync(USER_DECK, func(text: String, done: int, total: int) -> void:
-                var line: Label = overlay.get_node("Panel/Box/Progress")
-                if total > 0:
-                        line.text = "%s… %d / %d" % [text.capitalize(), done, total]
-                else:
-                        line.text = "%s…" % text.capitalize()
-        )
+        var result: Dictionary = await _sync.sync(USER_DECK, overlay.report)
+        overlay.finish(bool(result.get("ok", false)))
+        await get_tree().create_timer(0.6).timeout
         overlay.queue_free()
         # Only a finished sync may move the "last synced" clock: a failed run
         # must leave the app honest about when it last heard from the repo.
@@ -166,49 +174,20 @@ func _run_sync() -> void:
 
         var line := ""
         if bool(result.get("ok", false)):
-                line = "Synced just now · %d pushed, %d pulled, %d merged" % [
-                        result.get("pushed", 0), result.get("pulled", 0), result.get("merged", 0)
-                ]
+                if int(result.get("pushed", 0)) + int(result.get("pulled", 0)) + int(result.get("merged", 0)) == 0:
+                        line = "Everything already in step — synced just now"
+                else:
+                        line = "Synced just now · %d pushed, %d pulled, %d merged" % [
+                                result.get("pushed", 0), result.get("pulled", 0), result.get("merged", 0)
+                        ]
         else:
                 line = "Sync could not finish (%s). Your cards are safe here." % str(result.get("error", "?"))
         if _screen is HomeScript:
                 var home: HomeScript = _screen
                 home.setup(_deck, SchedulerScript.counts(_deck, _now()), line, _settings.has_token())
-
-
-func _sync_overlay() -> Control:
-        var dim := ColorRect.new()
-        dim.name = "SyncOverlay"
-        dim.color = Color(0.1, 0.14, 0.11, 0.35)
-        dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-        var center := CenterContainer.new()
-        center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-        dim.add_child(center)
-        var panel := PanelContainer.new()
-        panel.name = "Panel"
-        panel.custom_minimum_size = Vector2(280, 0)
-        panel.add_theme_stylebox_override("panel", ThemeScript.card_stylebox())
-        center.add_child(panel)
-        var box := VBoxContainer.new()
-        box.name = "Box"
-        box.add_theme_constant_override("separation", 8)
-        panel.add_child(box)
-        var title := Label.new()
-        title.text = "Syncing"
-        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        title.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.TITLE, true))
-        title.add_theme_font_size_override("font_size", ThemeScript.TITLE)
-        title.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
-        box.add_child(title)
-        var progress := Label.new()
-        progress.name = "Progress"
-        progress.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        progress.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-        progress.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        progress.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
-        progress.text = "reading your repo…"
-        box.add_child(progress)
-        return dim
+        elif _screen is SettingsScreenScript:
+                var screen: SettingsScreenScript = _screen
+                screen.note_sync_result(line)
 
 
 func _sync_line() -> String:

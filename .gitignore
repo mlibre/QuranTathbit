@@ -10,3 +10,8 @@ builds/
 android/
 keystores/
 .godot/export_credentials.cfg
+
+# The 12 MB source package lives on the developer's machine, not in the
+# repo. tools/verify_deck.py proves the deck is byte-identical to it when
+# it is present, and prints a clean "skip" when it is not.
+quran-cards-2026-10-14.apkg

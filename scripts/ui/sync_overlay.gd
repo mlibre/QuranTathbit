@@ -1,0 +1,151 @@
+class_name SyncOverlay
+extends ColorRect
+const ThemeScript := preload("res://scripts/ui/theme.gd")
+
+## What sync looks like while it happens: a quiet card over a dimmed screen
+## that says plainly which phase is running, how far through it is, and that
+## the deck itself is safe on this machine whatever the network does. The
+## engine speaks in short phrases -- "signing in", "uploading" -- and this
+## screen turns them into words a person reads once and understands.
+
+const PHRASES := {
+        "signing in": "Signing in to GitHub",
+        "reading repo": "Reading your repo",
+        "downloading": "Fetching what changed",
+        "uploading": "Sending your cards",
+        "merging progress": "Merging your progress",
+        "saving": "Saving to your repo",
+}
+
+var _phase: Label
+var _count: Label
+var _bar: ProgressBar
+var _sweep: Tween
+
+func _ready() -> void:
+        color = Color(0.10, 0.14, 0.11, 0.45)
+        mouse_filter = Control.MOUSE_FILTER_STOP
+        set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+        var center := CenterContainer.new()
+        center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        add_child(center)
+
+        var panel := PanelContainer.new()
+        panel.custom_minimum_size = Vector2(340, 0)
+        panel.add_theme_stylebox_override("panel", ThemeScript.card_stylebox())
+        center.add_child(panel)
+
+        var pad := MarginContainer.new()
+        for side in ["left", "right"]:
+                pad.add_theme_constant_override("margin_" + side, 26)
+        for side in ["top", "bottom"]:
+                pad.add_theme_constant_override("margin_" + side, 22)
+        panel.add_child(pad)
+
+        var box := VBoxContainer.new()
+        box.add_theme_constant_override("separation", 10)
+        pad.add_child(box)
+
+        var title := Label.new()
+        title.text = "Syncing"
+        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        title.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.TITLE, true))
+        title.add_theme_font_size_override("font_size", ThemeScript.TITLE)
+        title.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
+        box.add_child(title)
+
+        _phase = Label.new()
+        _phase.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        _phase.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        _phase.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY))
+        _phase.add_theme_font_size_override("font_size", ThemeScript.BODY)
+        _phase.add_theme_color_override("font_color", ThemeScript.INK)
+        _phase.text = str(PHRASES["reading repo"]) + "…"
+        box.add_child(_phase)
+
+        _bar = ProgressBar.new()
+        _bar.show_percentage = false
+        _bar.custom_minimum_size = Vector2(0, 10)
+        _bar.add_theme_stylebox_override("background", _track_stylebox())
+        _bar.add_theme_stylebox_override("fill", _fill_stylebox())
+        box.add_child(_bar)
+
+        _count = Label.new()
+        _count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        _count.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
+        _count.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+        _count.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
+        box.add_child(_count)
+
+        var reassurance := Label.new()
+        reassurance.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        reassurance.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        reassurance.text = "Your cards stay on this device — sync only shares them."
+        reassurance.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
+        reassurance.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+        reassurance.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
+        box.add_child(reassurance)
+
+        _start_sweep()
+        ThemeScript.settle_in(panel, 0.0, 0.3)
+
+
+## The engine's progress, made visible: a phase in plain words, and a bar
+## that either knows how far it is or gently says "working on it".
+func report(text: String, done: int, total: int) -> void:
+        if _phase == null:
+                return
+        _phase.text = str(PHRASES.get(text, text.capitalize())) + "…"
+        if total > 0:
+                _stop_sweep()
+                _count.text = "%d of %d" % [done, total]
+                _bar.value = 100.0 * float(done) / float(total)
+        else:
+                _count.text = ""
+                _start_sweep()
+
+
+## The last thing the overlay says before it goes: one calm beat of outcome.
+func finish(ok: bool) -> void:
+        if _phase == null:
+                return
+        _stop_sweep()
+        _count.text = ""
+        if ok:
+                _bar.value = 100.0
+                _phase.text = "Up to date"
+        else:
+                _phase.text = "Sync could not finish"
+
+
+func _start_sweep() -> void:
+        if _sweep != null and _sweep.is_valid():
+                return
+        if _bar == null:
+                return
+        _bar.value = 0.0
+        _sweep = create_tween()
+        _sweep.set_loops()
+        _sweep.tween_property(_bar, "value", 100.0, 1.1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+        _sweep.tween_property(_bar, "value", 0.0, 1.1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+
+
+func _stop_sweep() -> void:
+        if _sweep != null and _sweep.is_valid():
+                _sweep.kill()
+        _sweep = null
+
+
+func _track_stylebox() -> StyleBoxFlat:
+        var box := StyleBoxFlat.new()
+        box.bg_color = ThemeScript.LINE
+        box.set_corner_radius_all(5)
+        return box
+
+
+func _fill_stylebox() -> StyleBoxFlat:
+        var box := StyleBoxFlat.new()
+        box.bg_color = ThemeScript.GREEN
+        box.set_corner_radius_all(5)
+        return box
