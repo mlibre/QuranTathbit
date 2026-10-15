@@ -64,7 +64,7 @@ func _add_eyebrow(ref_line: String) -> void:
         label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         label.selection_enabled = true
-        var script := ThemeScript.script_of(ref_line)
+        var script := ThemeScript.reference_script(ref_line)
         label.text_direction = TextDirection.TEXT_DIRECTION_AUTO
         label.horizontal_alignment = (
                 HORIZONTAL_ALIGNMENT_RIGHT if script != "plain" else HORIZONTAL_ALIGNMENT_CENTER
@@ -90,7 +90,16 @@ func _add_text(markdown: String, link: String, lead := false) -> void:
         # A verse or translation is something a person will want to copy:
         # hold the mouse and drag, the way every other reader works.
         label.selection_enabled = true
-        var script := ThemeScript.script_of(MarkdownScript.plain(markdown))
+        # The question side is a reference -- a surah's name and a range,
+        # Arabic by construction -- so it reads in the Quranic face whether
+        # or not its letters carry a script tell. Everything else (the answer
+        # side) classifies line by line: verses are vocalised, translations
+        # are not, and that is the tell between them.
+        var script: String = (
+                ThemeScript.reference_script(MarkdownScript.plain(markdown))
+                if lead
+                else ThemeScript.script_of(MarkdownScript.plain(markdown))
+        )
         # Scripture reads right-to-left. Under an RTL base direction a
         # RichTextLabel mirrors its alignment (LEFT lands on the start edge),
         # so the base stays AUTO and the alignment is set visually instead:

@@ -68,6 +68,10 @@ func request_many(requests: Array) -> Array:
                         HTTPClient.METHOD_GET
                 )
                 var body := PackedByteArray(spec.get("body", PackedByteArray()))
+                # The node has to be in the tree before request() is called --
+                # HTTPRequest refuses to start outside it (ERR_UNCONFIGURED),
+                # which is what broke the Linux build's first sync.
+                add_child(node)
                 var err := node.request(str(spec.get("url", "")), flat, verb, body.get_string_from_utf8())
                 if err != OK:
                         # A request that cannot even start answers immediately;
@@ -76,7 +80,6 @@ func request_many(requests: Array) -> Array:
                         node.queue_free()
                         continue
                 state.remaining += 1
-                add_child(node)
                 node.request_completed.connect(_on_batch_one.bind(node, i, results, state))
         # The last answer always arrives in a later frame than this loop, so
         # polling the frame is race-free: no completion can be missed, and a

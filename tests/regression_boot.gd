@@ -68,6 +68,34 @@ func _check_home_numbers(home: Control) -> void:
         _ok(not study.disabled, "study is ready")
         _ok(study.text == "Learn new cards", "the button names what the session is")
 
+        # The settings corner once sat under a full-rect container added after
+        # it, and no click could reach it. The engine's hit test -- deepest
+        # topmost control, children in reverse order -- is the part that
+        # decides who gets the click, so it is the part this walks by hand.
+        var corner: Button = home.get_node("SettingsCorner")
+        var at := corner.get_global_rect().get_center()
+        _ok(_top_at(home, at) == corner, "the settings corner is on top of everything at its own centre")
+
+
+## The engine's own hit test, walked by hand: deepest topmost control at a
+## point, children in reverse order, honouring visibility and mouse_filter.
+func _top_at(from: Control, at: Vector2) -> Control:
+        var children := from.get_children()
+        for i in range(children.size() - 1, -1, -1):
+                var child := children[i]
+                if child is not Control:
+                        continue
+                var c := child as Control
+                if not c.visible or c.mouse_filter == Control.MOUSE_FILTER_IGNORE:
+                        continue
+                if not c.get_global_rect().has_point(at):
+                        continue
+                var deeper: Control = _top_at(c, at)
+                if deeper != null:
+                        return deeper
+                return c
+        return null
+
 func _check_study_session(main: Node) -> void:
         main._start_session()
         await create_timer(0.4).timeout

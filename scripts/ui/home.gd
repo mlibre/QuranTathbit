@@ -64,7 +64,7 @@ func setup(deck: DeckScript, counts: Dictionary, sync_line: String, connected: b
         eyebrow.visible = not reference.is_empty()
         if not reference.is_empty():
                 next_up.text = reference
-                var script := ThemeScript.script_of(reference)
+                var script := ThemeScript.reference_script(reference)
                 next_up.add_theme_font_override("font", ThemeScript.font_for(script, ThemeScript.BODY))
                 next_up.add_theme_font_size_override("font_size", _size_for(script))
                 next_up.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
@@ -116,7 +116,6 @@ func _build() -> void:
         set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
         add_child(ThemeScript.paper_backdrop())
         add_child(ThemeScript.paper_pattern())
-        add_child(_settings_corner())
 
         var margin := MarginContainer.new()
         margin.name = "Margin"
@@ -139,6 +138,13 @@ func _build() -> void:
         column.add_child(_stats())
         column.add_child(_study_button())
         column.add_child(_bottom_group())
+
+        # The corner button goes on last, not first: children added later sit
+        # above earlier ones in both drawing and hit-testing, and a full-rect
+        # container added after it was covering the corner, so the click that
+        # opened settings landed on the page instead. On top is where a
+        # floating control belongs.
+        add_child(_settings_corner())
 
 ## The deck's other life, gathered at the page's foot: the sync button and
 ## its state line belong to each other, so they stand together, a breath

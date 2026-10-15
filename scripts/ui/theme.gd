@@ -31,6 +31,10 @@ const VAZIR_BOLD := "res://assets/fonts/Vazirmatn-Bold.ttf"
 # separates an Arabic line from a Persian one.
 const ARABIC_ONLY := [0x0629, 0x0643]  # teh marbuta, Arabic kaf
 const PERSIAN_ONLY := [0x067E, 0x0686, 0x0698, 0x06AF, 0x06A9, 0x06CC, 0x06D2]
+# The mushaf's own voice: fathatan through hah with sukun, and the
+# superscript alef. Vocalised text is scripture; translations never carry
+# these, and a bare Arabic word can.
+const HARAKAT := [0x064B, 0x064C, 0x064D, 0x064E, 0x064F, 0x0650, 0x0651, 0x0652, 0x0653, 0x0654, 0x0655, 0x0670]
 
 const DISPLAY := 34
 const TITLE := 22
@@ -525,12 +529,23 @@ static func amiri(size: int, bold := false) -> Font:
 ##
 ## The two scripts share almost every letter, so the tell is the handful that
 ## belong to only one: Persian writes پ چ ژ گ ک ی and the zero-width joiner;
-## Arabic writes ة ى ك and the hamza forms. A line with Persian-only letters
-## and no Arabic-only ones is Persian; everything else that is not Latin
-## defaults to Arabic, the face a memorised line must be read in.
+## Arabic writes ة and the harakat. The rules, in order:
+##
+##   1. One Persian-only letter settles it -- nothing in the Arabic script
+##      writes پ چ ژ گ, so a line carrying one is Persian even when it quotes
+##      Arabic words in Arabic orthography. A translation that names a surah
+##      is still a translation.
+##   2. Harakat or an Arabic-only letter is the mushaf's own voice: vocalised
+##      text is scripture.
+##   3. Bare shared-script text with no tell either way is, in this deck, the
+##      Persian translation -- "بنام خداوند بخشنده مهربان" carries no
+##      Persian-only letter at all, yet is Persian, and rendered in Amiri at
+##      scripture's size it was neither. Verses never land here: every verse
+##      in this deck is vocalised.
 static func script_of(text: String) -> String:
         var arabic_only := 0
         var persian_only := 0
+        var harakat := 0
         var script := 0
         for i in text.length():
                 var code := text.unicode_at(i)
@@ -543,13 +558,31 @@ static func script_of(text: String) -> String:
                 elif code in PERSIAN_ONLY:
                         persian_only += 1
                         script += 1
+                elif code in HARAKAT:
+                        harakat += 1
+                        script += 1
                 elif _is_arabic_block(code):
                         script += 1
         if script == 0:
                 return "plain"
-        if persian_only > 0 and arabic_only == 0:
+        if persian_only > 0:
                 return "persian"
-        return "arabic"
+        if arabic_only > 0 or harakat > 0:
+                return "arabic"
+        return "persian"
+
+
+## The classifier for references -- the "next up" line, the eyebrow above an
+## answer, the question side of a card. A reference is a surah's name and a
+## range: Arabic by construction, whether or not its letters happen to carry
+## a tell (قريش carries none). So anything of the Arabic block reads as
+## Arabic here, in the Quranic face, and only Latin stays plain.
+static func reference_script(text: String) -> String:
+        var script := 0
+        for i in text.length():
+                if _is_arabic_block(text.unicode_at(i)):
+                        script += 1
+        return "arabic" if script > 0 else "plain"
 
 
 static func _is_arabic_block(code: int) -> bool:
