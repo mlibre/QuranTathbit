@@ -5,6 +5,7 @@ const HttpClientScript := preload("res://scripts/net/http_client.gd")
 const GitHubAuthScript := preload("res://scripts/net/github_auth.gd")
 const SettingsScript := preload("res://scripts/data/settings.gd")
 const DeckScript := preload("res://scripts/data/deck.gd")
+const VersionScript := preload("res://scripts/data/version.gd")
 
 ## Settings is short on purpose: connect GitHub, name the repo, sync. The
 ## deck itself is edited as files -- in any editor, on any machine -- so
@@ -314,13 +315,23 @@ func _source_body() -> Control:
         box.add_theme_constant_override("separation", 8)
         pad.add_child(box)
 
-        var what := Label.new()
+        var what := RichTextLabel.new()
         what.name = "What"
+        what.bbcode_enabled = true
+        what.fit_content = true
+        what.scroll_active = false
         what.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        what.text = "The deck's verses, Persian translation and recitations come from quran.makarem.ir, carried unchanged from the deck package."
-        what.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-        what.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        what.add_theme_color_override("font_color", ThemeScript.INK)
+        what.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        what.text = (
+                "The deck's verses, Persian translation and recitations come from "
+                + "[url=https://quran.makarem.ir/]quran.makarem.ir[/url], carried unchanged from the deck package."
+        )
+        what.add_theme_font_override("normal_font", ThemeScript.vazir(ThemeScript.CAPTION))
+        what.add_theme_font_size_override("normal_font_size", ThemeScript.CAPTION)
+        what.add_theme_color_override("default_color", ThemeScript.INK)
+        # Selection lets a user copy the line; the link opens in the browser.
+        what.selection_enabled = true
+        what.meta_clicked.connect(func(meta: Variant) -> void: OS.shell_open(str(meta)))
         box.add_child(what)
 
         var open := Button.new()
@@ -361,7 +372,7 @@ func _about() -> Control:
         label.name = "About"
         label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        label.text = "QuranTathbit · a quiet memorisation companion\nScheduling follows Anki's SM-2"
+        label.text = "QuranTathbit v%s\na quiet memorisation companion" % VersionScript.VERSION
         label.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
         label.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
         label.add_theme_color_override("font_color", ThemeScript.INK_SOFT)

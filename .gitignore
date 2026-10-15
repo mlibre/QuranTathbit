@@ -15,3 +15,9 @@ keystores/
 # repo. tools/verify_deck.py proves the deck is byte-identical to it when
 # it is present, and prints a clean "skip" when it is not.
 quran-cards-2026-10-14.apkg
+
+# Node / npm locals: package.json and start.js ARE committed (they ARE the
+# package), but anything npm pulls or builds locally is not.
+node_modules/
+npm-debug.log*
+.npm/

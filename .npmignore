@@ -1,0 +1,18 @@
+# The npm package ships only the files listed in package.json's `files` array.
+# This file is a belt-and-braces safety: even if a stray file slips in, npm
+# will not include it.
+*
+!index.html
+!index.js
+!index.wasm
+!index.pck
+!index.icon.png
+!index.apple-touch-icon.png
+!index.png
+!index.audio.worklet.js
+!index.audio.position.worklet.js
+!decks/**
+!start.js
+!README.npm.md
+!LICENSE
+!package.json

@@ -34,3 +34,15 @@ No other source is used for the card data. That data belongs to its source
 above and is not itself licensed under the MIT terms above; it is included
 solely as attributed content. The typefaces bundled in assets/fonts/ carry
 their own open licenses (see the OFL files beside them).
+
+------------------------------------------------------------------------------
+Algorithm attribution
+------------------------------------------------------------------------------
+
+The scheduling algorithm used by this application is a port of Anki's SM-2
+review scheduler (itself derived from the classic SuperMemo-2 algorithm),
+including Anki's deck defaults, ease adjustments, learning steps, lapse
+handling, interval fuzzing and review queue. Anki is licensed under the GNU
+AGPLv3; this project ships an independent reimplementation of the algorithm's
+math (no Anki source code is included) and is not affiliated with or endorsed
+by the Anki project. See https://apps.ankiweb.net/ for the original.

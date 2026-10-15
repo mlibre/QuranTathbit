@@ -1,193 +1,173 @@
 # QuranTathbit
 
-[![Web app](https://img.shields.io/badge/play_in_browser-github_pages-1E6B52)](https://mlibre.github.io/QuranTathbit/)
-[![CI](https://github.com/mlibre/QuranTathbit/actions/workflows/pages.yml/badge.svg)](https://github.com/mlibre/QuranTathbit/actions/workflows/pages.yml)
+<div align="center">
 
-A quiet companion for keeping the Qur'an close. One deck, studied one card at a
-time, kept as plain folders and files, synced through your own GitHub repo.
+<img src="docs/media/qurantathbit_banner.svg" alt="QuranTathbit — a quiet companion for keeping the Qur'an close" width="800"/>
 
-Built with Godot 4.7 and GDScript. Runs on Android, Linux, Windows and the web
-from one codebase.
+[![Play in your browser](https://img.shields.io/badge/%E2%96%B6%EF%B8%8F%20Play%20in%20your%20browser-GitHub%20Pages-1E6B52?style=for-the-badge&labelColor=14513D)](https://mlibre.github.io/QuranTathbit/)
+[![Download](https://img.shields.io/badge/Download-Releases-C29A3B?style=for-the-badge&labelColor=14513D)](https://github.com/mlibre/QuranTathbit/releases)
+[![Web build](https://img.shields.io/github/actions/workflow/status/mlibre/QuranTathbit/pages.yml?branch=main&style=for-the-badge&label=web%20build&labelColor=14513D)](https://github.com/mlibre/QuranTathbit/actions/workflows/pages.yml)
+[![npm](https://img.shields.io/badge/npm-qurantathbit-C29A3B?style=for-the-badge&labelColor=14513D)](https://www.npmjs.com/package/qurantathbit)
+![Made with Godot](https://img.shields.io/badge/made%20with-Godot%204.7-478cbf?style=for-the-badge&labelColor=14513D)
 
-## What it is
+*a quiet companion for keeping the Qur'an close — one deck, one card at a time, with your own GitHub as the cloud.*
 
-- **One deck, no deck manager.** There is nothing to create, name, import or
-  browse. The deck ships with the app; you study it.
-- **Anki's learning math.** The scheduler is a faithful port of Anki's SM-2
-  (the classic SuperMemo-2 algorithm with Anki's exact parameters): again
-  −0.20 ease, hard −0.15, easy +0.15, hard factor 1.2, easy bonus 1.3,
-  learning steps 1m/10m, graduating at 1 day, easy at 4, lapse multiplier 0,
-  maximum interval 100 years, and Anki's fuzz so cards do not all return on
-  the same day.
+</div>
+
+A small, calm app for memorising the Qur'an. Open it, study the card in front
+of you, mark how well it went, come back tomorrow. That is the whole thing —
+no account on someone else's server, no cloud you cannot see, no deck to build
+or import. Your deck lives as folders and files on your own machine, and if
+you want it on your phone too, it lives as the same folders and files on your
+own private GitHub repository.
+
+The verses, the Persian translation, and the recitation of every card come
+from [quran.makarem.ir](https://quran.makarem.ir) — and from nowhere else.
+See the credits and the [LICENSE](LICENSE) for the full attribution.
+
+## ▶️ Play it in your browser
+
+The web build is published automatically — nothing to install, nothing to sign
+up for:
+
+### **[▶️ Open QuranTathbit](https://mlibre.github.io/QuranTathbit/)**
+
+The page opens with a 1 MB app and streams each recitation from the site on
+demand, so the first card is in front of you in seconds. Runs on any modern
+browser — desktop, laptop, tablet, or phone.
+
+> In a browser you sign in to GitHub sync by pasting a personal access token
+> (GitHub's sign-in page does not allow cross-origin requests). On desktop and
+> Android the full device-flow sign-in works. Both paths reach the same place.
+
+## ⬇️ Download it for your computer
+
+Grab a build from the
+[**Releases**](https://github.com/mlibre/QuranTathbit/releases) page:
+
+| Platform | File | How to run |
+| --- | --- | --- |
+| **Windows** | `QuranTathbit-Windows.zip` → `QuranTathbit.exe` | unzip anywhere, double-click |
+| **Linux** | `QuranTathbit-Linux.zip` → `QuranTathbit.x86_64` | `chmod +x`, then run |
+| **Android** | `QuranTathbit-Android.apk` | sideload; allow installs from this source when asked |
+
+No installer, no dependencies, no account: the download *is* the app.
+
+### Run from source
+
+Any machine with [Godot 4.7](https://godotengine.org/download) can run the
+project from this repository:
+
+```bash
+godot --headless --path . --import   # once, after a fresh clone
+godot --path .                       # then open and press F5
+```
+
+### Use it through npm
+
+For developers who prefer the npm route, the web build is also published as an
+npm package — install it and serve it from anywhere:
+
+```bash
+npx qurantathbit        # downloads the web build and serves it at http://localhost:8080
+```
+
+or
+
+```bash
+npm install qurantathbit
+node node_modules/qurantathbit/start.js
+```
+
+## About the app
+
+- **One deck, no deck manager.** The deck ships with the app — 99 cards from
+  Al-Fātiḥah and Al-Baqarah, each one a verse, its Persian translation, and a
+  recitation. There is nothing to create, name, import, or browse. You study
+  what is there.
+- **Spaced repetition that learns how well you remember.** Each card knows
+  when to come back: soon if it was hard, later if it was easy, with a small
+  random nudge so the deck does not all return on the same day. The numbers
+  follow the well-known SM-2 review algorithm; see the
+  [LICENSE](LICENSE) for the attribution.
 - **Cards are folders and files.** A deck is a folder; a card is a folder of
-  markdown plus its media. No database, no import, no proprietary format —
-  every card is something you can read, edit and diff in any editor on any
-  machine.
-- **Sync is your own GitHub repo.** Sign in with GitHub's OAuth device flow
-  (or paste a personal token) and the deck lives in your private repository as
-  the same folders and files. Phone, laptop and browser stay in step.
-- **The browser stays light.** The web build ships the deck's text in its .pck
-  (under a megabyte) and streams each recitation from `decks/quran/` beside
-  `index.html` on demand, so the page opens fast and the audio is where it
-  needs to be, when it needs to be.
+  plain markdown plus its media. No database, no proprietary format — every
+  card is something you can read, edit, and diff in any editor on any machine.
+- **Sync is your own GitHub repo.** Sign in with GitHub (the OAuth device
+  flow, or a pasted token) and the deck lives in a private repository you
+  own, as the same folders and files. Phone, laptop, and browser stay in step;
+  the merge is card-by-card, so two devices that studied offline both keep
+  their work when they meet.
+- **The browser stays light.** The web build ships the deck's text in its app
+  (about 1 MB) and streams each recitation from the site beside it, so the
+  page opens fast and the audio is where it needs to be, when it needs to be.
+- **Copy what you read.** Every verse and every translation is selectable —
+  hold the mouse and drag, or long-press on a touch screen, the way every
+  other reader works. Paste into your notes, your chat, anywhere.
+- **Quiet by design.** No streaks, no leaderboards, no notifications shouting
+  for attention. The home screen says how many cards are waiting and one
+  button to start. That is the whole interface.
 
-## The deck on disk
+## How a study session feels
 
-```
-quran/
-  deck.json                  {"format": 1, "name": "Quran", "cards": [...]}
-  001/
-    front.md                 the question
-    back.md                  the answer
-    001001.mp3               media named from the markdown
-  002/
-    ...
-  progress.json              what you have learned, per card
-```
+1. **Home** — the deck's name, today's waiting count, one big **Study** button.
+2. **Question** — the front of the card: the surah and āyāt in Arabic, set in
+   Amiri at a size you can read across the room. Below it a small gold button
+   plays the recitation. Press **Space** (or the **Show answer** button) when
+   you are ready.
+3. **Answer** — the back of the card: the verse, the makarem.ir Persian
+   translation, the recitation again. Four buttons ask how it went —
+   **Again**, **Hard**, **Good**, **Easy** — each carrying its next interval
+   plainly, so the cost of each choice is visible before you make it.
+4. **Rest** — when the queue is empty, a small card says so and tells you to
+   come back tomorrow. Progress is saved automatically.
 
-`front.md` and `back.md` are plain markdown. The app understands paragraphs,
-`**bold**`, `*italic*`, `[links](https://…)` and `![name](name)` media
-references — an audio reference becomes a play button, an image becomes a
-picture. A card's Arabic verses are set in Amiri at a size meant to be read
-across the room; Persian translations sit beneath them in Vazirmatn; the
-interface itself wears Vazirmatn. Anything the markdown names is resolved next
-to the markdown, so a card folder is self-contained.
-
-Progress lives in `progress.json` beside `deck.json` — one entry per card id.
-Two devices that studied different cards merge cleanly when they sync (more
-reviews wins, the later answer breaks ties).
-
-The bundled deck is 99 cards from Al-Fātiḥah and Al-Baqarah: the front names
-the surah and āyāt, the back carries the verse, the makarem.ir translation, and
-the recitation as audio.
-
-## Sync, in one paragraph
+## Sync, in plain words
 
 On **Settings → Connect GitHub** the app shows a short code; you type it at
-`github.com/login/device` on any device you trust, and the app is signed in. On
-first sync it creates a private repository named `quran-tathbit` (renameable)
-and pushes the deck. After that, each sync is a three-way merge per file keyed
-on the last-synced checksum: a file changed only here is pushed, a file changed
-only there is pulled, a file changed on both sides keeps your local edit
-(cards) or merges card by card (progress). Anything else in your repo is left
-alone.
+`github.com/login/device` on any device you trust, and the app is signed in.
+On the first sync it creates a private repository named `quran-tathbit`
+(renameable) and pushes the deck. After that, every sync is a three-way merge:
+what changed only here is pushed, what changed only there is pulled, what
+changed on both sides keeps your local edit (for cards) or merges card by card
+(for progress). Anything else in your repo is left alone.
 
-Tokens are stored in the platform's user-data folder. The card content itself
-is never encrypted — that is the point of a deck you can read.
-
-While a sync runs a small overlay covers the screen with a plain phase ("Signing
+A small overlay covers the screen while sync runs, with a plain phase ("Signing
 in to GitHub", "Fetching what changed", …) and a progress bar that knows how
 far along it is — so the first sync, which can take a minute against a fresh
-repo, never looks frozen. A sync where nothing moved says so plainly instead of
-silently finishing.
+repo, never looks frozen.
 
-### Signing in
+Forking the project and want your own GitHub app? Every field to fill into
+the github.com form is written out in [docs/OAUTH_SETUP.md](docs/OAUTH_SETUP.md).
 
-Sign-in is wired to the project's own OAuth app out of the box: the device-flow
-client id (`Ov23liUgUybWeux2DCcF`, a public value by design) ships inside
-`scripts/net/github_auth.gd`, so **Settings → Connect GitHub** works in every
-build with no extra setup. A pasted classic token with `repo` scope is still
-accepted as an alternative (and is the reliable path in browsers, where
-cross-origin rules can block the device-flow endpoints).
+## Keyboard shortcuts
 
-Forking the project? Register your own OAuth app — every field to put into the
-github.com form is written out in
-[docs/OAUTH_SETUP.md](docs/OAUTH_SETUP.md) — then paste your client id over
-the constant in `scripts/net/github_auth.gd`.
-
-## Scripts
-
-| path | what it holds |
+| Key | What it does |
 | --- | --- |
-| `scripts/main.gd` | the app root: deck install, settings, session, screens |
-| `scripts/data/deck.gd` | a deck as folders and files; loads and saves progress |
-| `scripts/data/card.gd` | one card: question, answer, media, scheduling state |
-| `scripts/data/scheduler.gd` | Anki's SM-2 math, ported |
-| `scripts/data/settings.gd` | the one small settings file |
-| `scripts/net/http_client.gd` | the app's only HTTP path |
-| `scripts/net/github_auth.gd` | the OAuth device flow |
-| `scripts/net/github_sync.gd` | the three-way merge with GitHub |
-| `scripts/ui/theme.gd` | palette, typefaces, script detection |
-| `scripts/ui/markdown.gd` | the card markdown subset |
-| `scripts/ui/card_view.gd` | renders a card side |
-| `scripts/ui/home.gd` | the one front door |
-| `scripts/ui/study.gd` | a session: question, answer, four buttons |
-| `scripts/ui/sync_overlay.gd` | the calm progress screen shown while sync runs |
-| `scripts/ui/settings_screen.gd` | connect, name the repo, sync |
-
-## Running it
-
-```bash
-godot --path .            # run on the desktop
-godot --headless --path . --import   # import assets once after a fresh clone
-```
-
-Export presets cover **Web**, **Windows**, **Linux** and **Android**; artifacts
-land in `builds/`. Every push to `main` runs the battery and publishes the web
-build to <https://mlibre.github.io/QuranTathbit/>; a tag `v*` additionally
-builds Windows, Linux and Android and attaches them to a GitHub release.
-
-## Downloading a build
-
-- **Web** — <https://mlibre.github.io/QuranTathbit/> (nothing to install).
-- **Windows / Linux / Android** — the latest release's assets: unzip and run
-  the executable, or install the APK (self-signed, so allow installs from this
-  source when your phone asks).
-- **From source** — clone, `godot --headless --path . --import` once, then
-  open in Godot 4.7 or export with the presets above.
-
-## Tests
-
-```bash
-scripts/check_indent.sh    # indentation guard
-tools/battery.sh           # the regression battery
-tools/verify_deck.py       # the deck is the package's, byte for byte
-```
-
-The battery runs every `tests/regression_*.gd` suite twice over: once in the
-machine's current state, and once with `.godot/global_script_class_cache.cfg`
-removed — the state of any machine that pulled new classes but has not opened
-the editor since. A suite is green only if it passes both ways. See
-`docs/TESTING.md`.
-
-`tools/verify_deck.py` re-extracts `quran-cards-2026-10-14.apkg` into a
-scratch folder and compares every shipped file with the extraction: the
-markdown and media must be byte-identical, and `deck.json` may differ only by
-the deck's name label. CI runs it before every deploy and release, so a deck
-that drifted from the package — by hand or by accident — fails the build
-instead of shipping. Needs `zstandard` (`pip install zstandard`) like the
-converter. The 12 MB `.apkg` itself is intentionally not committed; the deck
-was proven byte-identical at introduction and `deck.json` records the source.
-With the package absent, the script prints a single `skip` line and exits 0;
-drop the developer's local copy back into the root to re-run the proof.
-
-## Converting an Anki deck
-
-The app never reads Anki's formats. `tools/apkg_to_deck.py` converts one once,
-as a developer tool, and writes the folder layout above:
-
-```bash
-python3 tools/apkg_to_deck.py quran-cards-2026-10-14.apkg assets/decks/quran \
-  --source https://quran.makarem.ir/
-```
-
-Needs `zstandard` (or the `zstd` binary) for modern packages, which compress
-both the collection and its media.
-
-## Fonts
-
-`assets/fonts/` ships two open-licensed typefaces, licenses beside them:
-
-- **Amiri** — a Naskh typeface cut for Quranic text, for the verses.
-- **Vazirmatn** — a calm Persian sans, for the translations and the interface.
+| **Space** / **Enter** | show the answer, then answer **Good** |
+| **1** – **4** | answer **Again**, **Hard**, **Good**, **Easy** |
+| **Esc** | close the session |
 
 ## Credits
 
-- **Card data** — the verses, the Persian translation and the recitations come
-  from [quran.makarem.ir](https://quran.makarem.ir), extracted from the public
-  `quran-cards-2026-10-14.apkg` export. No other source is used for card
-  content; `deck.json` records the source beside the cards it describes. See
-  the attribution section of [LICENSE](LICENSE).
+- **Card data** — the verses, the Persian translation, and the recitations
+  come from [quran.makarem.ir](https://quran.makarem.ir), extracted from the
+  public `quran-cards-2026-10-14.apkg` export. No other source is used for
+  card content; `deck.json` records the source beside the cards it describes.
+  See the attribution section of [LICENSE](LICENSE).
 - **Code** — MIT, as laid out in [LICENSE](LICENSE).
-- **Typefaces** — Amiri and Vazirmatn, each under its SIL OFL license in
-  `assets/fonts/`.
+- **Algorithm** — the SM-2 review scheduler; see the algorithm attribution
+  section of [LICENSE](LICENSE).
+- **Typefaces** — Amiri (Naskh, for the Arabic verses) and Vazirmatn (Persian
+  sans, for the translations and the interface), each under its SIL OFL
+  license in `assets/fonts/`.
+
+## 🇵🇸 In support of Palestine
+
+This project stands with Palestine. If you are able, please consider donating
+to [UNRWA](https://www.unrwa.org) or a trusted aid organization of your
+choice.
+
+The people of Palestine endure daily suffering and loss, too often unseen and
+unhelped. They are asking for support — and we can give our voice, our care,
+and our help. Even a small act can matter. 🤲

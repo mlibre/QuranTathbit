@@ -1,0 +1,46 @@
+{
+  "name": "qurantathbit",
+  "version": "1.0.2",
+  "description": "A quiet companion for keeping the Qur'an close — one deck, one card at a time, with your own GitHub as the cloud. Web build served from any static host or `npx qurantathbit`.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mlibre/QuranTathbit.git"
+  },
+  "homepage": "https://mlibre.github.io/QuranTathbit/",
+  "bugs": {
+    "url": "https://github.com/mlibre/QuranTathbit/issues"
+  },
+  "keywords": [
+    "quran",
+    "islam",
+    "memorisation",
+    "flashcards",
+    "spaced-repetition",
+    "godot",
+    "web-game"
+  ],
+  "bin": {
+    "qurantathbit": "start.js"
+  },
+  "files": [
+    "index.html",
+    "index.js",
+    "index.wasm",
+    "index.pck",
+    "index.icon.png",
+    "index.apple-touch-icon.png",
+    "index.png",
+    "index.audio.worklet.js",
+    "index.audio.position.worklet.js",
+    "decks/",
+    "README.npm.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node start.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

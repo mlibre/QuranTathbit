@@ -1,0 +1,86 @@
+name: Publish to npm
+
+# Builds the web export, lays the recitations beside it (the way the Pages
+# workflow does), and publishes the result to npm as the `qurantathbit` package.
+# A user can then `npx qurantathbit` and get the app at localhost:8080, or
+# install it as a dependency and serve the files from their own host.
+#
+# Runs on every `v*` tag (the same tag that drives the desktop release builds)
+# so each release ships a fresh npm package; also runnable by hand from the
+# Actions tab.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot 4.7.2 and templates
+        run: |
+          curl -sL -o godot.zip https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          unzip -q godot.zip && sudo install -m 755 Godot_v4.7.2-stable_linux.x86_64 /usr/local/bin/godot
+          curl -sL -o templates.tpz https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz
+          mkdir -p ~/.local/share/godot/export_templates
+          unzip -q templates.tpz -d tpl && mv tpl/templates ~/.local/share/godot/export_templates/4.7.2.stable
+          godot --version
+
+      - name: Run the regression battery
+        run: |
+          godot --headless --path . --import
+          tools/battery.sh
+
+      - name: Verify the deck against the package
+        run: |
+          python3 -m pip install --quiet zstandard
+          python3 tools/verify_deck.py
+
+      - name: Export the web build
+        run: |
+          mkdir -p builds/web
+          touch builds/.gdignore
+          godot --headless --path . --export-release "Web" builds/web/index.html
+
+      # The web build's .pck carries the deck's text; the audio streams from
+      # decks/quran/ beside index.html. Both must land in the npm package.
+      - name: Lay the recitations beside the app
+        run: |
+          mkdir -p builds/web/decks
+          cp -r assets/decks/quran builds/web/decks/quran
+          find builds/web/decks -type f ! -name '*.mp3' -delete
+          find builds/web/decks -type d -empty -delete
+
+      - name: Stage the npm package
+        run: |
+          mkdir -p pkg
+          cp builds/web/index.html builds/web/index.js builds/web/index.wasm \
+                builds/web/index.pck builds/web/index.png \
+                builds/web/index.icon.png builds/web/index.apple-touch-icon.png \
+                builds/web/index.audio.worklet.js builds/web/index.audio.position.worklet.js \
+                pkg/ 2>/dev/null || true
+          cp -r builds/web/decks pkg/decks
+          cp start.js pkg/start.js
+          cp README.npm.md pkg/README.npm.md
+          cp LICENSE pkg/LICENSE
+          cp package.json pkg/package.json
+          # Show what we are about to publish, so the log is auditable.
+          ls -la pkg
+          du -sh pkg
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org/"
+
+      - name: Publish to npm
+        working-directory: pkg
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
