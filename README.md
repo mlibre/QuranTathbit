@@ -33,12 +33,15 @@ up for:
 ### **[▶️ Open QuranTathbit](https://mlibre.github.io/QuranTathbit/)**
 
 The page opens with a 1 MB app and streams each recitation from the site on
-demand, so the first card is in front of you in seconds. Runs on any modern
-browser — desktop, laptop, tablet, or phone.
+demand. The engine rides compressed — about 10 MB the first visit — and the
+app then caches itself, so it opens instantly and works offline afterwards.
+Runs on any modern browser — desktop, laptop, tablet, or phone.
 
-> In a browser you sign in to GitHub sync by pasting a personal access token
-> (GitHub's sign-in page does not allow cross-origin requests). On desktop and
-> Android the full device-flow sign-in works. Both paths reach the same place.
+> In a browser you sign in with a one-minute token: press **Connect GitHub**
+> and the app walks you through it (GitHub's sign-in page cannot be opened
+> from another site — a browser cannot change that, so the app opens the
+> token form with everything prefilled instead). On desktop and Android the
+> full device-code sign-in works.
 
 ## ⬇️ Download it for your computer
 
@@ -99,11 +102,13 @@ node node_modules/qurantathbit/start.js
   the merge is card-by-card, so two devices that studied offline both keep
   their work when they meet.
 - **The browser stays light.** The web build ships the deck's text in its app
-  (about 1 MB) and streams each recitation from the site beside it, so the
-  page opens fast and the audio is where it needs to be, when it needs to be.
-- **Copy what you read.** Every verse and every translation is selectable —
-  hold the mouse and drag, or long-press on a touch screen, the way every
-  other reader works. Paste into your notes, your chat, anywhere.
+  (about 1 MB), serves the engine compressed (about 10 MB the first visit)
+  and streams each recitation from the site beside it. After the first visit
+  the app is cached and opens offline.
+- **Copy what you read.** Every verse, every translation, and every
+  explanation on every screen is selectable — hold the mouse and drag, or
+  long-press on a touch screen, the way every other reader works. Paste into
+  your notes, your chat, anywhere.
 - **Quiet by design.** No streaks, no leaderboards, no notifications shouting
   for attention. The home screen says how many cards are waiting and one
   button to start. That is the whole interface.

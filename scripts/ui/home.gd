@@ -2,6 +2,8 @@ class_name HomeScreen
 extends Control
 const ThemeScript := preload("res://scripts/ui/theme.gd")
 const DeckScript := preload("res://scripts/data/deck.gd")
+const SchedulerScript := preload("res://scripts/data/scheduler.gd")
+const MarkdownScript := preload("res://scripts/ui/markdown.gd")
 
 ## The only front door: the deck's name, what is waiting today, and the one
 ## button that matters. Everything else on this screen is a quiet second
@@ -12,6 +14,7 @@ signal sync_pressed
 signal settings_pressed
 
 var _counts := {"due": 0, "new": 0, "learned": 0}
+var _deck_of_last_setup: DeckScript
 
 func _ready() -> void:
         _build()
@@ -21,6 +24,7 @@ func setup(deck: DeckScript, counts: Dictionary, sync_line: String, connected: b
         if not is_node_ready():
                 await ready
         _counts = counts
+        _deck_of_last_setup = deck
         var title: Label = get_node("Margin/Column/DeckCard/Box/Title")
         var caption: Label = get_node("Margin/Column/DeckCard/Box/Caption")
         title.text = deck.name
@@ -46,8 +50,44 @@ func setup(deck: DeckScript, counts: Dictionary, sync_line: String, connected: b
         var sync_caption: Label = get_node("Margin/Column/SyncLine")
         sync_caption.text = sync_line
 
+        # The one line that answers "what am I about to study?": the next
+        # card's own heading, read from its front, dressed for its script.
+        var next_up: Label = get_node("Margin/Column/DeckCard/Box/NextUp")
+        var reference := _next_reference()
+        next_up.visible = not reference.is_empty()
+        if not reference.is_empty():
+                next_up.text = "Next up · %s" % reference
+                var script := ThemeScript.script_of(reference)
+                next_up.add_theme_font_override("font", ThemeScript.font_for(script, ThemeScript.BODY))
+                next_up.add_theme_font_size_override("font_size", _size_for(script))
+                next_up.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
+
+## The next card's heading: the first line of its front, plain text. The
+## scheduler's queue already knows which card is truly next -- due before new --
+## so this is read from the queue, not guessed from the deck's order.
+func _next_reference() -> String:
+        if _counts["due"] + _counts["new"] == 0:
+                return ""
+        var queue: Array = SchedulerScript.queue(_deck_of_last_setup, int(Time.get_unix_time_from_system()))
+        if queue.is_empty():
+                return ""
+        var front: String = queue[0].front
+        for line in front.split("\n"):
+                var plain := MarkdownScript.plain(line).strip_edges()
+                if not plain.is_empty():
+                        return plain
+        return ""
+
+func _size_for(script: String) -> int:
+        if script == "arabic":
+                return 24
+        if script == "persian":
+                return 19
+        return ThemeScript.BODY
+
 func _build() -> void:
         set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        add_child(_backdrop())
         var margin := MarginContainer.new()
         margin.name = "Margin"
         margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -87,27 +127,53 @@ func _build() -> void:
         sync_line.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
         column.add_child(sync_line)
 
+## A slow paper gradient behind everything: the screen breathes top-to-bottom
+## instead of sitting on one flat colour.
+func _backdrop() -> Control:
+        var rect := ColorRect.new()
+        rect.name = "Backdrop"
+        rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        var gradient := Gradient.new()
+        gradient.colors = PackedColorArray([Color("#FBF8F0"), Color("#F0E8D5")])
+        var texture := GradientTexture2D.new()
+        texture.gradient = gradient
+        texture.fill_from = Vector2(0, 0)
+        texture.fill_to = Vector2(0, 1)
+        rect.color = Color.WHITE
+        rect.texture = texture
+        return rect
+
 func _wordmark() -> Control:
         var row := CenterContainer.new()
         row.name = "Wordmark"
-        row.custom_minimum_size = Vector2(0, 64)
+        row.custom_minimum_size = Vector2(0, 72)
+        var stack := VBoxContainer.new()
+        stack.alignment = BoxContainer.ALIGNMENT_CENTER
+        stack.add_theme_constant_override("separation", 8)
         var label := Label.new()
         label.text = "QuranTathbit"
         label.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.TITLE, true))
         label.add_theme_font_size_override("font_size", ThemeScript.TITLE)
         label.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
-        row.add_child(label)
+        stack.add_child(label)
+        var rule := PanelContainer.new()
+        rule.custom_minimum_size = Vector2(46, 3)
+        rule.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        rule.add_theme_stylebox_override("panel", ThemeScript.soft_stylebox(ThemeScript.GOLD, 2))
+        stack.add_child(rule)
+        row.add_child(stack)
         return row
 
 func _deck_card() -> Control:
         var card := PanelContainer.new()
         card.name = "DeckCard"
         card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-        card.custom_minimum_size = Vector2(0, 92)
+        card.custom_minimum_size = Vector2(0, 112)
         card.add_theme_stylebox_override("panel", ThemeScript.card_stylebox())
         var box := VBoxContainer.new()
         box.name = "Box"
         box.alignment = BoxContainer.ALIGNMENT_CENTER
+        box.add_theme_constant_override("separation", 6)
         card.add_child(box)
 
         var title := Label.new()
@@ -125,6 +191,15 @@ func _deck_card() -> Control:
         caption.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
         caption.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
         box.add_child(caption)
+
+        var next_up := Label.new()
+        next_up.name = "NextUp"
+        next_up.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        next_up.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        next_up.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY))
+        next_up.add_theme_font_size_override("font_size", ThemeScript.BODY)
+        next_up.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
+        box.add_child(next_up)
         return card
 
 func _stats() -> Control:
@@ -141,7 +216,7 @@ func _pill(title: String, key: String) -> Control:
         var pill := PanelContainer.new()
         pill.name = title
         pill.custom_minimum_size = Vector2(104, 74)
-        pill.add_theme_stylebox_override("panel", ThemeScript.soft_stylebox(ThemeScript.GREEN_SOFT))
+        pill.add_theme_stylebox_override("panel", ThemeScript.soft_stylebox(_pill_bg(key)))
         var box := VBoxContainer.new()
         box.name = "Box"
         box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -152,7 +227,7 @@ func _pill(title: String, key: String) -> Control:
         value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         value.add_theme_font_override("font", ThemeScript.vazir(26, true))
         value.add_theme_font_size_override("font_size", 26)
-        value.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
+        value.add_theme_color_override("font_color", _pill_fg(key))
         box.add_child(value)
 
         var name := Label.new()
@@ -163,6 +238,26 @@ func _pill(title: String, key: String) -> Control:
         name.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
         box.add_child(name)
         return pill
+
+## Waiting wears gold, new wears green, learned rests on paper: the three
+## numbers a glance can tell apart before they are read.
+func _pill_bg(key: String) -> Color:
+        match key:
+                "due":
+                        return ThemeScript.GOLD_SOFT
+                "new":
+                        return ThemeScript.GREEN_SOFT
+                _:
+                        return Color(0.96, 0.95, 0.92)
+
+func _pill_fg(key: String) -> Color:
+        match key:
+                "due":
+                        return Color("#9C7A28")
+                "new":
+                        return ThemeScript.GREEN_DEEP
+                _:
+                        return ThemeScript.INK_SOFT
 
 func _study_button() -> Control:
         var button := Button.new()

@@ -57,13 +57,22 @@ jobs:
           find builds/web/decks -type f ! -name '*.mp3' -delete
           find builds/web/decks -type d -empty -delete
 
+      # The npm package serves from a local disk, where the raw .wasm costs
+      # nothing to transfer: no .gz is shipped (the page's fetch patch falls
+      # back to the raw file when the .gz is absent) and the service worker
+      # stays as generated, caching the raw file on first load. Only the
+      # installed-app colours are aligned with the Pages build.
       - name: Stage the npm package
         run: |
+          sed -i 's/"background_color":"#000000"/"background_color":"#faf5ed","theme_color":"#14513d"/' builds/web/index.manifest.json
           mkdir -p pkg
           cp builds/web/index.html builds/web/index.js builds/web/index.wasm \
                 builds/web/index.pck builds/web/index.png \
                 builds/web/index.icon.png builds/web/index.apple-touch-icon.png \
                 builds/web/index.audio.worklet.js builds/web/index.audio.position.worklet.js \
+                builds/web/index.manifest.json builds/web/index.service.worker.js \
+                builds/web/index.offline.html \
+                builds/web/index.144x144.png builds/web/index.180x180.png builds/web/index.512x512.png \
                 pkg/ 2>/dev/null || true
           cp -r builds/web/decks pkg/decks
           cp start.js pkg/start.js

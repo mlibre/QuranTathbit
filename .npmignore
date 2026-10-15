@@ -11,6 +11,12 @@
 !index.png
 !index.audio.worklet.js
 !index.audio.position.worklet.js
+!index.manifest.json
+!index.service.worker.js
+!index.offline.html
+!index.144x144.png
+!index.180x180.png
+!index.512x512.png
 !decks/**
 !start.js
 !README.npm.md

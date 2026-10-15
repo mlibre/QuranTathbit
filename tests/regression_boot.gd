@@ -117,7 +117,7 @@ func _check_settings(main: Node) -> void:
         _ok(settings != null, "settings opens")
         if settings == null:
                 return
-        var state: Label = settings.get_node("Margin/Scroll/Column/GitHub/Padding/Box/State")
+        var state: RichTextLabel = settings.get_node("Margin/Scroll/Column/GitHub/Padding/Box/State")
         _ok(state.text.length() > 0, "the GitHub section says where things stand")
         settings.closed.emit()
         await create_timer(0.4).timeout

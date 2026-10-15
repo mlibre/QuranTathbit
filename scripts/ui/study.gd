@@ -65,9 +65,40 @@ func _build() -> void:
         margin.add_child(column)
 
         column.add_child(_top_bar())
+        column.add_child(_session_bar())
         column.add_child(_surface())
         column.add_child(_answers())
+        if not DisplayServer.is_touchscreen_available():
+                column.add_child(_key_hints())
         column.add_child(_footer())
+
+## The session's own quiet progress: a thin bar under the top row that fills
+## as cards are answered. The count label above it stays for the exact number;
+## the bar is for the feeling of being nearly done.
+func _session_bar() -> Control:
+        var bar := ProgressBar.new()
+        bar.name = "SessionBar"
+        bar.show_percentage = false
+        bar.custom_minimum_size = Vector2(0, 5)
+        var track := StyleBoxFlat.new()
+        track.bg_color = ThemeScript.LINE
+        track.set_corner_radius_all(3)
+        var fill := StyleBoxFlat.new()
+        fill.bg_color = ThemeScript.GREEN
+        fill.set_corner_radius_all(3)
+        bar.add_theme_stylebox_override("background", track)
+        bar.add_theme_stylebox_override("fill", fill)
+        return bar
+
+func _key_hints() -> Control:
+        var label := Label.new()
+        label.name = "Keys"
+        label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        label.text = "Space reveals · 1–4 answer · Esc closes"
+        label.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
+        label.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+        label.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
+        return label
 
 func _top_bar() -> Control:
         var row := HBoxContainer.new()
@@ -198,6 +229,7 @@ func _show_front() -> void:
         var card: CardScript = _cards[_index]
         var progress: Label = get_node("Margin/Column/TopBar/Progress")
         progress.text = "%d / %d" % [_index + 1, _cards.size()]
+        (get_node("Margin/Column/SessionBar") as ProgressBar).value = 100.0 * float(_index) / float(_cards.size())
         _view.show_text(card.front, card.folder, true)
         ThemeScript.settle_in(_view)
         get_node("Margin/Column/Footer/ShowAnswer").visible = true
@@ -275,6 +307,7 @@ func _answer(button: String) -> void:
         _show_front()
 
 func _show_done() -> void:
+        (get_node("Margin/Column/SessionBar") as ProgressBar).value = 100.0
         var view: CardViewScript = get_node("Margin/Column/Surface/CardPanel/Padding/View")
         view.show_text("**Session complete**\n\nYou answered %d cards. Everything is saved.\n\nRest is part of learning." % _answered_count, "")
         ThemeScript.settle_in(view)

@@ -98,6 +98,25 @@ func _section(title: String) -> Control:
         label.add_theme_color_override("font_color", ThemeScript.GOLD)
         return label
 
+## Every line of explanation on this screen is a selectable RichTextLabel:
+## a person reads with their eyes and copies with their mouse, and neither
+## should wait for the other. One builder, so every line looks and behaves
+## the same everywhere on this screen.
+func _text(what: String, color: Color, size: int, center := false, bold := false) -> RichTextLabel:
+        var label := RichTextLabel.new()
+        label.selection_enabled = true
+        label.fit_content = true
+        label.scroll_active = false
+        label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        if center:
+                label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        label.add_theme_font_override("normal_font", ThemeScript.vazir(size, bold))
+        label.add_theme_font_size_override("normal_font_size", size)
+        label.add_theme_color_override("default_color", color)
+        label.text = what
+        return label
+
 func _github_body() -> Control:
         var card := PanelContainer.new()
         card.name = "GitHub"
@@ -114,12 +133,8 @@ func _github_body() -> Control:
         box.add_theme_constant_override("separation", 12)
         pad.add_child(box)
 
-        var state := Label.new()
+        var state := _text("", ThemeScript.INK, ThemeScript.BODY)
         state.name = "State"
-        state.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        state.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY))
-        state.add_theme_font_size_override("font_size", ThemeScript.BODY)
-        state.add_theme_color_override("font_color", ThemeScript.INK)
         box.add_child(state)
 
         var flow := VBoxContainer.new()
@@ -128,22 +143,12 @@ func _github_body() -> Control:
         flow.add_theme_constant_override("separation", 10)
         box.add_child(flow)
 
-        var code := Label.new()
+        var code := _text("", ThemeScript.GREEN_DEEP, 30, true, true)
         code.name = "Code"
-        code.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        code.add_theme_font_override("font", ThemeScript.vazir(30, true))
-        code.add_theme_font_size_override("font_size", 30)
-        code.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
         flow.add_child(code)
 
-        var hint := Label.new()
+        var hint := _text("Type this code at github.com/login/device, then wait here.", ThemeScript.INK_SOFT, ThemeScript.CAPTION, true)
         hint.name = "Hint"
-        hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        hint.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-        hint.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        hint.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
-        hint.text = "Type this code at github.com/login/device, then wait here."
         flow.add_child(hint)
 
         var open := Button.new()
@@ -204,7 +209,7 @@ func _github_body() -> Control:
         box.add_child(token_row)
         var token := LineEdit.new()
         token.name = "Token"
-        token.placeholder_text = "…or paste a token with repo scope"
+        token.placeholder_text = ("Paste the token GitHub shows you" if OS.has_feature("web") else "…or paste a token with repo scope")
         token.secret = true
         token.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         token.custom_minimum_size = Vector2(0, 44)
@@ -248,13 +253,8 @@ func _github_body() -> Control:
         sync.pressed.connect(func() -> void: sync_requested.emit())
         box.add_child(sync)
 
-        var note := Label.new()
+        var note := _text("", ThemeScript.INK_SOFT, ThemeScript.CAPTION, true)
         note.name = "SyncNote"
-        note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        note.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-        note.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        note.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
         box.add_child(note)
         return card
 
@@ -274,28 +274,16 @@ func _deck_body() -> Control:
         box.add_theme_constant_override("separation", 8)
         pad.add_child(box)
 
-        var name := Label.new()
+        var name := _text("", ThemeScript.INK, ThemeScript.BODY, false, true)
         name.name = "Name"
-        name.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY, true))
-        name.add_theme_font_size_override("font_size", ThemeScript.BODY)
-        name.add_theme_color_override("font_color", ThemeScript.INK)
         box.add_child(name)
 
-        var folder := Label.new()
+        var folder := _text("", ThemeScript.INK_SOFT, ThemeScript.CAPTION)
         folder.name = "Folder"
-        folder.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        folder.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-        folder.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        folder.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
         box.add_child(folder)
 
-        var note := Label.new()
+        var note := _text("Cards are folders on your disk. Edit them anywhere; sync carries them.", ThemeScript.INK_SOFT, ThemeScript.CAPTION)
         note.name = "Note"
-        note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        note.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-        note.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        note.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
-        note.text = "Cards are folders on your disk. Edit them anywhere; sync carries them."
         box.add_child(note)
         return card
 
@@ -357,25 +345,14 @@ func _source_body() -> Control:
         box.add_child(open)
 
         if OS.has_feature("web"):
-                var note := Label.new()
+                var note := _text("In the browser, recitations stream from this site while you study.", ThemeScript.INK_SOFT, ThemeScript.CAPTION)
                 note.name = "WebNote"
-                note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-                note.text = "In the browser, recitations stream from this site while you study."
-                note.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-                note.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-                note.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
                 box.add_child(note)
         return card
 
 func _about() -> Control:
-        var label := Label.new()
+        var label := _text("QuranTathbit v%s\na quiet memorisation companion" % VersionScript.VERSION, ThemeScript.INK_SOFT, ThemeScript.CAPTION, true)
         label.name = "About"
-        label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        label.text = "QuranTathbit v%s\na quiet memorisation companion" % VersionScript.VERSION
-        label.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-        label.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        label.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
         return label
 
 # --- state ---------------------------------------------------------------------
@@ -383,12 +360,12 @@ func _about() -> Control:
 ## The main screen reports how a sync went while Settings is the screen on
 ## top; the note sits under the Sync button and clears when asked again.
 func note_sync_result(text: String) -> void:
-        var note: Label = get_node_or_null("Margin/Scroll/Column/GitHub/Padding/Box/SyncNote")
+        var note: RichTextLabel = get_node_or_null("Margin/Scroll/Column/GitHub/Padding/Box/SyncNote")
         if note != null:
                 note.text = text
 
 func _refresh() -> void:
-        var state: Label = get_node("Margin/Scroll/Column/GitHub/Padding/Box/State")
+        var state: RichTextLabel = get_node("Margin/Scroll/Column/GitHub/Padding/Box/State")
         var connect: Button = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Buttons/Connect")
         var disconnect: Button = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Buttons/Disconnect")
         var repo: LineEdit = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Repo")
@@ -397,12 +374,14 @@ func _refresh() -> void:
                 state.text = "Connected as @%s" % _settings.owner
         elif _settings.has_token():
                 state.text = "Token saved"
+        elif OS.has_feature("web"):
+                state.text = "Not connected. In a browser you sign in with a one-minute token — press Connect GitHub and it walks you through."
         else:
                 state.text = "Not connected. Sync keeps your progress on your own GitHub repo."
         connect.visible = not _settings.has_token()
         disconnect.visible = _settings.has_token()
-        var name: Label = get_node("Margin/Scroll/Column/DeckInfo/Padding/Box/Name")
-        var folder: Label = get_node("Margin/Scroll/Column/DeckInfo/Padding/Box/Folder")
+        var name: RichTextLabel = get_node("Margin/Scroll/Column/DeckInfo/Padding/Box/Name")
+        var folder: RichTextLabel = get_node("Margin/Scroll/Column/DeckInfo/Padding/Box/Folder")
         name.text = "%s — %d cards" % [_deck.name, _deck.cards.size()]
         folder.text = _deck.folder
         note_sync_result("")
@@ -410,22 +389,27 @@ func _refresh() -> void:
 # --- the device flow ------------------------------------------------------------
 
 func _begin_device_flow() -> void:
+        # A browser can never reach GitHub's device-flow endpoints (they send
+        # no CORS headers), so on the web Connect takes the one-minute token
+        # path instead of trying and failing in front of the user.
+        if OS.has_feature("web"):
+                _begin_web_connect()
+                return
         if not _auth.is_configured():
-                var state: Label = get_node("Margin/Scroll/Column/GitHub/Padding/Box/State")
-                state.text = "This build has no GitHub app id yet. Add your OAuth app's client id to scripts/net/github_auth.gd, or paste a token below."
+                var state0: RichTextLabel = get_node("Margin/Scroll/Column/GitHub/Padding/Box/State")
+                state0.text = "This build has no GitHub app id yet. Add your OAuth app's client id to scripts/net/github_auth.gd, or paste a token below."
                 return
         var began: Dictionary = await _auth.begin(_http)
         var flow: VBoxContainer = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Flow")
-        var code: Label = flow.get_node("Code")
+        var code: RichTextLabel = flow.get_node("Code")
         var open: Button = flow.get_node("Open")
         var connect: Button = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Buttons/Connect")
         if began.has("error"):
-                var state: Label = get_node("Margin/Scroll/Column/GitHub/Padding/Box/State")
+                var state: RichTextLabel = get_node("Margin/Scroll/Column/GitHub/Padding/Box/State")
                 if OS.has_feature("web"):
-                        # GitHub's sign-in endpoints send no CORS headers, so
-                        # no browser build can ever reach them. Say so once,
-                        # plainly, and hand the user the path that works.
-                        state.text = "Browsers cannot open GitHub's sign-in page (cross-origin rules). Paste a personal access token with the repo scope below: GitHub, Settings, Developer settings, Personal access tokens, then Generate new token (classic)."
+                        # Unreachable on the web (the branch above), kept as a
+                        # safety net: say what works instead of what failed.
+                        state.text = "Browsers cannot open GitHub's sign-in page (cross-origin rules). Use Connect GitHub for the token steps instead."
                 else:
                         state.text = "Could not reach GitHub. Check your connection and try again."
                 return
@@ -464,6 +448,30 @@ func _pretty_code(code: String) -> String:
         if code.length() <= 4:
                 return code
         return "%s-%s" % [code.substr(0, 4), code.substr(4)]
+
+## The browser's way in: GitHub's sign-in page cannot be opened from another
+## site (cross-origin rules, and no static site can change that), so Connect
+## walks the one-minute token path instead. The button opens GitHub's token
+## form with the name and the permission prefilled; the user generates,
+## copies, pastes below, saves. Everything after -- sync included -- runs in
+## the browser against api.github.com, which does allow it.
+func _begin_web_connect() -> void:
+        var state: RichTextLabel = get_node("Margin/Scroll/Column/GitHub/Padding/Box/State")
+        state.text = "Signing in inside a browser takes a token — GitHub's sign-in page cannot be opened from another site, and no static site can change that. One minute, three steps:"
+        var flow: VBoxContainer = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Flow")
+        var code: RichTextLabel = flow.get_node("Code")
+        var hint: RichTextLabel = flow.get_node("Hint")
+        var open: Button = flow.get_node("Open")
+        code.visible = false
+        hint.text = (
+                "1. Press the button — GitHub opens with the form filled in: the name and the repo permission are already set.\n"
+                + "2. Generate the token, then copy the string it shows you.\n"
+                + "3. Paste it below and press Save."
+        )
+        open.text = "Create a token on GitHub"
+        _flow_uri = "https://github.com/settings/tokens/new?scopes=repo&description=QuranTathbit%20sync"
+        flow.visible = true
+        get_node("Margin/Scroll/Column/GitHub/Padding/Box/TokenRow/Token").grab_focus()
 
 func _finish(token: String) -> void:
         var who: Dictionary = await _auth.whoami(_http, token)

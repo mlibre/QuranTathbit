@@ -66,6 +66,23 @@ jobs:
           find builds/web/decks -type f ! -name '*.mp3' -delete
           find builds/web/decks -type d -empty -delete
 
+      # GitHub Pages serves the .wasm raw (no content-encoding): 39.5 MB over
+      # the wire for every first visit. gzip -9 makes it 10 MB; the page's
+      # head script (html/head_include) swaps the engine's fetch to the .gz
+      # and decompresses it in the browser, falling back to the raw file when
+      # the .gz is absent. The service worker should cache the bytes the page
+      # actually asks for -- the .gz -- so a returning visitor loads from the
+      # local cache instead of the network.
+      - name: Ship the engine compressed
+        run: |
+          test -f builds/web/index.wasm
+          gzip -9 -k builds/web/index.wasm
+          sed -i 's/"index.wasm"/"index.wasm.gz"/' builds/web/index.service.worker.js
+          grep -q '"index.wasm.gz"' builds/web/index.service.worker.js
+          # The installed app's title bar should wear the app's colours, not black.
+          sed -i 's/"background_color":"#000000"/"background_color":"#faf5ed","theme_color":"#14513d"/' builds/web/index.manifest.json
+          ls -la builds/web/index.wasm builds/web/index.wasm.gz
+
       # The .pck must carry the deck's text and none of its audio -- a 13 MB
       # smaller download before the first card is even seen -- and the audio
       # the app will stream must be waiting beside it. Cards reference their
@@ -75,6 +92,8 @@ jobs:
         run: |
           test -f builds/web/index.pck
           test -f builds/web/decks/quran/001/001001.mp3
+          test -f builds/web/index.wasm.gz
+          grep -q "index.wasm.gz" builds/web/index.html
           python3 - <<'PY'
           import sys
           data = open("builds/web/index.pck", "rb").read()
@@ -85,7 +104,11 @@ jobs:
               sys.exit("ERROR: the exported .pck embeds deck audio; the web build streams it from decks/ instead")
           if len(data) > 3_000_000:
               sys.exit("ERROR: the web .pck is %d bytes; the deck's audio should stream, not embed" % len(data))
-          print("web .pck carries the deck text (%d KB) and streams its audio from decks/" % (len(data) // 1024))
+          gz = len(open("builds/web/index.wasm.gz", "rb").read())
+          if gz > 15_000_000:
+              sys.exit("ERROR: index.wasm.gz is %d bytes; the compressed engine stopped being small" % gz)
+          raw = len(open("builds/web/index.wasm", "rb").read())
+          print("web .pck %d KB (text only); engine %d KB raw, %d KB on the wire" % (len(data)//1024, raw//1024, gz//1024))
           PY
 
       - name: Upload Pages artifact
