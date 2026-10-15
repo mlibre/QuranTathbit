@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="docs/media/qurantathbit_banner.svg" alt="QuranTathbit — a quiet companion for keeping the Qur'an close" width="800"/>
+<img src="docs/media/qurantathbit_banner.svg" alt="QuranTathbit — a calm app for memorizing the Qur'an" width="800"/>
 
 [![Play in your browser](https://img.shields.io/badge/%E2%96%B6%EF%B8%8F%20Play%20in%20your%20browser-GitHub%20Pages-1E6B52?style=for-the-badge&labelColor=14513D)](https://mlibre.github.io/QuranTathbit/)
 [![Download](https://img.shields.io/badge/Download-Releases-C29A3B?style=for-the-badge&labelColor=14513D)](https://github.com/mlibre/QuranTathbit/releases)
@@ -10,16 +10,10 @@
 [![npm](https://img.shields.io/badge/npm-qurantathbit-C29A3B?style=for-the-badge&labelColor=14513D)](https://www.npmjs.com/package/qurantathbit)
 ![Made with Godot](https://img.shields.io/badge/made%20with-Godot%204.7-478cbf?style=for-the-badge&labelColor=14513D)
 
-*a quiet companion for keeping the Qur'an close — one deck, one card at a time, with your own GitHub as the cloud.*
+*A calm app for memorizing the Qur'an*<br/>
+*Sync across devices*
 
 </div>
-
-A small, calm app for memorising the Qur'an. Open it, study the card in front
-of you, mark how well it went, come back tomorrow. That is the whole thing —
-no account on someone else's server, no cloud you cannot see, no deck to build
-or import. Your deck lives as folders and files on your own machine, and if
-you want it on your phone too, it lives as the same folders and files on your
-own private GitHub repository.
 
 The verses, the Persian translation, and the recitation of every card come
 from [quran.makarem.ir](https://quran.makarem.ir) — and from nowhere else.

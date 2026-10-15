@@ -33,11 +33,11 @@
     </g>
   </g>
 
-  <!-- the app's name and one quiet line -->
+  <!-- the app's name and its two quiet lines -->
   <g font-family="Vazirmatn, 'Segoe UI', sans-serif">
     <text x="260" y="170" font-size="78" font-weight="700" fill="#14513D">QuranTathbit</text>
-    <text x="264" y="218" font-size="26" fill="#5C6B62">a quiet companion for keeping the Qur&#x2019;n close</text>
-    <text x="264" y="252" font-size="20" fill="#5C6B62">one deck &#xb7; one card at a time &#xb7; your own GitHub as the cloud</text>
+    <text x="264" y="218" font-size="26" fill="#5C6B62">A calm app for memorizing the Qur&#x2019;n</text>
+    <text x="264" y="252" font-size="20" fill="#5C6B62">Sync across devices</text>
   </g>
 
   <!-- three small cards on the right, hinting at the study flow -->
@@ -75,11 +75,5 @@
       <rect x="80" y="0" width="34" height="14" rx="6" fill="none" stroke="#1E6B52" stroke-width="1.5"/>
       <rect x="120" y="0" width="34" height="14" rx="6" fill="none" stroke="#14513D" stroke-width="1.5"/>
     </g>
-  </g>
-
-  <!-- small "data: quran.makarem.ir" tag, bottom right -->
-  <g font-family="Vazirmatn, 'Segoe UI', sans-serif" font-size="14" fill="#9C7A28">
-    <rect x="1056" y="320" width="184" height="22" rx="11" fill="#F6EDD8" stroke="#C29A3B" stroke-width="0.8"/>
-    <text x="1148" y="335" text-anchor="middle">data: quran.makarem.ir</text>
   </g>
 </svg>
