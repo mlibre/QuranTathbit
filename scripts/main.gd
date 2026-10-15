@@ -152,8 +152,11 @@ func _run_sync() -> void:
                         line.text = "%s…" % text.capitalize()
         )
         overlay.queue_free()
-        _settings.last_sync = _now()
-        _settings.save()
+        # Only a finished sync may move the "last synced" clock: a failed run
+        # must leave the app honest about when it last heard from the repo.
+        if bool(result.get("ok", false)):
+                _settings.last_sync = _now()
+                _settings.save()
 
         # Progress may have merged in from another device; read the deck back.
         var reloaded: DeckScript = DeckScript.load(USER_DECK)

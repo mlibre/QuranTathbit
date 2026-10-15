@@ -1,5 +1,8 @@
 # QuranTathbit
 
+[![Web app](https://img.shields.io/badge/play_in_browser-github_pages-1E6B52)](https://mlibre.github.io/QuranTathbit/)
+[![CI](https://github.com/mlibre/QuranTathbit/actions/workflows/pages.yml/badge.svg)](https://github.com/mlibre/QuranTathbit/actions/workflows/pages.yml)
+
 A quiet companion for keeping the Qur'an close. One deck, studied one card at a
 time, kept as plain folders and files, synced through your own GitHub repo.
 
@@ -70,12 +73,16 @@ is never encrypted — that is the point of a deck you can read.
 
 ### Picking the client id
 
-`scripts/net/github_auth.gd` holds `CLIENT_ID`, empty by default. Create one
-OAuth app (GitHub → Settings → Developer settings → OAuth Apps → New
-application; the device flow needs no callback URL) and paste its client id —
-it is public by design, not a secret. With it empty the app says so plainly
-instead of failing mysteriously, and a pasted classic token with `repo` scope
-is always accepted as an alternative.
+The sign-in flow needs one OAuth app registration; every field to put in the
+github.com form, and where the client id goes, is written out in
+[docs/OAUTH_SETUP.md](docs/OAUTH_SETUP.md). In short: `scripts/net/github_auth.gd`
+holds `CLIENT_ID`, empty by default. Create one OAuth app (GitHub → Settings →
+Developer settings → OAuth Apps → New application; the device flow needs no
+callback URL) and paste its client id — it is public by design, not a secret.
+With it empty the app says so plainly instead of failing mysteriously, and a
+pasted classic token with `repo` scope is always accepted as an alternative
+(and is the reliable path in browsers, where cross-origin rules can block the
+device-flow endpoints).
 
 ## Scripts
 
@@ -104,7 +111,18 @@ godot --headless --path . --import   # import assets once after a fresh clone
 ```
 
 Export presets cover **Web**, **Windows**, **Linux** and **Android**; artifacts
-land in `builds/`.
+land in `builds/`. Every push to `main` runs the battery and publishes the web
+build to <https://mlibre.github.io/QuranTathbit/>; a tag `v*` additionally
+builds Windows, Linux and Android and attaches them to a GitHub release.
+
+## Downloading a build
+
+- **Web** — <https://mlibre.github.io/QuranTathbit/> (nothing to install).
+- **Windows / Linux / Android** — the latest release's assets: unzip and run
+  the executable, or install the APK (self-signed, so allow installs from this
+  source when your phone asks).
+- **From source** — clone, `godot --headless --path . --import` once, then
+  open in Godot 4.7 or export with the presets above.
 
 ## Tests
 
@@ -125,7 +143,8 @@ The app never reads Anki's formats. `tools/apkg_to_deck.py` converts one once,
 as a developer tool, and writes the folder layout above:
 
 ```bash
-python3 tools/apkg_to_deck.py quran-cards-2026-10-14.apkg assets/decks/quran
+python3 tools/apkg_to_deck.py quran-cards-2026-10-14.apkg assets/decks/quran \
+  --source https://quran.makarem.ir/
 ```
 
 Needs `zstandard` (or the `zstd` binary) for modern packages, which compress
@@ -140,6 +159,11 @@ both the collection and its media.
 
 ## Credits
 
-The deck content — verses, Persian translation and recitations — comes from
-[quran.makarem.ir](https://quran.makarem.ir), converted from the public
-`quran-cards-2026-10-14.apkg` export.
+- **Card data** — the verses, the Persian translation and the recitations come
+  from [quran.makarem.ir](https://quran.makarem.ir), extracted from the public
+  `quran-cards-2026-10-14.apkg` export. No other source is used for card
+  content; `deck.json` records the source beside the cards it describes. See
+  the attribution section of [LICENSE](LICENSE).
+- **Code** — MIT, as laid out in [LICENSE](LICENSE).
+- **Typefaces** — Amiri and Vazirmatn, each under its SIL OFL license in
+  `assets/fonts/`.

@@ -15,17 +15,27 @@ refreshed) and writes that layout:
         ...
 
 Usage:
-    python3 tools/apkg_to_deck.py DECK.apkg assets/decks/quran
+    python3 tools/apkg_to_deck.py DECK.apkg assets/decks/quran --source https://quran.makarem.ir/
 
-Reads `collection.anki2` when it holds real data (legacy exports, schema < 18);
-otherwise decompresses `collection.anki21b` (zstd), which is what modern Anki
-ships. Anki's HTML fields are flattened to markdown so the app's renderer can
-dress each kind of text the way it deserves. Media files are copied by name;
-a missing reference aborts the run instead of silently shipping a broken card.
+Prefers `collection.anki21b` (zstd-compressed, what modern Anki ships -- modern
+packages stub the legacy `collection.anki2` with a "please update" note) and
+falls back to a real legacy collection. Anki's HTML fields are flattened to
+markdown so the app's renderer can dress each kind of text the way it
+deserves. Media files are copied by name and verified against the package's
+own sha1 checksums when it carries them; a missing or corrupt reference
+aborts the run instead of silently shipping a broken card.
+
+The written deck.json names the data's source when one is known:
+
+    {"format": 1, "name": ..., "source": "https://quran.makarem.ir/", "cards": [...]}
+
+Pass --source URL (or edit the json) to set it.
 """
 
 from __future__ import annotations
 
+import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -79,48 +89,97 @@ def zstd_decompress(data: bytes) -> bytes:
     return zstandard.ZstdDecompressor().stream_reader(io.BytesIO(data)).read()
 
 
+def connect_sqlite(path: Path) -> sqlite3.Connection:
+    """Open an Anki collection with its custom collation available.
+
+    Anki registers a `unicase` collation in every database it writes; schema-18
+    tables (fields, templates) put it in their primary keys, so any query there
+    dies with "no such collation sequence" unless a stand-in exists.
+    """
+    con = sqlite3.connect(path)
+    con.create_collation("unicase", lambda a, b: (a > b) - (a < b))
+    return con
+
+
 def load_collection(zf: zipfile.ZipFile, workdir: Path) -> Path:
     """Return a path to a usable collection.anki2, decompressing when needed."""
+    # Modern packages ship collection.anki21b and stub the legacy file with a
+    # "please update" note, so the compressed one is preferred when present.
+    if "collection.anki21b" in zf.namelist():
+        path = workdir / "collection.anki2"
+        path.write_bytes(zstd_decompress(zf.read("collection.anki21b")))
+        return path
     if "collection.anki2" in zf.namelist():
         candidate = workdir / "collection.anki2"
         candidate.write_bytes(zf.read("collection.anki2"))
-        con = sqlite3.connect(candidate)
+        con = connect_sqlite(candidate)
         try:
             notes = con.execute("select count(*) from notes").fetchone()[0]
-            tables = {
-                name
-                for (name,) in con.execute(
-                    "select name from sqlite_master where type='table'"
-                )
-            }
         finally:
             con.close()
-        # Modern packages stub the legacy file with a "please update" note.
-        if notes > 0 and ("notetypes" in tables or "models" in tables):
+        if notes > 0:
             return candidate
-    if "collection.anki21b" not in zf.namelist():
-        sys.exit("error: package has no collection to read")
-    path = workdir / "collection.anki2"
-    path.write_bytes(zstd_decompress(zf.read("collection.anki21b")))
-    return path
+    sys.exit("error: package has no collection to read")
 
 
-def read_media_names(zf: zipfile.ZipFile, workdir: Path) -> list[str]:
-    """Media names in zip-index order ('0', '1', ... -> '001001.mp3')."""
+def _pb_varint(data: bytes, i: int) -> tuple[int, int]:
+    value, shift = 0, 0
+    while True:
+        byte = data[i]
+        i += 1
+        value |= (byte & 0x7F) << shift
+        shift += 7
+        if not byte & 0x80:
+            return value, i
+
+
+def read_media_index(zf: zipfile.ZipFile) -> list[tuple[str, str | None]]:
+    """Media (name, sha1-or-None) in zip-index order ('0', '1', ... -> name).
+
+    Legacy packages keep a JSON map {"0": "name.mp3"}; modern ones zstd-compress
+    a protobuf list of entries (name = field 1, size = 2, sha1 = 3). The
+    checksums let each copied file be verified, not just copied.
+    """
     if "media" not in zf.namelist():
         return []
     raw = zf.read("media")
     if raw[:4] == b"\x28\xb5\x2f\xfd":  # zstd magic: schema-18 protobuf index
         raw = zstd_decompress(raw)
-        names = [
-            m.group(1).decode()
-            for m in re.finditer(rb"\n([\x20-\x7e]{4,}\.\w{2,4})", raw)
-        ]
-        if names:
-            return names
+        entries: list[tuple[str, str | None]] = []
+        i = 0
+        while i < len(raw):
+            tag, i = _pb_varint(raw, i)
+            if tag >> 3 != 1 or tag & 7 != 2:
+                sys.exit("error: unexpected media index layout")
+            length, i = _pb_varint(raw, i)
+            entry = raw[i : i + length]
+            i += length
+            name, sha1, j = "", None, 0
+            while j < len(entry):
+                etag, j = _pb_varint(entry, j)
+                field, wire = etag >> 3, etag & 7
+                if wire == 2:
+                    elen, j = _pb_varint(entry, j)
+                    value = entry[j : j + elen]
+                    j += elen
+                    if field == 1:
+                        name = value.decode("utf-8")
+                    elif field == 3:
+                        sha1 = value.hex()
+                elif wire == 0:
+                    _, j = _pb_varint(entry, j)
+                else:
+                    sys.exit(f"error: unexpected wire type {wire} in media index")
+            if not name:
+                sys.exit("error: media index entry without a name")
+            entries.append((name, sha1))
+        if entries:
+            return entries
         sys.exit("error: could not read the package's media index")
     mapping = json.loads(raw)
-    return [mapping[key] for key in sorted(mapping, key=int)]
+    return [
+        (mapping[key], None) for key in sorted(mapping, key=int)
+    ]
 
 
 def html_to_blocks(field_html: str) -> list[str]:
@@ -138,23 +197,26 @@ def html_to_blocks(field_html: str) -> list[str]:
     return blocks
 
 
-def convert(apkg: Path, out_dir: Path) -> None:
+def convert(apkg: Path, out_dir: Path, source: str = "") -> None:
     workdir = out_dir.parent / ".apkg_work"
     shutil.rmtree(workdir, ignore_errors=True)
     workdir.mkdir(parents=True)
     try:
         zf = zipfile.ZipFile(apkg)
         collection = load_collection(zf, workdir)
-        media_names = read_media_names(zf, workdir)
+        media_index = read_media_index(zf)
 
         blobs: dict[str, bytes] = {}
-        for index, name in enumerate(media_names):
+        for index, (name, sha1) in enumerate(media_index):
             try:
-                blobs[name] = zstd_decompress(zf.read(str(index)))
+                data = zstd_decompress(zf.read(str(index)))
             except KeyError:
                 sys.exit(f"error: package media {index} ({name}) is missing")
+            if sha1 is not None and hashlib.sha1(data).hexdigest() != sha1:
+                sys.exit(f"error: package media {name} failed its sha1 checksum")
+            blobs[name] = data
 
-        con = sqlite3.connect(collection)
+        con = connect_sqlite(collection)
         con.row_factory = sqlite3.Row
         try:
             tables = {
@@ -208,9 +270,11 @@ def convert(apkg: Path, out_dir: Path) -> None:
             )
             cards.append(f"{number:03d}")
 
+        deck_meta: dict = {"format": 1, "name": name, "cards": cards}
+        if source:
+            deck_meta["source"] = source
         (out_dir / "deck.json").write_text(
-            json.dumps({"format": 1, "name": name, "cards": cards}, ensure_ascii=False, indent=2)
-            + "\n",
+            json.dumps(deck_meta, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
         unused = sorted(set(blobs) - copied)
@@ -225,9 +289,12 @@ def convert(apkg: Path, out_dir: Path) -> None:
 
 
 def main() -> None:
-    if len(sys.argv) != 3:
-        sys.exit(__doc__)
-    convert(Path(sys.argv[1]), Path(sys.argv[2]))
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("apkg", type=Path, help="the .apkg package to read")
+    parser.add_argument("out", type=Path, help="the deck folder to write")
+    parser.add_argument("--source", default="", help="data source URL recorded in deck.json")
+    args = parser.parse_args()
+    convert(args.apkg, args.out, args.source)
 
 
 if __name__ == "__main__":

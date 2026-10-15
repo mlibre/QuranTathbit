@@ -20,8 +20,6 @@ jobs:
           curl -sL -o templates.tpz https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz
           mkdir -p ~/.local/share/godot/export_templates
           unzip -q templates.tpz -d tpl && mv tpl/templates ~/.local/share/godot/export_templates/4.7.2.stable
-      # Green suites before a shippable artifact: the cold pass in the
-      # battery is what a stranger's machine effectively is.
       - name: Run the regression battery
         run: |
           godot --headless --path . --import
@@ -31,6 +29,14 @@ jobs:
           mkdir -p builds/windows
           touch builds/.gdignore
           godot --headless --path . --export-release "Windows" builds/windows/QuranTathbit.exe
+      - name: Check the build carries the deck
+        run: |
+          python3 - <<'PY'
+          data = open("builds/windows/QuranTathbit.exe", "rb").read()
+          missing = [n for n in (b"deck.json", b"front.md", b".mp3") if n not in data]
+          assert not missing, "the exe's embedded .pck is missing deck files: %s" % missing
+          print("windows build carries the deck files")
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: QuranTathbit-windows
@@ -73,9 +79,8 @@ jobs:
           java-version: "17"
       # No setup-android action: GitHub's ubuntu runners ship a preinstalled
       # SDK (ANDROID_HOME points at it) with the build-tools and platform
-      # packages gradle needs, and the action itself has been the flaky leg
-      # of this job — it died inside its own install twice in a row, before
-      # Godot was even downloaded.
+      # packages the export needs, and the action itself has been the flaky leg
+      # of this job in the field.
       - name: Install Godot 4.7.2 and templates
         run: |
           curl -sL -o godot.zip https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
@@ -91,18 +96,21 @@ jobs:
             -dname "CN=QuranTathbit, O=mlibre, C=US"
         env:
           KEYSTORE_PASSWORD: tathbit-keep-it-close
-      # The keystore reaches Godot through its own environment variables, and
-      # the toolchain through JAVA_HOME / ANDROID_HOME, which Godot reads
-      # directly. The editor-settings file and .godot/export_credentials.cfg
-      # routes both failed in the field: a bare key fragment is not a parseable
-      # .tres, so the settings never loaded, and the credentials keys are
-      # keystore/release_password / _user / keystore/release — _pass was a name
-      # Godot never read, so the trio always looked half-configured.
+      # The preset ships with empty keystore fields so a local editor export is
+      # never surprised; CI fills them in here, for this run only. The grep
+      # afterwards makes a silent no-op impossible: if the pattern ever stops
+      # matching the preset, the job stops instead of exporting an unsigned apk.
+      - name: Point the preset at the keystore
+        run: |
+          sed -i \
+            -e 's|^release=""|release="'"$PWD"'/tathbit.keystore"|' \
+            -e 's|^release_user=""|release_user="qurantathbit"|' \
+            -e 's|^release_pass=""|release_pass="tathbit-keep-it-close"|' \
+            export_presets.cfg
+          grep -q '^release=".*tathbit.keystore"' export_presets.cfg
+          grep -q '^release_user="qurantathbit"' export_presets.cfg
+          grep -q '^release_pass="' export_presets.cfg
       - name: Export Android build
-        env:
-          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ github.workspace }}/tathbit.keystore
-          GODOT_ANDROID_KEYSTORE_RELEASE_USER: qurantathbit
-          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: tathbit-keep-it-close
         run: |
           mkdir -p builds/android
           touch builds/.gdignore
@@ -116,6 +124,9 @@ jobs:
   release:
     needs: [windows, linux, android]
     runs-on: ubuntu-latest
+    # A manual dispatch has no tag to release against; artifacts are still
+    # uploaded above for inspection, and this job simply stays out of the way.
+    if: startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/download-artifact@v4
       - name: Package and publish
@@ -133,5 +144,5 @@ jobs:
             gh release create -R "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" \
               QuranTathbit-Windows.zip QuranTathbit-Linux.zip QuranTathbit-Android.apk \
               --title "QuranTathbit $GITHUB_REF_NAME" \
-              --notes "One deck, kept as folders and files. Unzip, run, study. The Android APK is self-signed: allow installs from this source when your phone asks."
+              --notes "One deck, kept as folders and files. Unzip, run, study. The Android APK is self-signed: allow installs from this source when your phone asks. Quran text, translation and recitation from https://quran.makarem.ir/"
           fi

@@ -47,7 +47,7 @@ Windows, web) in Godot 4.7 with GDScript only.
 
 ## Engineering
 
-- **Tabs**, one `class_name` per script, code-built UI (no external scenes
+- **One indent style per file**, one `class_name` per script, code-built UI (no external scenes
   beyond the entry point), headless SceneTree test suites.
 - **Cache-free boot safety.** A fresh clone has no editor-built class cache,
   so every cross-file class reference is pinned behind a `preload` constant

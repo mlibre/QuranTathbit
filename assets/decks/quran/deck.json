@@ -1,6 +1,7 @@
 {
   "format": 1,
   "name": "Quran",
+  "source": "https://quran.makarem.ir/",
   "cards": [
     "001",
     "002",

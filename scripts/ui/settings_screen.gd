@@ -19,6 +19,7 @@ var _auth: GitHubAuthScript
 var _settings: SettingsScript
 var _deck: DeckScript
 var _polling := false
+var _flow_uri := ""  # where "Open GitHub" sends the user while a flow is live
 
 func _ready() -> void:
         _build()
@@ -153,6 +154,10 @@ func _github_body() -> Control:
         open.add_theme_stylebox_override("hover", ThemeScript.soft_stylebox(ThemeScript.GREEN_SOFT, 23))
         open.add_theme_stylebox_override("pressed", ThemeScript.soft_stylebox(ThemeScript.GREEN_SOFT, 23))
         open.add_theme_stylebox_override("focus", ThemeScript.outline_stylebox(ThemeScript.GREEN))
+        open.pressed.connect(func() -> void:
+                if not _flow_uri.is_empty():
+                        OS.shell_open(_flow_uri)
+        )
         flow.add_child(open)
 
         var buttons := HBoxContainer.new()
@@ -330,7 +335,7 @@ func _begin_device_flow() -> void:
                 get_node("Margin/Scroll/Column/GitHub/Padding/Box/State").text = "Could not reach GitHub. Check your connection and try again."
                 return
         code.text = _pretty_code(str(began.user_code))
-        open.pressed.connect(func() -> void: OS.shell_open(str(began.verification_uri)))
+        _flow_uri = str(began.verification_uri)
         connect.disabled = true
         flow.visible = true
         _polling = true
@@ -352,9 +357,11 @@ func _begin_device_flow() -> void:
                 _polling = false
                 flow.visible = false
                 connect.disabled = false
+                _flow_uri = ""
                 get_node("Margin/Scroll/Column/GitHub/Padding/Box/State").text = "That flow did not complete. Try again when ready."
                 return
         _polling = false
+        _flow_uri = ""
 
 func _pretty_code(code: String) -> String:
         if code.length() > 4 and code.contains("-"):
@@ -374,6 +381,7 @@ func _finish(token: String) -> void:
         _settings.token = token
         _settings.setup_done = true
         _settings.save()
+        _flow_uri = ""
         var flow: VBoxContainer = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Flow")
         flow.visible = false
         var connect: Button = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Buttons/Connect")

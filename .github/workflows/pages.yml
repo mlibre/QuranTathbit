@@ -48,6 +48,21 @@ jobs:
           touch builds/.gdignore
           godot --headless --path . --export-release "Web" builds/web/index.html
 
+      # The deck must ride inside the .pck: if the include filter ever loses
+      # the markdown, json or mp3 files, the exported app boots without its
+      # deck and this line catches it before a browser ever sees it.
+      - name: Check the web build carries the deck
+        run: |
+          test -f builds/web/index.pck
+          python3 - <<'PY'
+          import re, sys
+          data = open("builds/web/index.pck", "rb").read()
+          missing = [needle for needle in (b"deck.json", b"front.md", b".mp3") if needle not in data]
+          if missing:
+              sys.exit("ERROR: the exported .pck is missing deck files: %s" % missing)
+          print("web .pck carries the deck files")
+          PY
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -60,5 +75,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
       - id: deployment
         uses: actions/deploy-pages@v4
