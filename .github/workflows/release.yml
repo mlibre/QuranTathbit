@@ -24,6 +24,11 @@ jobs:
         run: |
           godot --headless --path . --import
           tools/battery.sh
+      # The deck inside the artifact must be the package's own, byte for byte.
+      - name: Verify the deck against the package
+        run: |
+          python3 -m pip install --quiet zstandard
+          python3 tools/verify_deck.py
       - name: Export Windows build
         run: |
           mkdir -p builds/windows

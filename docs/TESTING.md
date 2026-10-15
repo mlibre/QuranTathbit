@@ -87,3 +87,27 @@ Xvfb :99 -screen 0 1280x800x24 &
 godot --path . --script tests/capture_shots.gd -- /tmp/shots
 python3 tools/shot_qa.py /tmp/shots
 ```
+
+## Deck fidelity
+
+The deck ships from one source: `quran-cards-2026-10-14.apkg`. Nothing may
+alter it on its way into the app. `tools/verify_deck.py` enforces that: it
+re-extracts the package into a scratch folder through the converter's own
+code and compares the shipped deck file by file.
+
+```bash
+python3 -m pip install zstandard
+python3 tools/verify_deck.py
+```
+
+- `front.md`, `back.md` and every media file must be **byte-identical** to
+  the extraction.
+- `deck.json` may differ only in the deck's *name* (the package calls it
+  "Default"; the app ships "Quran") — the card list and the recorded source
+  URL (`https://quran.makarem.ir/`) must match exactly.
+- `*.import` files (Godot editor metadata) and `progress.json` (runtime
+  state) are ignored; anything else in the deck folder fails the run.
+
+CI runs it before every Pages deploy and release build, so a deck that
+drifted from the package — edited by hand, mangled by a tool, or written
+from memory — fails the build instead of reaching a user.

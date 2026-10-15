@@ -43,6 +43,13 @@ jobs:
           godot --headless --path . --import
           tools/battery.sh
 
+      # The deck the browser receives must be the package's, byte for byte:
+      # this re-extracts the .apkg and fails the build on any difference.
+      - name: Verify the deck against the package
+        run: |
+          python3 -m pip install --quiet zstandard
+          python3 tools/verify_deck.py
+
       - name: Export the web build
         run: |
           mkdir -p builds/web

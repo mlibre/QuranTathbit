@@ -130,6 +130,7 @@ builds Windows, Linux and Android and attaches them to a GitHub release.
 ```bash
 scripts/check_indent.sh    # indentation guard
 tools/battery.sh           # the regression battery
+tools/verify_deck.py       # the deck is the package's, byte for byte
 ```
 
 The battery runs every `tests/regression_*.gd` suite twice over: once in the
@@ -137,6 +138,14 @@ machine's current state, and once with `.godot/global_script_class_cache.cfg`
 removed — the state of any machine that pulled new classes but has not opened
 the editor since. A suite is green only if it passes both ways. See
 `docs/TESTING.md`.
+
+`tools/verify_deck.py` re-extracts `quran-cards-2026-10-14.apkg` into a
+scratch folder and compares every shipped file with the extraction: the
+markdown and media must be byte-identical, and `deck.json` may differ only by
+the deck's name label. CI runs it before every deploy and release, so a deck
+that drifted from the package — by hand or by accident — fails the build
+instead of shipping. Needs `zstandard` (`pip install zstandard`) like the
+converter.
 
 ## Converting an Anki deck
 
