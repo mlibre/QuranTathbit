@@ -71,18 +71,19 @@ alone.
 Tokens are stored in the platform's user-data folder. The card content itself
 is never encrypted — that is the point of a deck you can read.
 
-### Picking the client id
+### Signing in
 
-The sign-in flow needs one OAuth app registration; every field to put in the
-github.com form, and where the client id goes, is written out in
-[docs/OAUTH_SETUP.md](docs/OAUTH_SETUP.md). In short: `scripts/net/github_auth.gd`
-holds `CLIENT_ID`, empty by default. Create one OAuth app (GitHub → Settings →
-Developer settings → OAuth Apps → New application; the device flow needs no
-callback URL) and paste its client id — it is public by design, not a secret.
-With it empty the app says so plainly instead of failing mysteriously, and a
-pasted classic token with `repo` scope is always accepted as an alternative
-(and is the reliable path in browsers, where cross-origin rules can block the
-device-flow endpoints).
+Sign-in is wired to the project's own OAuth app out of the box: the device-flow
+client id (`Ov23liUgUybWeux2DCcF`, a public value by design) ships inside
+`scripts/net/github_auth.gd`, so **Settings → Connect GitHub** works in every
+build with no extra setup. A pasted classic token with `repo` scope is still
+accepted as an alternative (and is the reliable path in browsers, where
+cross-origin rules can block the device-flow endpoints).
+
+Forking the project? Register your own OAuth app — every field to put into the
+github.com form is written out in
+[docs/OAUTH_SETUP.md](docs/OAUTH_SETUP.md) — then paste your client id over
+the constant in `scripts/net/github_auth.gd`.
 
 ## Scripts
 

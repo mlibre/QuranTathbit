@@ -14,8 +14,8 @@ const HttpClientScript := preload("res://scripts/net/http_client.gd")
 ## id empty the app says so instead of failing mysteriously. Users who prefer
 ## can paste a classic token with `repo` scope instead, in Settings.
 
-# Paste your OAuth app's client ID here (it is not a secret).
-const CLIENT_ID := ""
+# The OAuth app this build signs in with (client id is public by design).
+const CLIENT_ID := "Ov23liUgUybWeux2DCcF"
 
 const DEVICE_CODE_URL := "https://github.com/login/device/code"
 const TOKEN_URL := "https://github.com/login/oauth/access_token"

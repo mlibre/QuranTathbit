@@ -23,12 +23,22 @@ app**. Fill the form exactly like this:
 Submit the form, then copy the **Client ID** (a public value, not a secret —
 nothing else on that page is needed).
 
-## Give the app the client id
+## The client id this build uses
 
-Open `scripts/net/github_auth.gd` and paste it:
+The project's OAuth app is registered and its client id
+(`Ov23liUgUybWeux2DCcF`) already ships in `scripts/net/github_auth.gd` —
+sign-in works in every build with no extra setup.
+
+The **client secret** GitHub shows on the same page is *not* used anywhere:
+the device flow does not need it, and a secret must never be committed to
+this or any public repository. Keep it private; if it has ever been shared,
+regenerate it on the app's settings page.
+
+Forking the project? Register your own app with the table above and paste
+your client id over the constant:
 
 ```gdscript
-const CLIENT_ID := "Iv1.xxxxxxxxxxxxxxxx"
+const CLIENT_ID := "your_client_id"
 ```
 
 Commit and push; the next builds carry it. Until a build has a client id, the
