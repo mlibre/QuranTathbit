@@ -12,13 +12,13 @@ godot --headless --path . --script tests/regression_<name>.gd   # one suite
 
 ## The suites
 
-| suite | what it holds the app to |
-| --- | --- |
-| `regression_scheduler` | Anki's SM-2, with Anki's own numbers: interval bands, fuzz bounds, step delays, lapse/relearn round trips, ease moves, queue caps |
-| `regression_deck` | the deck as folders and files: load, card discovery, media resolution, progress round-trip, and repair of a hand-corrupted or partial `progress.json` |
-| `regression_sync` | sync against a fake GitHub: first push, second device pulling, local-edit-wins vs remote-follows, progress merge by card, failed transfers retrying, foreign repo files untouched, a shared deck arriving |
-| `regression_markdown` | the card markdown subset, and the Arabic/Persian/Latin script detection that dresses each block |
-| `regression_boot` | a cold first run: the bundled deck installs itself into `user://`, home shows the real numbers, a session renders a real card and records its answer, settings opens and returns |
+| suite                  | what it holds the app to                                                                                                                                                                                  |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `regression_scheduler` | Anki's SM-2, with Anki's own numbers: interval bands, fuzz bounds, step delays, lapse/relearn round trips, ease moves, queue caps                                                                         |
+| `regression_deck`      | the deck as folders and files: load, card discovery, media resolution, progress round-trip, and repair of a hand-corrupted or partial `progress.json`                                                     |
+| `regression_sync`      | sync against a fake GitHub: first push, second device pulling, local-edit-wins vs remote-follows, progress merge by card, failed transfers retrying, foreign repo files untouched, a shared deck arriving |
+| `regression_markdown`  | the card markdown subset, and the Arabic/Persian/Latin script detection that dresses each block                                                                                                           |
+| `regression_boot`      | a cold first run: the bundled deck installs itself into `user://`, home shows the real numbers, a session renders a real card and records its answer, settings opens and returns                          |
 
 ## Why the battery runs twice
 

@@ -11,13 +11,13 @@ flow works on Android, Windows, Linux and the web.
 GitHub → Settings → Developer settings → OAuth Apps → **Register a new OAuth
 app**. Fill the form exactly like this:
 
-| Field | Value |
-| --- | --- |
-| **Application name** | `QuranTathbit` |
-| **Homepage URL** | `https://mlibre.github.io/QuranTathbit/` |
-| **Application description** | `Anki-style Quran flashcards. Sign in with GitHub to sync your deck and study progress across Android, Windows, Linux and Web.` |
-| **Redirect URI** | `https://mlibre.github.io/QuranTathbit/` — the web build's home. (Optional, for a future browser-redirect sign-in: `http://localhost:8899/callback`. Leave **wildcard matching off**.) |
-| **Enable Device Flow** | **checked** — this is the flow the app uses on every platform. |
+| Field                         | Value                                                                                                                                                                                                                  |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Application name**          | `QuranTathbit`                                                                                                                                                                                                         |
+| **Homepage URL**              | `https://mlibre.github.io/QuranTathbit/`                                                                                                                                                                               |
+| **Application description**   | `Quran flashcards. Sign in with GitHub to sync your deck and study progress across Android, Windows, Linux and Web.`                                                                                                   |
+| **Redirect URI**              | `https://mlibre.github.io/QuranTathbit/` — the web build's home. (Optional, for a future browser-redirect sign-in: `http://localhost:8899/callback`. Leave **wildcard matching off**.)                                 |
+| **Enable Device Flow**        | **checked** — this is the flow the app uses on every platform.                                                                                                                                                         |
 | **Expire user access tokens** | Leave **unchecked** for now: the app does not yet refresh tokens, and expiring tokens would sign you out every few hours. Check it only if you prefer the stricter default and do not mind re-connecting occasionally. |
 
 Submit the form, then copy the **Client ID** (a public value, not a secret —
