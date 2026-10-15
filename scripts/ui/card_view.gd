@@ -105,7 +105,13 @@ func _add_text(markdown: String, link: String, lead := false) -> void:
         # so the base stays AUTO and the alignment is set visually instead:
         # scripture from the right edge, anything else from the left.
         label.text_direction = TextDirection.TEXT_DIRECTION_AUTO
-        if script == "arabic" or script == "persian":
+        if lead:
+                # The question side is a reference, alone on its page: it
+                # stands in the middle like a chapter heading, whatever its
+                # script -- an RTL line against the right edge of a nearly
+                # empty card reads as a smudge, not a heading.
+                label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        elif script == "arabic" or script == "persian":
                 label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
         else:
                 # A plain line in a centred card -- the citation under a verse,
@@ -122,10 +128,11 @@ func _add_text(markdown: String, link: String, lead := false) -> void:
         elif script == "persian":
                 label.add_theme_constant_override("line_separation", 6)
         label.meta_clicked.connect(_open_link)
-        # A verse gets the room a verse deserves: extra breath after it, so the
-        # translation below reads as the verse's own second voice.
+        # A verse gets the room a verse deserves: a long breath after it,
+        # so the translation below reads as the verse's own second voice
+        # and never crowds it.
         if script == "arabic" and not lead:
-                add_child(_with_bottom_room(label, 12))
+                add_child(_with_bottom_room(label, 22))
         else:
                 add_child(label)
 

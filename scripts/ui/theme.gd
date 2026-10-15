@@ -89,6 +89,8 @@ class SoundMark extends Control:
 
 
 ## A small status dot. Filled says "alive"; hollow says "off, by choice".
+## Sized to anchor a line of caption text beside it, not to float under
+## it: a dot too small reads as dirt on the page.
 class StatusDot extends Control:
         var color := GREEN
         var filled := true
@@ -96,14 +98,14 @@ class StatusDot extends Control:
         func _init(p_color: Color = GREEN, p_filled := true) -> void:
                 color = p_color
                 filled = p_filled
-                custom_minimum_size = Vector2(11, 11)
+                custom_minimum_size = Vector2(12, 12)
 
         func _draw() -> void:
-                var center := Vector2(5.5, 5.5)
+                var center := Vector2(6, 6)
                 if filled:
-                        draw_circle(center, 4.2, color)
+                        draw_circle(center, 4.6, color)
                 else:
-                        draw_arc(center, 3.6, 0.0, TAU, 24, color, 1.7, true)
+                        draw_arc(center, 4.0, 0.0, TAU, 24, color, 2.0, true)
 
 
 ## A check inside a soft medal: the end-of-session mark, quiet as a stamp.
@@ -172,13 +174,22 @@ class AheadMark extends Control:
                 )
 
 
-## Two circular arrows, hand over hand: sync, in plain sight.
+## Two circular arrows, hand over hand: sync, in plain sight. While the
+## work is actually running the mark turns, slowly -- the one motion the
+## app allows itself for ongoing work, the recitation's bars being the
+## other -- and when the work ends it settles upright at the nearest
+## full turn, the way a wheel stops.
 class SyncMark extends Control:
         var color := GREEN_DEEP
+        var working := false
 
         func _init(p_color: Color = GREEN_DEEP) -> void:
                 color = p_color
                 custom_minimum_size = Vector2(20, 20)
+
+        func _process(delta: float) -> void:
+                if working:
+                        rotation += delta * 1.5
 
         func _draw() -> void:
                 var c := Vector2(10, 10)
@@ -201,6 +212,42 @@ class SyncMark extends Control:
                         PackedVector2Array([at + n * 2.6, at - n * 2.6, at + dir * 4.8]),
                         color
                 )
+
+        ## Work beginning and work ending: the turn only runs while there is
+        ## something to turn for, and it finishes standing up.
+        func set_working(on: bool) -> void:
+                working = on
+                if on:
+                        return
+                var upright := TAU * ceilf(rotation / TAU) if rotation > 0.0 else 0.0
+                var tween := create_tween()
+                tween.tween_property(self, "rotation", upright, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+## A title-page ornament: a small eight-pointed star riding a short rule,
+## the way a reverent book dresses the space under its name. One mark, gold,
+## quiet -- the paper pattern's lattice in miniature.
+class OrnamentMark extends Control:
+        var color := GOLD
+
+        func _init(p_color: Color = GOLD) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(84, 18)
+                mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+        func _draw() -> void:
+                var c := size / 2.0
+                var tint := Color(color.r, color.g, color.b, 0.7)
+                var gap := 14.0
+                draw_line(Vector2(4, c.y), Vector2(c.x - gap, c.y), tint, 1.4, true)
+                draw_line(Vector2(c.x + gap, c.y), Vector2(size.x - 4, c.y), tint, 1.4, true)
+                for turn in [0.0, PI / 8.0]:
+                        var points := PackedVector2Array()
+                        for i in 4:
+                                var ang: float = float(turn) + TAU * i / 4.0
+                                points.append(c + Vector2(cos(ang), sin(ang)) * 5.5)
+                        points.append(points[0])
+                        draw_polyline(points, GOLD_DEEP, 1.5, true)
 
 
 ## A still lattice of eight-pointed stars behind the page: the margin
@@ -309,18 +356,56 @@ static func style_scroll(scroll: ScrollContainer) -> void:
 # --- the shared buttons -----------------------------------------------------------
 
 
-## Every button answers the hand before the click lands: a small settle
-## toward its centre while it is held, a return the moment it lets go. One
-## helper, wired once, so the whole app agrees on what a press feels like --
-## on the mouse and, through the same pop, on the keyboard.
-static func pressable(button: Button, press_scale := 0.965) -> void:
+## Every button answers the hand before the click lands. Three states, one
+## voice: visited grows a breath (2%), held settles toward its centre
+## (3.5%), let go returns to whichever of the two it is still in -- so a
+## click while hovering never pops, and leaving while held never jumps.
+## One helper, wired once, so the whole app agrees on what a press feels
+## like -- on the mouse and, through the same scale, on the keyboard.
+static func pressable(button: Button, press_scale := 0.965, hover_scale := 1.02) -> void:
         button.resized.connect(func() -> void:
                 if button.size.x > 0.0:
                         button.pivot_offset = button.size / 2.0
         )
-        button.button_down.connect(func() -> void: _scale_to(button, press_scale, 0.08))
-        button.pressed.connect(func() -> void: _scale_to(button, 1.0, 0.16))
-        button.button_up.connect(func() -> void: _scale_to(button, 1.0, 0.16))
+        var state := {"hovered": false, "held": false}
+        var apply := func() -> void:
+                var target := 1.0
+                if state["held"]:
+                        target = press_scale
+                elif state["hovered"]:
+                        target = hover_scale
+                _scale_to(button, target, 0.13)
+        button.mouse_entered.connect(func() -> void:
+                state["hovered"] = true
+                apply.call()
+        )
+        button.mouse_exited.connect(func() -> void:
+                state["hovered"] = false
+                apply.call()
+        )
+        button.button_down.connect(func() -> void:
+                state["held"] = true
+                apply.call()
+        )
+        button.button_up.connect(func() -> void:
+                state["held"] = false
+                apply.call()
+        )
+        # The keyboard's press rides the focus path, which never touches
+        # button_down/up: route it through the same states so Enter feels
+        # like the mouse does.
+        button.focus_entered.connect(func() -> void:
+                if state["held"]:
+                        return
+                state["hovered"] = true
+                apply.call()
+        )
+        button.focus_exited.connect(func() -> void:
+                if state["held"]:
+                        return
+                state["hovered"] = false
+                apply.call()
+        )
 
 
 static func _scale_to(button: Button, to: float, duration: float) -> void:
@@ -463,7 +548,28 @@ static func key_chip(label_text: String) -> PanelContainer:
 # --- motion ---------------------------------------------------------------------
 
 
-## Fade a control in, sliding it a breath upward. One shot, then it settles.
+## A number that arrives: 0 to its value over half a second, easing out,
+## the way a page's own numbers do when they matter. One shot, then it
+## rests. Numbers that are already 0 (nothing due, nothing learned) never
+## move -- rest is also an answer.
+static func count_up(label: Label, to: int, duration := 0.55) -> void:
+        if to <= 0:
+                label.text = str(to)
+                return
+        label.text = "0"
+        var tween := label.create_tween()
+        tween.tween_method(
+                func(v: float) -> void: label.text = str(int(round(v))),
+                0.0,
+                float(to),
+                duration
+        ).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+## Fade a control in, sliding it a breath. A positive distance arrives
+## from below -- the direction of going deeper into the app; a negative
+## one arrives from above, the direction of coming back home. One shot,
+## then it settles.
 static func appear(control: Control, delay := 0.0, distance := 14.0) -> void:
         if control == null:
                 return

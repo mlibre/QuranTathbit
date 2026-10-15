@@ -44,7 +44,6 @@ func _ready() -> void:
         _build()
         resized.connect(_layout)
         call_deferred("_layout")
-        ThemeScript.appear(self)
 
 func _exit_tree() -> void:
         if _player != null and is_instance_valid(_player):
@@ -100,7 +99,7 @@ func _session_bar() -> Control:
         bar.show_percentage = false
         bar.custom_minimum_size = Vector2(0, 9)
         var track := StyleBoxFlat.new()
-        track.bg_color = Color("#D8CCB0")
+        track.bg_color = Color("#CFC1A2")
         track.set_corner_radius_all(4)
         var fill := StyleBoxFlat.new()
         fill.bg_color = ThemeScript.GREEN_DEEP
@@ -133,6 +132,7 @@ func _top_bar() -> Control:
         var bar: Dictionary = ThemeScript.top_bar("")
         var row: HBoxContainer = bar["row"]
         var back: Button = bar["back"]
+        back.tooltip_text = "Back to home"
         back.pressed.connect(func() -> void: closed.emit())
         # The header's middle is this screen's count, not its name: the user
         # knows where they are; what they want to know is how far is left.
@@ -234,6 +234,11 @@ func _layout() -> void:
         # The centre the question side needs: the filler is never shorter than
         # the surface, so a short card floats in the middle of the page.
         fill.custom_minimum_size.y = surface.size.y
+        # The footer's two buttons share one width: capped at their own
+        # measure, never wider than the window, so a phone holds them whole.
+        var avail := minf(320.0, size.x - 48.0)
+        (get_node("Margin/Column/Footer/ShowAnswer") as Button).custom_minimum_size = Vector2(avail, 58.0)
+        (get_node("Margin/Column/Footer/Done") as Button).custom_minimum_size = Vector2(avail, 58.0)
 
 func _layout_answers() -> void:
         var grid: GridContainer = get_node("Margin/Column/Answers")
@@ -325,10 +330,14 @@ func _answer_button(option: Dictionary, index: int) -> Control:
                         grade = GOOD_COLOR
                 "easy":
                         grade = EASY_COLOR
-        # A wash fill at rest -- an empty outline reads as disabled -- with the
-        # grade's border arriving on hover and staying while pressed.
+        # A wash fill at rest -- an empty outline reads as disabled -- a
+        # hairline of the grade's own colour so the pill has an edge even
+        # before it is visited (a bare wash was reading as inactive), with
+        # the full border arriving on hover and staying while pressed.
         var rest := StyleBoxFlat.new()
         rest.bg_color = Color(grade.r, grade.g, grade.b, 0.12)
+        rest.border_color = Color(grade.r, grade.g, grade.b, 0.38)
+        rest.set_border_width_all(2)
         rest.set_corner_radius_all(16)
         var held := StyleBoxFlat.new()
         held.bg_color = Color(grade.r, grade.g, grade.b, 0.20)

@@ -16,7 +16,9 @@ func _init() -> void:
         var main = (load("res://scripts/main.gd") as GDScript).new()
         root.add_child(main)
         await main.ready
-        await create_timer(0.4).timeout
+        # The home numbers count themselves in over half a second; read them
+        # only once they have settled, or the check races the count.
+        await create_timer(0.9).timeout
 
         var home: Control = main.get_node_or_null("Home")
         _ok(home != null, "the home screen is the first thing shown")

@@ -26,7 +26,12 @@ var _flow_uri := ""  # where "Open GitHub" sends the user while a flow is live
 
 func _ready() -> void:
         _build()
-        ThemeScript.appear(self)
+        resized.connect(_layout)
+        call_deferred("_layout")
+        # The cards arrive one after another, a beat apart: a page that
+        # assembles itself reads as composed, not stamped.
+        var column: VBoxContainer = get_node("Margin/Scroll/Wrap/Column")
+        ThemeScript.stagger_in(column, 0.06, 0.26)
 
 func setup(http: HttpClientScript, auth: GitHubAuthScript, settings: SettingsScript, deck: DeckScript) -> void:
         _http = http
@@ -56,15 +61,25 @@ func _build() -> void:
         ThemeScript.style_scroll(scroll)
         margin.add_child(scroll)
 
+        # A ScrollContainer stretches its child to the whole window when the
+        # horizontal scroll is off, so the capped column rides inside a
+        # centre wrapper: the cards keep a reader's measure on a desktop and
+        # fill a phone to its edges.
+        var wrap := CenterContainer.new()
+        wrap.name = "Wrap"
+        wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        scroll.add_child(wrap)
+
         var column := VBoxContainer.new()
         column.name = "Column"
-        column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        column.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         column.add_theme_constant_override("separation", 18)
-        scroll.add_child(column)
+        wrap.add_child(column)
 
         # The same header every screen above home wears: back the way they came.
         var bar: Dictionary = ThemeScript.top_bar("Settings")
         var back: Button = bar["back"]
+        back.tooltip_text = "Back to home"
         back.pressed.connect(func() -> void: closed.emit())
         column.add_child(bar["row"])
 
@@ -74,6 +89,17 @@ func _build() -> void:
         column.add_child(_section("Data source"))
         column.add_child(_source_body())
         column.add_child(_about())
+
+## The page answers the window: the cards keep a reader's measure on a
+## desktop -- never a stripe the width of a whole window -- and fill a phone
+## to its edges.
+func _layout() -> void:
+        if size.x <= 0.0:
+                return
+        var column: VBoxContainer = get_node_or_null("Margin/Scroll/Wrap/Column")
+        if column == null:
+                return
+        column.custom_minimum_size = Vector2(minf(620.0, size.x - 52.0), 0.0)
 
 ## A section header is a small gold word and a rule that runs to the edge of
 ## the page: the word names what follows, the rule says where it ends.
@@ -198,13 +224,33 @@ func _github_body() -> Control:
         hint.name = "Hint"
         flow.add_child(hint)
 
+        # The flow's two ways onward, side by side: the way to GitHub, and
+        # the code on the clipboard for the walk there. Copying is what a
+        # person does with a code; the app does it for them.
+        var actions := HBoxContainer.new()
+        actions.name = "Actions"
+        actions.alignment = BoxContainer.ALIGNMENT_CENTER
+        actions.add_theme_constant_override("separation", 10)
+        flow.add_child(actions)
+
         var open := ThemeScript.ghost_button("Open GitHub", ThemeScript.GREEN, 44)
         open.name = "Open"
+        open.tooltip_text = "Open the sign-in page"
         open.pressed.connect(func() -> void:
                 if not _flow_uri.is_empty():
                         OS.shell_open(_flow_uri)
         )
-        flow.add_child(open)
+        actions.add_child(open)
+
+        var copy := ThemeScript.ghost_button("Copy code", ThemeScript.GREEN, 44, 22)
+        copy.name = "Copy"
+        copy.tooltip_text = "Copy the code to the clipboard"
+        copy.pressed.connect(func() -> void:
+                var code_text: RichTextLabel = flow.get_node("Code/Pad/CodeText")
+                if not code_text.text.is_empty():
+                        DisplayServer.clipboard_set(code_text.text)
+        )
+        actions.add_child(copy)
 
         var buttons := HBoxContainer.new()
         buttons.name = "Buttons"
@@ -214,6 +260,7 @@ func _github_body() -> Control:
         var connect := ThemeScript.primary_button("Connect GitHub", 46)
         connect.name = "Connect"
         connect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        connect.tooltip_text = "Sign in with GitHub"
         connect.pressed.connect(_begin_device_flow)
         buttons.add_child(connect)
 
@@ -250,6 +297,9 @@ func _github_body() -> Control:
         token_hint.name = "TokenHint"
         box.add_child(token_hint)
 
+        # The page's own division: the account above, the deck's home below.
+        box.add_child(ThemeScript.hairline())
+
         box.add_child(_field_label("Repository"))
         var repo := LineEdit.new()
         repo.name = "Repo"
@@ -269,6 +319,7 @@ func _github_body() -> Control:
 
         var sync := ThemeScript.primary_button("Sync now", 46)
         sync.name = "Sync"
+        sync.tooltip_text = "Sync with GitHub"
         sync.pressed.connect(func() -> void: sync_requested.emit())
         box.add_child(sync)
 
@@ -346,6 +397,9 @@ func _about() -> Control:
         box.alignment = BoxContainer.ALIGNMENT_CENTER
         box.add_theme_constant_override("separation", 4)
         # The name in the script it was given, then the line it works by.
+        var ornament := ThemeScript.OrnamentMark.new()
+        ornament.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        box.add_child(ornament)
         var arabic := Label.new()
         arabic.text = "تثبيت القرآن"
         arabic.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -366,15 +420,15 @@ func _about() -> Control:
 ## The main screen reports how a sync went while Settings is the screen on
 ## top; the note sits under the Sync button and clears when asked again.
 func note_sync_result(text: String) -> void:
-        var note: RichTextLabel = get_node_or_null("Margin/Scroll/Column/GitHub/Padding/Box/SyncNote")
+        var note: RichTextLabel = get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/SyncNote")
         if note != null:
                 note.text = text
 
 func _refresh() -> void:
-        var state: RichTextLabel = get_node("Margin/Scroll/Column/GitHub/Padding/Box/State")
-        var connect: Button = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Buttons/Connect")
-        var disconnect: Button = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Buttons/Disconnect")
-        var repo: LineEdit = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Repo")
+        var state: RichTextLabel = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State")
+        var connect: Button = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Buttons/Connect")
+        var disconnect: Button = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Buttons/Disconnect")
+        var repo: LineEdit = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Repo")
         repo.text = _settings.repo
         if _settings.has_token() and not _settings.owner.is_empty():
                 state.text = "Connected as @%s" % _settings.owner
@@ -386,8 +440,8 @@ func _refresh() -> void:
                 state.text = "Not connected. Sync keeps your progress on your own GitHub repo."
         connect.visible = not _settings.has_token()
         disconnect.visible = _settings.has_token()
-        var name: RichTextLabel = get_node("Margin/Scroll/Column/DeckInfo/Padding/Box/Name")
-        var folder: RichTextLabel = get_node("Margin/Scroll/Column/DeckInfo/Padding/Box/Folder")
+        var name: RichTextLabel = get_node("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/Name")
+        var folder: RichTextLabel = get_node("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/Folder")
         name.text = "%s — %d cards" % [_deck.name, _deck.cards.size()]
         folder.text = _deck.folder
         note_sync_result("")
@@ -402,16 +456,16 @@ func _begin_device_flow() -> void:
                 _begin_web_connect()
                 return
         if not _auth.is_configured():
-                var state0: RichTextLabel = get_node("Margin/Scroll/Column/GitHub/Padding/Box/State")
+                var state0: RichTextLabel = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State")
                 state0.text = "This build has no GitHub app id yet. Add your OAuth app's client id to scripts/net/github_auth.gd, or paste a token below."
                 return
         var began: Dictionary = await _auth.begin(_http)
-        var flow: VBoxContainer = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Flow")
+        var flow: VBoxContainer = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Flow")
         var code: PanelContainer = flow.get_node("Code")
-        var open: Button = flow.get_node("Open")
-        var connect: Button = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Buttons/Connect")
+        var open: Button = flow.get_node("Actions/Open")
+        var connect: Button = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Buttons/Connect")
         if began.has("error"):
-                var state: RichTextLabel = get_node("Margin/Scroll/Column/GitHub/Padding/Box/State")
+                var state: RichTextLabel = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State")
                 if OS.has_feature("web"):
                         # Unreachable on the web (the branch above), kept as a
                         # safety net: say what works instead of what failed.
@@ -421,6 +475,7 @@ func _begin_device_flow() -> void:
                 return
         (code.get_node("Pad/CodeText") as RichTextLabel).text = _pretty_code(str(began.user_code))
         code.visible = true
+        (flow.get_node("Actions/Copy") as Button).visible = true
         _flow_uri = str(began.verification_uri)
         connect.disabled = true
         flow.visible = true
@@ -444,7 +499,7 @@ func _begin_device_flow() -> void:
                 flow.visible = false
                 connect.disabled = false
                 _flow_uri = ""
-                get_node("Margin/Scroll/Column/GitHub/Padding/Box/State").text = "That flow did not complete. Try again when ready."
+                get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State").text = "That flow did not complete. Try again when ready."
                 return
         _polling = false
         _flow_uri = ""
@@ -463,13 +518,14 @@ func _pretty_code(code: String) -> String:
 ## copies, pastes below, saves. Everything after -- sync included -- runs in
 ## the browser against api.github.com, which does allow it.
 func _begin_web_connect() -> void:
-        var state: RichTextLabel = get_node("Margin/Scroll/Column/GitHub/Padding/Box/State")
+        var state: RichTextLabel = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State")
         state.text = "Signing in inside a browser takes a token — GitHub's sign-in page cannot be opened from another site, and no static site can change that. One minute, three steps:"
-        var flow: VBoxContainer = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Flow")
+        var flow: VBoxContainer = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Flow")
         var code: PanelContainer = flow.get_node("Code")
         var hint: RichTextLabel = flow.get_node("Hint")
-        var open: Button = flow.get_node("Open")
+        var open: Button = flow.get_node("Actions/Open")
         code.visible = false
+        (flow.get_node("Actions/Copy") as Button).visible = false
         hint.text = (
                 "1. Press the button — GitHub opens with the form filled in: the name and the repo permission are already set.\n"
                 + "2. Generate the token, then copy the string it shows you.\n"
@@ -478,35 +534,35 @@ func _begin_web_connect() -> void:
         open.text = "Create a token on GitHub"
         _flow_uri = "https://github.com/settings/tokens/new?scopes=repo&description=QuranTathbit%20sync"
         flow.visible = true
-        get_node("Margin/Scroll/Column/GitHub/Padding/Box/TokenRow/Token").grab_focus()
+        get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/TokenRow/Token").grab_focus()
 
 func _finish(token: String) -> void:
         var who: Dictionary = await _auth.whoami(_http, token)
         if who.has("error"):
-                get_node("Margin/Scroll/Column/GitHub/Padding/Box/State").text = "Connected, but we could not read your login."
+                get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State").text = "Connected, but we could not read your login."
                 _settings.token = token
         else:
                 _settings.owner = str(who.login)
-                get_node("Margin/Scroll/Column/GitHub/Padding/Box/State").text = "Connected as @%s" % _settings.owner
+                get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State").text = "Connected as @%s" % _settings.owner
         _settings.token = token
         _settings.setup_done = true
         _settings.save()
         _flow_uri = ""
-        var flow: VBoxContainer = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Flow")
+        var flow: VBoxContainer = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Flow")
         flow.visible = false
-        var connect: Button = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Buttons/Connect")
+        var connect: Button = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Buttons/Connect")
         connect.disabled = false
         _refresh()
         account_changed.emit()
 
 func _save_token() -> void:
-        var token: LineEdit = get_node("Margin/Scroll/Column/GitHub/Padding/Box/TokenRow/Token")
+        var token: LineEdit = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/TokenRow/Token")
         if token.text.strip_edges().is_empty():
                 return
         var value := token.text.strip_edges()
         var who: Dictionary = await _auth.whoami(_http, value)
         if who.has("error"):
-                get_node("Margin/Scroll/Column/GitHub/Padding/Box/State").text = "That token did not work. Check it and try again."
+                get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State").text = "That token did not work. Check it and try again."
                 return
         _settings.token = value
         _settings.owner = str(who.login)

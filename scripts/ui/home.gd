@@ -19,15 +19,34 @@ var _deck_of_last_setup: DeckScript
 
 func _ready() -> void:
         _build()
-        ThemeScript.appear(self)
+        resized.connect(_layout)
+        call_deferred("_layout")
+
+## The page answers the window: pills, study and sync grow to fill a phone
+## and stop at their own measure on a desktop, so nothing ever overflows
+## and nothing ever floats narrower than the content it holds. Runs on
+## every resize; reads nothing but the window's own width.
+func _layout() -> void:
+        if size.x <= 0.0:
+                return
+        var avail := size.x - 56.0  # the margin's 28 on each side
+        var gap := 12.0
+        var pill_w := clampf((avail - 2.0 * gap) / 3.0, 64.0, 116.0)
+        for name in ["Due", "New", "Learned"]:
+                var pill: PanelContainer = get_node("Margin/Column/Stats/" + name)
+                pill.custom_minimum_size = Vector2(pill_w, 74)
+        var study: Button = get_node("Margin/Column/Study")
+        study.custom_minimum_size = Vector2(minf(340.0, avail), 60.0)
+        var sync: Button = get_node("Margin/Column/Bottom/Buttons/Sync")
+        sync.custom_minimum_size = Vector2(minf(180.0, avail), 48.0)
 
 func setup(deck: DeckScript, counts: Dictionary, sync_line: String, connected: bool, sync_state := "off") -> void:
         if not is_node_ready():
                 await ready
         _counts = counts
         _deck_of_last_setup = deck
-        var title: Label = get_node("Margin/Column/DeckCard/Box/Title")
-        var caption: Label = get_node("Margin/Column/DeckCard/Box/Caption")
+        var title: Label = get_node("Margin/Column/DeckCard/Pad/Box/Title")
+        var caption: Label = get_node("Margin/Column/DeckCard/Pad/Box/Caption")
         title.text = deck.name
         var waiting: int = counts["due"] + counts["new"]
         caption.text = (
@@ -39,9 +58,12 @@ func setup(deck: DeckScript, counts: Dictionary, sync_line: String, connected: b
         var due_pill: Label = get_node("Margin/Column/Stats/Due/Box/Value")
         var new_pill: Label = get_node("Margin/Column/Stats/New/Box/Value")
         var learned_pill: Label = get_node("Margin/Column/Stats/Learned/Box/Value")
-        due_pill.text = str(counts["due"])
-        new_pill.text = str(counts["new"])
-        learned_pill.text = str(counts["learned"])
+        # The numbers arrive rather than appear: 0 to their value over half a
+        # second, easing out. A page that counts its own inventory in is a
+        # page that was just thought about, not stamped.
+        ThemeScript.count_up(due_pill, int(counts["due"]))
+        ThemeScript.count_up(new_pill, int(counts["new"]))
+        ThemeScript.count_up(learned_pill, int(counts["learned"]))
 
         var study: Button = get_node("Margin/Column/Study")
         if waiting == 0:
@@ -57,8 +79,8 @@ func setup(deck: DeckScript, counts: Dictionary, sync_line: String, connected: b
 
         # The one line that answers "what am I about to study?": the next
         # card's own heading, read from its front, dressed for its script.
-        var next_up: Label = get_node("Margin/Column/DeckCard/Box/NextUp")
-        var eyebrow: Label = get_node("Margin/Column/DeckCard/Box/Eyebrow")
+        var next_up: Label = get_node("Margin/Column/DeckCard/Pad/Box/NextUp")
+        var eyebrow: Label = get_node("Margin/Column/DeckCard/Pad/Box/Eyebrow")
         var reference := _next_reference()
         next_up.visible = not reference.is_empty()
         eyebrow.visible = not reference.is_empty()
@@ -88,6 +110,10 @@ func _set_sync_line(text: String, state: String) -> void:
                         dot.color = ThemeScript.INK
                         dot.filled = false
         dot.queue_redraw()
+        # The line fades in where it stands: a fresh state is news, and news
+        # arrives, it does not pop.
+        ThemeScript.settle_in(row, 0.0, 0.2)
+
 
 ## The next card's heading: the first line of its front, plain text. The
 ## scheduler's queue already knows which card is truly next -- due before new --
@@ -154,15 +180,15 @@ func _bottom_group() -> Control:
         var group := VBoxContainer.new()
         group.name = "Bottom"
         group.alignment = BoxContainer.ALIGNMENT_CENTER
-        group.add_theme_constant_override("separation", 10)
+        group.add_theme_constant_override("separation", 8)
         group.add_child(_bottom_buttons())
         group.add_child(_sync_line_row())
         return group
 
-## Settings in the corner, where a whole machine keeps it: a small tune mark,
-## quiet until visited. The wordmark no longer has to share the bottom row
-## with it, and the front door stays the only thing the middle of the page
-## talks about.
+## Settings in the corner, where a whole machine keeps it. The mark sits
+## on a soft green coin at rest -- a button that is only three thin lines
+## on bare paper reads as debris, and was missed by every first-time
+## reader -- and the coin deepens when visited.
 func _settings_corner() -> Button:
         var corner := Button.new()
         corner.name = "SettingsCorner"
@@ -174,32 +200,44 @@ func _settings_corner() -> Button:
         corner.offset_right = -28.0
         corner.offset_top = 22.0
         corner.offset_bottom = 70.0
-        var styles := ThemeScript.mark_button_styles(ThemeScript.INK)
-        corner.add_theme_stylebox_override("normal", styles["normal"])
-        corner.add_theme_stylebox_override("hover", styles["hover"])
-        corner.add_theme_stylebox_override("pressed", styles["hover"])
-        corner.add_theme_stylebox_override("focus", styles["focus"])
+        var rest := StyleBoxFlat.new()
+        rest.bg_color = Color(ThemeScript.GREEN.r, ThemeScript.GREEN.g, ThemeScript.GREEN.b, 0.08)
+        rest.set_corner_radius_all(24)
+        var hover := StyleBoxFlat.new()
+        hover.bg_color = Color(ThemeScript.GREEN.r, ThemeScript.GREEN.g, ThemeScript.GREEN.b, 0.16)
+        hover.set_corner_radius_all(24)
+        var focus := StyleBoxFlat.new()
+        focus.bg_color = Color(ThemeScript.GREEN.r, ThemeScript.GREEN.g, ThemeScript.GREEN.b, 0.10)
+        focus.border_color = Color(ThemeScript.GREEN.r, ThemeScript.GREEN.g, ThemeScript.GREEN.b, 0.55)
+        focus.set_border_width_all(2)
+        focus.set_corner_radius_all(24)
+        corner.add_theme_stylebox_override("normal", rest)
+        corner.add_theme_stylebox_override("hover", hover)
+        corner.add_theme_stylebox_override("pressed", hover)
+        corner.add_theme_stylebox_override("focus", focus)
         var center := CenterContainer.new()
         center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
         center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        var mark := ThemeScript.SlidersMark.new(ThemeScript.INK)
+        var mark := ThemeScript.SlidersMark.new(ThemeScript.GREEN_DEEP)
         mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
         center.add_child(mark)
         corner.add_child(center)
+        corner.tooltip_text = "Settings"
         ThemeScript.pressable(corner)
         corner.pressed.connect(func() -> void: settings_pressed.emit())
         return corner
 
-## The app's name in both of its languages: the Arabic reads as the name it
-## was given, the Latin as the name it types. The gold rule between the marks
-## and the card keeps the wordmark from floating off the page.
+## The app's name in both of its languages, and under it the ornament a
+## title page wears: the Arabic reads as the name it was given, the Latin
+## as the name it types, and the gold star between two short rules keeps
+## the wordmark from floating off the page.
 func _wordmark() -> Control:
         var row := CenterContainer.new()
         row.name = "Wordmark"
-        row.custom_minimum_size = Vector2(0, 66)
+        row.custom_minimum_size = Vector2(0, 64)
         var stack := VBoxContainer.new()
         stack.alignment = BoxContainer.ALIGNMENT_CENTER
-        stack.add_theme_constant_override("separation", 6)
+        stack.add_theme_constant_override("separation", 7)
         var arabic := Label.new()
         arabic.name = "Arabic"
         arabic.text = "تثبيت القرآن"
@@ -215,11 +253,9 @@ func _wordmark() -> Control:
         label.add_theme_font_size_override("font_size", 20)
         label.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
         stack.add_child(label)
-        var rule := PanelContainer.new()
-        rule.custom_minimum_size = Vector2(40, 3)
-        rule.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-        rule.add_theme_stylebox_override("panel", ThemeScript.soft_stylebox(ThemeScript.GOLD, 2))
-        stack.add_child(rule)
+        var ornament := ThemeScript.OrnamentMark.new()
+        ornament.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        stack.add_child(ornament)
         row.add_child(stack)
         return row
 
@@ -229,11 +265,20 @@ func _deck_card() -> Control:
         card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         card.custom_minimum_size = Vector2(0, 112)
         card.add_theme_stylebox_override("panel", ThemeScript.card_stylebox())
+        # The page's own margins: every other card in the app pads its
+        # content; this one was letting its widest line touch the frame.
+        var pad := MarginContainer.new()
+        pad.name = "Pad"
+        pad.add_theme_constant_override("margin_left", 30)
+        pad.add_theme_constant_override("margin_right", 30)
+        pad.add_theme_constant_override("margin_top", 16)
+        pad.add_theme_constant_override("margin_bottom", 16)
+        card.add_child(pad)
         var box := VBoxContainer.new()
         box.name = "Box"
         box.alignment = BoxContainer.ALIGNMENT_CENTER
         box.add_theme_constant_override("separation", 6)
-        card.add_child(box)
+        pad.add_child(box)
 
         var title := Label.new()
         title.name = "Title"
@@ -268,6 +313,9 @@ func _deck_card() -> Control:
 
         var next_up := Label.new()
         next_up.name = "NextUp"
+        # The reference centres like the card's own title and caption: an
+        # RTL line left-aligned inside a centred card reads as a smudge, not
+        # a heading.
         next_up.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         next_up.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         next_up.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY))
@@ -307,9 +355,9 @@ func _pill(title: String, key: String) -> Control:
         var name := Label.new()
         name.text = title
         name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        name.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-        name.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        name.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
+        name.add_theme_font_override("font", ThemeScript.vazir(13, true))
+        name.add_theme_font_size_override("font_size", 13)
+        name.add_theme_color_override("font_color", ThemeScript.INK)
         box.add_child(name)
         return pill
 
@@ -381,6 +429,7 @@ func _bottom_buttons() -> Control:
         sync_label.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
         sync_box.add_child(sync_label)
         sync.add_child(sync_box)
+        sync.tooltip_text = "Sync with GitHub"
         sync.pressed.connect(func() -> void: sync_pressed.emit())
         row.add_child(sync)
         return row
@@ -410,9 +459,22 @@ func refresh(counts: Dictionary) -> void:
         var due_pill: Label = get_node("Margin/Column/Stats/Due/Box/Value")
         var new_pill: Label = get_node("Margin/Column/Stats/New/Box/Value")
         var learned_pill: Label = get_node("Margin/Column/Stats/Learned/Box/Value")
-        due_pill.text = str(counts["due"])
-        new_pill.text = str(counts["new"])
-        learned_pill.text = str(counts["learned"])
+        ThemeScript.count_up(due_pill, int(counts["due"]))
+        ThemeScript.count_up(new_pill, int(counts["new"]))
+        ThemeScript.count_up(learned_pill, int(counts["learned"]))
         var study: Button = get_node("Margin/Column/Study")
         study.disabled = counts["due"] + counts["new"] == 0
         study.text = "Study" if counts["due"] > 0 else ("Learn new cards" if counts["new"] > 0 else "Nothing due — come back tomorrow")
+
+## Enter begins the day's study, the way Space reveals an answer: the home
+## screen's one button is the whole screen, so the keyboard may press it
+## from anywhere.
+func _unhandled_input(event: InputEvent) -> void:
+        if not visible:
+                return
+        if event is InputEventKey and event.pressed and not event.echo:
+                if event.keycode in [KEY_ENTER, KEY_KP_ENTER]:
+                        var study: Button = get_node("Margin/Column/Study")
+                        if not study.disabled:
+                                study_pressed.emit()
+                                get_viewport().set_input_as_handled()

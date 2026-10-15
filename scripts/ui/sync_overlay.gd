@@ -21,20 +21,30 @@ var _phase: Label
 var _count: Label
 var _bar: ProgressBar
 var _sweep: Tween
+var _mark: ThemeScript.SyncMark
+var _panel: PanelContainer
 
 func _ready() -> void:
-        color = Color(0.10, 0.14, 0.11, 0.45)
+        color = Color(0.10, 0.14, 0.11, 0.0)
         mouse_filter = Control.MOUSE_FILTER_STOP
         set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        resized.connect(_layout)
+        call_deferred("_layout")
+        # The dim arrives with the card on it, not before it: a screen that
+        # darkens before it has anything to say reads as a freeze.
+        var dim := create_tween()
+        dim.tween_property(self, "color:a", 0.45, 0.18)
 
         var center := CenterContainer.new()
         center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        center.mouse_filter = Control.MOUSE_FILTER_IGNORE
         add_child(center)
 
         var panel := PanelContainer.new()
-        panel.custom_minimum_size = Vector2(360, 0)
+        panel.name = "Panel"
         panel.add_theme_stylebox_override("panel", ThemeScript.card_stylebox())
         center.add_child(panel)
+        _panel = panel
 
         var pad := MarginContainer.new()
         for side in ["left", "right"]:
@@ -48,11 +58,13 @@ func _ready() -> void:
         pad.add_child(box)
 
         # The two circular arrows, at rest above the words: what is happening,
-        # before a single line is read.
+        # before a single line is read. While work is under way the mark
+        # turns, slowly -- the shape of something in motion, and the same
+        # honesty as the recitation's breathing bars.
         var mark_row := CenterContainer.new()
-        var mark := ThemeScript.SyncMark.new(ThemeScript.GREEN)
-        mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        mark_row.add_child(mark)
+        _mark = ThemeScript.SyncMark.new(ThemeScript.GREEN)
+        _mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        mark_row.add_child(_mark)
         box.add_child(mark_row)
 
         var title := Label.new()
@@ -101,6 +113,15 @@ func _ready() -> void:
         ThemeScript.settle_in(panel, 0.0, 0.3)
 
 
+## The card answers the window: capped at its own measure, never wider
+## than what a phone can hold.
+func _layout() -> void:
+        if size.x <= 0.0 or _panel == null:
+                return
+        var avail := minf(360.0, size.x - 48.0)
+        _panel.custom_minimum_size = Vector2(avail, 0)
+
+
 ## The engine's progress, made visible: a phase in plain words, and a bar
 ## that either knows how far it is or gently says "working on it".
 func report(text: String, done: int, total: int) -> void:
@@ -134,6 +155,8 @@ func _start_sweep() -> void:
                 return
         if _bar == null:
                 return
+        if _mark != null:
+                _mark.set_working(true)
         _bar.value = 0.0
         _sweep = create_tween()
         _sweep.set_loops()
@@ -145,6 +168,8 @@ func _stop_sweep() -> void:
         if _sweep != null and _sweep.is_valid():
                 _sweep.kill()
         _sweep = null
+        if _mark != null:
+                _mark.set_working(false)
 
 
 func _track_stylebox() -> StyleBoxFlat:

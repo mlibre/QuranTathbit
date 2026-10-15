@@ -91,7 +91,9 @@ func _go_home() -> void:
                 return
         var home := HomeScript.new()
         home.name = "Home"
-        _swap(home)
+        # Home is the way back: it arrives from above, the direction of
+        # returning, the way going deeper arrives from below.
+        _swap(home, true)
         home.setup(_deck, SchedulerScript.counts(_deck, _now()), _sync_line(), _settings.has_token(), _sync_state())
         home.study_pressed.connect(_start_session)
         home.sync_pressed.connect(_on_sync_pressed)
@@ -218,13 +220,18 @@ static func _ago(seconds: int) -> String:
         return "%dd ago" % (seconds / 86400)
 
 
-func _swap(next: Control) -> void:
+## Screens change hands like pages: the outgoing one fades where it stands
+## and stops taking input at once, and the incoming one arrives -- from
+## below when the user is going deeper into the app, from above when they
+## are coming back home. One vocabulary, every transition.
+func _swap(next: Control, from_above := false) -> void:
         if _screen != null:
                 var old: Control = _screen
                 old.mouse_filter = Control.MOUSE_FILTER_IGNORE  # a fading screen stops taking input
                 ThemeScript.vanish(old)
         _screen = next
         add_child(next)
+        ThemeScript.appear(next, 0.0, -14.0 if from_above else 14.0)
 
 
 func _now() -> int:

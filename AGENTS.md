@@ -30,10 +30,17 @@ Windows, web) in Godot 4.7 with GDScript only.
 - **Calm and bright.** Warm paper, a deep green, a gold accent, a Quranic
   typeface for the verses, Vazirmatn for everything else. Never dark, grim,
   spooky or clinical — this is a companion for something revered.
-- **Menus are still; the card is alive.** Panels, cards and buttons never
-  pulse, breathe, drift or loop. An element moves only in response to input,
-  and every transition is a one-shot arrival that settles. The only motion
-  that repeats is the recitation's own feedback.
+- **Still at rest, alive in answer.** Nothing loops, pulses, drifts or
+  parallaxes on its own; the screen at rest is a page. Motion answers
+  three things only: input (hover grows a breath, a held press settles,
+  focus arrives like a hover so the keyboard feels like the mouse), a
+  change of screen or state (one-shot arrivals that settle -- deeper
+  screens come from below, coming home comes from above, numbers count
+  in, cards assemble a beat apart), and work actually under way (the
+  recitation's breathing bars, the sync mark turning while a sync runs).
+  Feedback motion ends when its cause ends. Motion inside containers
+  uses scale, never position -- containers own position, and a tween
+  that fights them loses.
 - **One name per thing.** front/back, again/hard/good/easy, deck, card,
   progress. A word that means two things teaches the user to stop trusting the
   signposts.
