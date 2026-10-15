@@ -1,0 +1,85 @@
+extends SceneTree
+
+## Visual QA: drive the real app through its first session on a fresh install
+## and save a PNG at each step, so tools/shot_qa.py can read what a person
+## would see. Run it on a display -- Xvfb is enough; headless mode cannot
+## render, so it cannot carry this one.
+##
+##     godot --path . --script tests/capture_shots.gd -- /tmp/shots
+##     python3 tools/shot_qa.py /tmp/shots
+##
+## The out directory defaults to /tmp/shots; name another after -- to put the
+## PNGs somewhere else. The install is wiped first, so the shots are always of
+## the same first run.
+
+const MainScript := preload("res://scripts/main.gd")
+
+const SHOTS := 7
+
+var _out := "/tmp/shots"
+var _saved := 0
+
+func _init() -> void:
+        var args := OS.get_cmdline_user_args()
+        if args.size() > 0:
+                _out = args[0]
+        DirAccess.make_dir_recursive_absolute(_out)
+        _fresh_install()
+
+        var main = (load("res://scripts/main.gd") as GDScript).new()
+        # The scene file gives the root its full-rect anchors; match it here,
+        # or every screen lays out at zero size and the shots lie.
+        main.set_anchors_preset(Control.PRESET_FULL_RECT)
+        root.add_child(main)
+        await main.ready
+        await create_timer(0.8).timeout
+
+        await _shot("home")
+        main._start_session()
+        await create_timer(0.8).timeout
+        await _shot("study_front")
+        var study: Control = main.get_node("Study")
+        study._reveal()
+        await create_timer(0.9).timeout
+        await _shot("study_back")
+        study._answer("good")
+        await create_timer(0.7).timeout
+        await _shot("study_next")
+        study._answer("easy")
+        await create_timer(0.7).timeout
+        await _shot("study_two")
+        study.closed.emit()
+        await create_timer(0.7).timeout
+        main._on_settings_pressed()
+        await create_timer(0.8).timeout
+        await _shot("settings")
+        main.get_node("Settings").closed.emit()
+        await create_timer(0.6).timeout
+        await _shot("home_again")
+
+        print("captures: %d of %d shot(s) in %s" % [_saved, SHOTS, _out])
+        quit(0 if _saved >= SHOTS else 1)
+
+func _shot(name: String) -> void:
+        await process_frame
+        await process_frame
+        var image := root.get_viewport().get_texture().get_image()
+        if image.save_png(_out.path_join(name + ".png")) == OK:
+                _saved += 1
+                print("shot: %s" % name)
+
+func _fresh_install() -> void:
+        _remove_tree("user://decks")
+        _remove_tree("user://settings.json")
+        _remove_tree("user://sync_manifest.json")
+
+func _remove_tree(path: String) -> void:
+        if FileAccess.file_exists(path):
+                DirAccess.remove_absolute(path)
+                return
+        if DirAccess.dir_exists_absolute(path):
+                for entry in DirAccess.get_files_at(path):
+                        DirAccess.remove_absolute(path.path_join(entry))
+                for entry in DirAccess.get_directories_at(path):
+                        _remove_tree(path.path_join(entry))
+                DirAccess.remove_absolute(path)

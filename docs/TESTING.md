@@ -55,3 +55,16 @@ Two conventions worth keeping:
 - **Assert on observable state.** Read `progress.json` off disk, walk the
   scene tree, count the cards in the repo. A suite that could pass while the
   app is broken is worse than no suite.
+
+## Visual QA
+
+Headless runs cannot prove what a person sees. `tests/capture_shots.gd`
+drives the real app through a fresh install and its first session and saves a
+PNG at each step; `tools/shot_qa.py` reads them back (luminance, dark voids,
+palette). It needs a display — Xvfb is enough:
+
+```bash
+Xvfb :99 -screen 0 1280x800x24 &
+godot --path . --script tests/capture_shots.gd -- /tmp/shots
+python3 tools/shot_qa.py /tmp/shots
+```

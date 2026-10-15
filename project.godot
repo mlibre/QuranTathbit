@@ -34,9 +34,14 @@ window/handheld/orientation=1
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 renderer/rendering_method.web="gl_compatibility"
+; The page behind the cards: the theme's warm paper, so the voids around the
+; centred column read as the page and not as a dark screen.
+environment/defaults/default_clear_color=Color(0.980392, 0.964706, 0.929412, 1)
 textures/default_filters/use_nearest_mipmap_filter=false
 textures/vram_compression/import_etc2_astc=true
-anti_aliasing/quality/msaa_2d=2
+; 2D MSAA is not supported by the GLES3 driver and only prints a warning on
+; every launch (the web build included); this interface is text, not geometry.
+anti_aliasing/quality/msaa_2d=0
 
 [input_devices]
 
