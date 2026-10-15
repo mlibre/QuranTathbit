@@ -34,6 +34,25 @@ Every cross-file reference is therefore pinned behind a `preload` constant
 paths are quoted. The cold pass is what proves it; a suite that only passes
 warm is not green.
 
+## Live checks
+
+Two tools speak to GitHub's real servers, for when the fakes are not enough.
+They cost nothing, store nothing, and never need credentials to pass:
+
+```bash
+godot --headless --path . --script tools/live_http_check.gd   # the HTTP pipeline
+godot --headless --path . --script tools/live_auth_check.gd   # the sign-in path
+```
+
+`live_http_check` sends one request through the app's own `HttpClient` and
+accepts any HTTP status back — it proves the network plumbing, not GitHub's
+answer. `live_auth_check` goes further with the real OAuth app id: it mints a
+genuine device/user code pair, polls once and expects the specific
+`authorization_pending` answer (a bad id would return `invalid_client`
+instead), and — if you export `QURAN_TATHBIT_LIVE_TOKEN` with a classic token
+first — ends with the same `whoami` call every sign-in path finishes with.
+The token is read from the environment and never written anywhere.
+
 ## Adding a suite
 
 Name it `tests/regression_<subject>.gd`; the battery picks it up

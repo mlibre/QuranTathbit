@@ -332,7 +332,14 @@ func _begin_device_flow() -> void:
         var open: Button = flow.get_node("Open")
         var connect: Button = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Buttons/Connect")
         if began.has("error"):
-                get_node("Margin/Scroll/Column/GitHub/Padding/Box/State").text = "Could not reach GitHub. Check your connection and try again."
+                var state: Label = get_node("Margin/Scroll/Column/GitHub/Padding/Box/State")
+                if OS.has_feature("web"):
+                        # GitHub's sign-in endpoints send no CORS headers, so
+                        # no browser build can ever reach them. Say so once,
+                        # plainly, and hand the user the path that works.
+                        state.text = "Browsers cannot open GitHub's sign-in page (cross-origin rules). Paste a personal access token with the repo scope below: GitHub, Settings, Developer settings, Personal access tokens, then Generate new token (classic)."
+                else:
+                        state.text = "Could not reach GitHub. Check your connection and try again."
                 return
         code.text = _pretty_code(str(began.user_code))
         _flow_uri = str(began.verification_uri)
