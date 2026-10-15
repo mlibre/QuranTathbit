@@ -1,0 +1,137 @@
+name: Release builds
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot 4.7.2 and templates
+        run: |
+          curl -sL -o godot.zip https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          unzip -q godot.zip && sudo install -m 755 Godot_v4.7.2-stable_linux.x86_64 /usr/local/bin/godot
+          curl -sL -o templates.tpz https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz
+          mkdir -p ~/.local/share/godot/export_templates
+          unzip -q templates.tpz -d tpl && mv tpl/templates ~/.local/share/godot/export_templates/4.7.2.stable
+      # Green suites before a shippable artifact: the cold pass in the
+      # battery is what a stranger's machine effectively is.
+      - name: Run the regression battery
+        run: |
+          godot --headless --path . --import
+          tools/battery.sh
+      - name: Export Windows build
+        run: |
+          mkdir -p builds/windows
+          touch builds/.gdignore
+          godot --headless --path . --export-release "Windows" builds/windows/QuranTathbit.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QuranTathbit-windows
+          path: builds/windows/QuranTathbit.exe
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot 4.7.2 and templates
+        run: |
+          curl -sL -o godot.zip https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          unzip -q godot.zip && sudo install -m 755 Godot_v4.7.2-stable_linux.x86_64 /usr/local/bin/godot
+          curl -sL -o templates.tpz https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz
+          mkdir -p ~/.local/share/godot/export_templates
+          unzip -q templates.tpz -d tpl && mv tpl/templates ~/.local/share/godot/export_templates/4.7.2.stable
+      - name: Export Linux build
+        run: |
+          mkdir -p builds/linux
+          touch builds/.gdignore
+          godot --headless --path . --import
+          godot --headless --path . --export-release "Linux" builds/linux/QuranTathbit.x86_64
+      - name: Smoke the exported binary
+        run: |
+          chmod +x builds/linux/QuranTathbit.x86_64
+          builds/linux/QuranTathbit.x86_64 --headless --quit-after 300 | tee boot.log
+          grep -q "QURAN_TATHBIT_BOOT_OK" boot.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QuranTathbit-linux
+          path: builds/linux/QuranTathbit.x86_64
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      # No setup-android action: GitHub's ubuntu runners ship a preinstalled
+      # SDK (ANDROID_HOME points at it) with the build-tools and platform
+      # packages gradle needs, and the action itself has been the flaky leg
+      # of this job — it died inside its own install twice in a row, before
+      # Godot was even downloaded.
+      - name: Install Godot 4.7.2 and templates
+        run: |
+          curl -sL -o godot.zip https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          unzip -q godot.zip && sudo install -m 755 Godot_v4.7.2-stable_linux.x86_64 /usr/local/bin/godot
+          curl -sL -o templates.tpz https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz
+          mkdir -p ~/.local/share/godot/export_templates
+          unzip -q templates.tpz -d tpl && mv tpl/templates ~/.local/share/godot/export_templates/4.7.2.stable
+      - name: Generate a release keystore
+        run: |
+          keytool -genkeypair -v -keystore tathbit.keystore -alias qurantathbit \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass "$KEYSTORE_PASSWORD" -keypass "$KEYSTORE_PASSWORD" \
+            -dname "CN=QuranTathbit, O=mlibre, C=US"
+        env:
+          KEYSTORE_PASSWORD: tathbit-keep-it-close
+      # The keystore reaches Godot through its own environment variables, and
+      # the toolchain through JAVA_HOME / ANDROID_HOME, which Godot reads
+      # directly. The editor-settings file and .godot/export_credentials.cfg
+      # routes both failed in the field: a bare key fragment is not a parseable
+      # .tres, so the settings never loaded, and the credentials keys are
+      # keystore/release_password / _user / keystore/release — _pass was a name
+      # Godot never read, so the trio always looked half-configured.
+      - name: Export Android build
+        env:
+          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ github.workspace }}/tathbit.keystore
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: qurantathbit
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: tathbit-keep-it-close
+        run: |
+          mkdir -p builds/android
+          touch builds/.gdignore
+          godot --headless --path . --import
+          godot --headless --path . --export-release "Android" builds/android/QuranTathbit.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QuranTathbit-android
+          path: builds/android/QuranTathbit.apk
+
+  release:
+    needs: [windows, linux, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+      - name: Package and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          zip -j QuranTathbit-Windows.zip QuranTathbit-windows/QuranTathbit.exe
+          zip -j QuranTathbit-Linux.zip QuranTathbit-linux/QuranTathbit.x86_64
+          cp QuranTathbit-android/QuranTathbit.apk QuranTathbit-Android.apk
+          # This job checks out nothing, so gh cannot discover the repository
+          # from git; every call names it explicitly with -R.
+          if gh release view -R "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload -R "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" QuranTathbit-Windows.zip QuranTathbit-Linux.zip QuranTathbit-Android.apk --clobber
+          else
+            gh release create -R "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" \
+              QuranTathbit-Windows.zip QuranTathbit-Linux.zip QuranTathbit-Android.apk \
+              --title "QuranTathbit $GITHUB_REF_NAME" \
+              --notes "One deck, kept as folders and files. Unzip, run, study. The Android APK is self-signed: allow installs from this source when your phone asks."
+          fi

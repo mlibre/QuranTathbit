@@ -1,0 +1,12 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# Only written if you run godot --dump-extension-api yourself (it always dumps
+# to the current folder); 6.7MB of engine reference data nothing here reads.
+# Run it from a scratch folder outside the project if you ever need one.
+extension_api.json
+builds/
+android/
+keystores/
+.godot/export_credentials.cfg

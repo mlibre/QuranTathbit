@@ -1,0 +1,43 @@
+; QuranTathbit — native Godot 4.7 project
+; Engine configuration. The app is pure 2D interface built in code at
+; runtime: no external scenes, textures or models — just the fonts and
+; the deck it ships with.
+
+config_version=5
+
+[application]
+
+config/name="QuranTathbit"
+config/description="A quiet companion for keeping the Qur'an close — one deck, kept as folders and files."
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7")
+boot_splash/bg_color=Color(0.98, 0.96, 0.93, 1)
+boot_splash/show_image=false
+config/icon="res://assets/icons/icon.svg"
+
+[display]
+
+; The app is built to be held as readily as it is run on a desktop: one
+; expanding canvas, a centered column, and comfortable from phone to
+; window. The interface is all 2D, so the compatibility renderer carries
+; every platform — web included — with nothing to drop.
+window/size/viewport_width=1280
+window/size/viewport_height=800
+window/size/window_width_override=1280
+window/size/window_height_override=800
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=1
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+renderer/rendering_method.web="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+textures/vram_compression/import_etc2_astc=true
+anti_aliasing/quality/msaa_2d=2
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
