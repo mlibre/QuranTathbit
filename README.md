@@ -117,13 +117,17 @@ node node_modules/qurantathbit/start.js
 
 1. **Home** — the deck's name, today's waiting count, one big **Study** button.
 2. **Question** — the front of the card: the surah and āyāt in Arabic, set in
-   Amiri at a size you can read across the room. Below it a small gold button
-   plays the recitation. Press **Space** (or the **Show answer** button) when
-   you are ready.
-3. **Answer** — the back of the card: the verse, the makarem.ir Persian
-   translation, the recitation again. Four buttons ask how it went —
-   **Again**, **Hard**, **Good**, **Easy** — each carrying its next interval
-   plainly, so the cost of each choice is visible before you make it.
+   Amiri at a size you can read across the room, standing in the middle of
+   the page. Press **Space** (or the **Show answer** button) when you are
+   ready.
+3. **Answer** — the back of the card: the verse in Amiri, large and set in
+   its own room, the makarem.ir Persian translation following a step behind,
+   and the recitation again, each button saying which verse will speak. The
+   question's own reference rides along at the top, small and gold, so the
+   verse is never read without knowing which one was asked for. Four buttons
+   ask how it went — **Again**, **Hard**, **Good**, **Easy** — each carrying
+   its next interval as the biggest word on the button, so the cost of each
+   choice is visible before you make it.
 4. **Rest** — when the queue is empty, a small card says so and tells you to
    come back tomorrow. Progress is saved automatically.
 
@@ -152,6 +156,12 @@ the github.com form is written out in [docs/OAUTH_SETUP.md](docs/OAUTH_SETUP.md)
 | **Space** / **Enter** | show the answer, then answer **Good** |
 | **1** – **4** | answer **Again**, **Hard**, **Good**, **Easy** |
 | **Esc** | close the session |
+
+In the browser, the tab still belongs to the browser: **F5** / **Ctrl+F5**
+(reload), **F11** (fullscreen), **F12** / **Ctrl+Shift+I** (dev tools),
+**Ctrl+L** (address bar), **Ctrl+F** (find) and friends work exactly as they
+do on any other page. The app keeps only the keys it uses — Space, 1–4, Esc —
+and hands everything the browser owns straight back to it.
 
 ## Credits
 

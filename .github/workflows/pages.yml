@@ -88,12 +88,26 @@ jobs:
       # the app will stream must be waiting beside it. Cards reference their
       # audio by bare name in markdown, so the test asks for the deck-path
       # form only a real embedded file would have.
+      # The engine listens for keydown on the canvas and preventDefault()s
+      # every one, which eats the browser's own shortcuts -- F5, Ctrl+F5,
+      # F11, Ctrl+L and friends stopped working the moment the canvas took
+      # focus. The head_include ships a capture-phase gate on window that
+      # stops propagation for the browser-reserved combos (and only those:
+      # Space, 1-4 and Esc still belong to the app), so the default action
+      # survives and the tab behaves like a tab again.
       - name: Check the web build carries the deck
         run: |
           test -f builds/web/index.pck
           test -f builds/web/decks/quran/001/001001.mp3
           test -f builds/web/index.wasm.gz
           grep -q "index.wasm.gz" builds/web/index.html
+          # The marker alone would pass even if the gate arrived truncated
+          # (a ConfigFile value ends at the first unescaped double quote --
+          # the gate is written in single quotes for exactly that reason),
+          # so the check demands its working parts, not its name.
+          grep -q "qt-browser-keys" builds/web/index.html
+          grep -q "stopImmediatePropagation" builds/web/index.html
+          grep -q "addEventListener('keydown'" builds/web/index.html
           python3 - <<'PY'
           import sys
           data = open("builds/web/index.pck", "rb").read()

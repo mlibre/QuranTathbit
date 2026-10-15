@@ -6,8 +6,9 @@ const SchedulerScript := preload("res://scripts/data/scheduler.gd")
 const MarkdownScript := preload("res://scripts/ui/markdown.gd")
 
 ## The only front door: the deck's name, what is waiting today, and the one
-## button that matters. Everything else on this screen is a quiet second
-## thought -- sync and settings wait at the bottom, small and unhurried.
+## button that matters. Settings lives in the corner, out of the way; sync
+## waits at the bottom, small and unhurried; the page itself is dressed in a
+## still lattice of stars, the way a book's margins are.
 
 signal study_pressed
 signal sync_pressed
@@ -50,7 +51,7 @@ func setup(deck: DeckScript, counts: Dictionary, sync_line: String, connected: b
                 study.text = "Study" if counts["due"] > 0 else "Learn new cards"
                 study.disabled = false
 
-        var sync_label: Label = get_node("Margin/Column/Buttons/Sync/SyncBox/Label")
+        var sync_label: Label = get_node("Margin/Column/Bottom/Buttons/Sync/SyncBox/Label")
         sync_label.text = "Sync" if connected else "Connect GitHub"
         _set_sync_line(sync_line, sync_state)
 
@@ -72,7 +73,7 @@ func setup(deck: DeckScript, counts: Dictionary, sync_line: String, connected: b
 ## do -- filled green when the deck and the repo last agreed, gold when the
 ## promise is still unkept, hollow when there is no connection at all.
 func _set_sync_line(text: String, state: String) -> void:
-        var row: HBoxContainer = get_node("Margin/Column/SyncLine")
+        var row: HBoxContainer = get_node("Margin/Column/Bottom/SyncLine")
         var label: Label = row.get_node("Text")
         label.text = text
         var dot: ThemeScript.StatusDot = row.get_node("Dot")
@@ -113,45 +114,75 @@ func _size_for(script: String) -> int:
 
 func _build() -> void:
         set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-        add_child(_backdrop())
+        add_child(ThemeScript.paper_backdrop())
+        add_child(ThemeScript.paper_pattern())
+        add_child(_settings_corner())
+
         var margin := MarginContainer.new()
         margin.name = "Margin"
         margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
         margin.add_theme_constant_override("margin_left", 28)
         margin.add_theme_constant_override("margin_right", 28)
-        margin.add_theme_constant_override("margin_top", 40)
-        margin.add_theme_constant_override("margin_bottom", 32)
+        margin.add_theme_constant_override("margin_top", 36)
+        margin.add_theme_constant_override("margin_bottom", 30)
         add_child(margin)
 
         var column := VBoxContainer.new()
         column.name = "Column"
         column.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
         column.alignment = BoxContainer.ALIGNMENT_CENTER
-        column.add_theme_constant_override("separation", 16)
+        column.add_theme_constant_override("separation", 18)
         margin.add_child(column)
 
-        var wordmark := _wordmark()
-        column.add_child(wordmark)
+        column.add_child(_wordmark())
+        column.add_child(_deck_card())
+        column.add_child(_stats())
+        column.add_child(_study_button())
+        column.add_child(_bottom_group())
 
-        var deck_card := _deck_card()
-        column.add_child(deck_card)
+## The deck's other life, gathered at the page's foot: the sync button and
+## its state line belong to each other, so they stand together, a breath
+## below the study flow they sit under -- close enough to read as one
+## subject, far enough that no thumb finds them by accident.
+func _bottom_group() -> Control:
+        var group := VBoxContainer.new()
+        group.name = "Bottom"
+        group.alignment = BoxContainer.ALIGNMENT_CENTER
+        group.add_theme_constant_override("separation", 10)
+        group.add_child(_bottom_buttons())
+        group.add_child(_sync_line_row())
+        return group
 
-        var stats := _stats()
-        column.add_child(stats)
-
-        var study := _study_button()
-        column.add_child(study)
-
-        var buttons := _bottom_buttons()
-        column.add_child(buttons)
-
-        var sync_line := _sync_line_row()
-        column.add_child(sync_line)
-
-## A slow paper gradient behind everything, shared by every screen: the
-## screen breathes top-to-bottom instead of sitting on one flat colour.
-func _backdrop() -> Control:
-        return ThemeScript.paper_backdrop()
+## Settings in the corner, where a whole machine keeps it: a small tune mark,
+## quiet until visited. The wordmark no longer has to share the bottom row
+## with it, and the front door stays the only thing the middle of the page
+## talks about.
+func _settings_corner() -> Button:
+        var corner := Button.new()
+        corner.name = "SettingsCorner"
+        corner.anchor_left = 1.0
+        corner.anchor_right = 1.0
+        corner.anchor_top = 0.0
+        corner.anchor_bottom = 0.0
+        corner.offset_left = -76.0
+        corner.offset_right = -28.0
+        corner.offset_top = 22.0
+        corner.offset_bottom = 70.0
+        var styles := ThemeScript.mark_button_styles(ThemeScript.INK)
+        corner.add_theme_stylebox_override("normal", styles["normal"])
+        corner.add_theme_stylebox_override("hover", styles["hover"])
+        corner.add_theme_stylebox_override("pressed", styles["hover"])
+        corner.add_theme_stylebox_override("focus", styles["focus"])
+        var center := CenterContainer.new()
+        center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        var mark := ThemeScript.SlidersMark.new(ThemeScript.INK)
+        mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        center.add_child(mark)
+        corner.add_child(center)
+        ThemeScript.pressable(corner)
+        corner.pressed.connect(func() -> void: settings_pressed.emit())
+        return corner
 
 ## The app's name in both of its languages: the Arabic reads as the name it
 ## was given, the Latin as the name it types. The gold rule between the marks
@@ -159,27 +190,27 @@ func _backdrop() -> Control:
 func _wordmark() -> Control:
         var row := CenterContainer.new()
         row.name = "Wordmark"
-        row.custom_minimum_size = Vector2(0, 72)
+        row.custom_minimum_size = Vector2(0, 66)
         var stack := VBoxContainer.new()
         stack.alignment = BoxContainer.ALIGNMENT_CENTER
-        stack.add_theme_constant_override("separation", 8)
+        stack.add_theme_constant_override("separation", 6)
         var arabic := Label.new()
         arabic.name = "Arabic"
         arabic.text = "تثبيت القرآن"
         arabic.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        arabic.add_theme_font_override("font", ThemeScript.amiri(18))
-        arabic.add_theme_font_size_override("font_size", 18)
-        arabic.add_theme_color_override("font_color", ThemeScript.GOLD)
+        arabic.add_theme_font_override("font", ThemeScript.amiri(17))
+        arabic.add_theme_font_size_override("font_size", 17)
+        arabic.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP)
         stack.add_child(arabic)
         var label := Label.new()
         label.name = "Latin"
         label.text = "QuranTathbit"
-        label.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.TITLE, true))
-        label.add_theme_font_size_override("font_size", ThemeScript.TITLE)
+        label.add_theme_font_override("font", ThemeScript.vazir(20, true))
+        label.add_theme_font_size_override("font_size", 20)
         label.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
         stack.add_child(label)
         var rule := PanelContainer.new()
-        rule.custom_minimum_size = Vector2(46, 3)
+        rule.custom_minimum_size = Vector2(40, 3)
         rule.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         rule.add_theme_stylebox_override("panel", ThemeScript.soft_stylebox(ThemeScript.GOLD, 2))
         stack.add_child(rule)
@@ -226,7 +257,7 @@ func _deck_card() -> Control:
         eyebrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         eyebrow.add_theme_font_override("font", ThemeScript.vazir(12, true))
         eyebrow.add_theme_font_size_override("font_size", 12)
-        eyebrow.add_theme_color_override("font_color", ThemeScript.GOLD)
+        eyebrow.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP)
         box.add_child(eyebrow)
 
         var next_up := Label.new()
@@ -290,30 +321,22 @@ func _pill_bg(key: String) -> Color:
 func _pill_fg(key: String) -> Color:
         match key:
                 "due":
-                        return Color("#9C7A28")
+                        return ThemeScript.GOLD_DEEP
                 "new":
                         return ThemeScript.GREEN_DEEP
                 _:
                         return ThemeScript.INK_SOFT
 
 func _study_button() -> Control:
-        var button := Button.new()
+        var button := ThemeScript.primary_button("Study", 60)
         button.name = "Study"
-        button.custom_minimum_size = Vector2(320, 62)
+        button.custom_minimum_size = Vector2(340, 60)
         button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-        button.add_theme_font_override("font", ThemeScript.vazir(21, true))
-        button.add_theme_font_size_override("font_size", 21)
-        button.add_theme_color_override("font_color", Color.WHITE)
-        button.add_theme_color_override("font_hover_color", Color.WHITE)
-        button.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.75))
-        button.add_theme_stylebox_override("normal", ThemeScript.button_stylebox(ThemeScript.GREEN))
-        button.add_theme_stylebox_override("hover", ThemeScript.button_stylebox(ThemeScript.GREEN_DEEP))
-        button.add_theme_stylebox_override("pressed", ThemeScript.button_stylebox(ThemeScript.GREEN_DEEP))
-        button.add_theme_stylebox_override("disabled", ThemeScript.button_stylebox(ThemeScript.INK_SOFT))
-        button.add_theme_stylebox_override("focus", ThemeScript.button_stylebox(ThemeScript.GREEN_DEEP))
         button.pressed.connect(func() -> void: study_pressed.emit())
         return button
 
+## Sync on its own, with its own mark: the deck's other life, on GitHub,
+## one small decision below the day's study.
 func _bottom_buttons() -> Control:
         var row := HBoxContainer.new()
         row.name = "Buttons"
@@ -322,18 +345,28 @@ func _bottom_buttons() -> Control:
 
         var sync := Button.new()
         sync.name = "Sync"
-        sync.custom_minimum_size = Vector2(150, 46)
+        sync.custom_minimum_size = Vector2(170, 48)
         sync.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY))
         sync.add_theme_font_size_override("font_size", ThemeScript.BODY)
         sync.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
         sync.add_theme_color_override("font_hover_color", ThemeScript.GREEN_DEEP)
-        sync.add_theme_stylebox_override("normal", ThemeScript.outline_stylebox(ThemeScript.GREEN, 2, 23))
-        sync.add_theme_stylebox_override("hover", ThemeScript.soft_stylebox(ThemeScript.GREEN_SOFT, 23))
-        sync.add_theme_stylebox_override("pressed", ThemeScript.soft_stylebox(ThemeScript.GREEN_SOFT, 23))
-        sync.add_theme_stylebox_override("focus", ThemeScript.outline_stylebox(ThemeScript.GREEN, 2, 23))
-        var sync_box := VBoxContainer.new()
+        sync.add_theme_color_override("font_focus_color", ThemeScript.GREEN_DEEP)
+        sync.add_theme_stylebox_override("normal", ThemeScript.outline_stylebox(ThemeScript.GREEN, 2, 24))
+        var held := ThemeScript.outline_stylebox(ThemeScript.GREEN, 2, 24)
+        held.bg_color = Color(ThemeScript.GREEN.r, ThemeScript.GREEN.g, ThemeScript.GREEN.b, 0.10)
+        sync.add_theme_stylebox_override("hover", held)
+        sync.add_theme_stylebox_override("pressed", held)
+        sync.add_theme_stylebox_override("focus", ThemeScript.outline_stylebox(Color(ThemeScript.GREEN.r, ThemeScript.GREEN.g, ThemeScript.GREEN.b, 0.55)))
+        ThemeScript.pressable(sync)
+        var sync_box := HBoxContainer.new()
         sync_box.name = "SyncBox"
         sync_box.alignment = BoxContainer.ALIGNMENT_CENTER
+        sync_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        sync_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        sync_box.add_theme_constant_override("separation", 9)
+        var mark := ThemeScript.SyncMark.new(ThemeScript.GREEN_DEEP)
+        mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        sync_box.add_child(mark)
         var sync_label := Label.new()
         sync_label.name = "Label"
         sync_label.text = "Sync"
@@ -344,21 +377,6 @@ func _bottom_buttons() -> Control:
         sync.add_child(sync_box)
         sync.pressed.connect(func() -> void: sync_pressed.emit())
         row.add_child(sync)
-
-        var settings := Button.new()
-        settings.name = "Settings"
-        settings.custom_minimum_size = Vector2(150, 46)
-        settings.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY))
-        settings.add_theme_font_size_override("font_size", ThemeScript.BODY)
-        settings.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
-        settings.add_theme_color_override("font_hover_color", ThemeScript.INK)
-        settings.add_theme_stylebox_override("normal", ThemeScript.outline_stylebox(ThemeScript.LINE))
-        settings.add_theme_stylebox_override("hover", ThemeScript.soft_stylebox(Color(0.96, 0.95, 0.92), 23))
-        settings.add_theme_stylebox_override("pressed", ThemeScript.soft_stylebox(Color(0.96, 0.95, 0.92), 23))
-        settings.add_theme_stylebox_override("focus", ThemeScript.outline_stylebox(ThemeScript.LINE))
-        settings.text = "Settings"
-        settings.pressed.connect(func() -> void: settings_pressed.emit())
-        row.add_child(settings)
         return row
 
 ## The row itself: a drawn dot, a breath of space, the words. Built once;

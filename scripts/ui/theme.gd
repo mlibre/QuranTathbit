@@ -12,12 +12,13 @@ extends RefCounted
 const PAPER := Color("#FAF6ED")
 const CARD := Color("#FFFFFF")
 const INK := Color("#26302B")
-const INK_SOFT := Color("#5C6B62")
+const INK_SOFT := Color("#635F4E")
 const LINE := Color("#E6DFCE")
 const GREEN := Color("#1E6B52")
 const GREEN_DEEP := Color("#14513D")
 const GREEN_SOFT := Color("#E3EFE8")
 const GOLD := Color("#C29A3B")
+const GOLD_DEEP := Color("#8D6E24")
 const GOLD_SOFT := Color("#F6EDD8")
 const DANGER := Color("#B4553F")
 
@@ -53,19 +54,34 @@ const MEASURE := 720
 # also lets each mark sit at its own weight beside the type.
 
 
-## A play triangle, the size of a word: for buttons that speak.
-class PlayIcon extends Control:
+## A play triangle that becomes a small breathing column of bars while the
+## recitation speaks. The app moves only in answer to a hand, with one
+## exception it has always allowed: the sound itself, showing that it sounds.
+class SoundMark extends Control:
         var color := GREEN
+        var speaking := false
+        var _t := 0.0
 
         func _init(p_color: Color = GREEN) -> void:
                 color = p_color
                 custom_minimum_size = Vector2(15, 17)
 
+        func _process(delta: float) -> void:
+                if speaking:
+                        _t += delta
+                        queue_redraw()
+
         func _draw() -> void:
-                draw_colored_polygon(
-                        PackedVector2Array([Vector2(2.5, 2), Vector2(14, 8.5), Vector2(2.5, 15)]),
-                        color
-                )
+                if not speaking:
+                        draw_colored_polygon(
+                                PackedVector2Array([Vector2(3.5, 2), Vector2(15, 8.5), Vector2(3.5, 15)]),
+                                color
+                        )
+                        return
+                for i in 4:
+                        var level := 0.35 + 0.65 * absf(sin(_t * 6.0 + i * 1.9))
+                        var h := 4.0 + level * 11.0
+                        draw_rect(Rect2(0.5 + i * 3.8, 8.5 - h / 2.0, 2.4, h), color)
 
 
 ## A small status dot. Filled says "alive"; hollow says "off, by choice".
@@ -99,6 +115,120 @@ class CheckMark extends Control:
                 draw_circle(points[0], 2.75, GOLD)
                 draw_circle(points[1], 2.75, GOLD)
                 draw_circle(points[2], 2.75, GOLD)
+
+
+## The tune mark: three rules and their knobs, for the place settings live.
+class SlidersMark extends Control:
+        var color := INK_SOFT
+
+        func _init(p_color: Color = INK_SOFT) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(18, 18)
+
+        func _draw() -> void:
+                var ys := [4.5, 9.0, 13.5]
+                var xs := [12.0, 6.0, 13.0]
+                for i in 3:
+                        draw_line(Vector2(2, ys[i]), Vector2(16, ys[i]), color, 1.8, true)
+                for i in 3:
+                        draw_circle(Vector2(xs[i], ys[i]), 3.1, color)
+
+
+## A chevron pointing back the way the user came: the universal way out.
+class BackMark extends Control:
+        var color := INK
+
+        func _init(p_color: Color = INK) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(14, 22)
+
+        func _draw() -> void:
+                draw_polyline(
+                        PackedVector2Array([Vector2(11, 3), Vector2(4, 11), Vector2(11, 19)]),
+                        color,
+                        2.4,
+                        true
+                )
+
+
+## The way onward, for the one button that begins a session.
+class AheadMark extends Control:
+        var color := Color.WHITE
+
+        func _init(p_color: Color = Color.WHITE) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(14, 22)
+
+        func _draw() -> void:
+                draw_polyline(
+                        PackedVector2Array([Vector2(3, 3), Vector2(10, 11), Vector2(3, 19)]),
+                        color,
+                        2.4,
+                        true
+                )
+
+
+## Two circular arrows, hand over hand: sync, in plain sight.
+class SyncMark extends Control:
+        var color := GREEN_DEEP
+
+        func _init(p_color: Color = GREEN_DEEP) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(20, 20)
+
+        func _draw() -> void:
+                var c := Vector2(10, 10)
+                var r := 7.0
+                # One arrow sweeps down and around to the left...
+                var a_from := deg_to_rad(-30.0)
+                var a_to := deg_to_rad(150.0)
+                draw_arc(c, r, a_from, a_to, 28, color, 2.2, true)
+                _head(c + Vector2(cos(a_to), sin(a_to)) * r, a_to + PI / 2.0)
+                # ...and its twin sweeps up and around to the right.
+                var b_from := deg_to_rad(150.0)
+                var b_to := deg_to_rad(330.0)
+                draw_arc(c, r, b_from, b_to, 28, color, 2.2, true)
+                _head(c + Vector2(cos(b_to), sin(b_to)) * r, b_to + PI / 2.0)
+
+        func _head(at: Vector2, direction: float) -> void:
+                var dir := Vector2(cos(direction), sin(direction))
+                var n := Vector2(-dir.y, dir.x)
+                draw_colored_polygon(
+                        PackedVector2Array([at + n * 2.6, at - n * 2.6, at + dir * 4.8]),
+                        color
+                )
+
+
+## A still lattice of eight-pointed stars behind the page: the margin
+## decoration of a reverent book, drawn once in gold at a whisper. It never
+## moves and never competes -- cards and words sit on top of it.
+class PaperPattern extends Control:
+        var spacing := 148.0
+        var star := 14.0
+        var tint := Color(GOLD.r, GOLD.g, GOLD.b, 0.075)
+
+        func _ready() -> void:
+                mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+        func _draw() -> void:
+                if size.x <= 0.0 or size.y <= 0.0:
+                        return
+                var rows := int(ceil(size.y / spacing)) + 1
+                var cols := int(ceil(size.x / spacing)) + 1
+                for row in rows:
+                        var offset := spacing / 2.0 if row % 2 == 1 else 0.0
+                        for col in cols:
+                                _star(Vector2(col * spacing + offset, row * spacing))
+
+        ## Rub el Hizb: two squares, one turned a half-step, eight points.
+        func _star(at: Vector2) -> void:
+                for turn in [0.0, PI / 8.0]:
+                        var points := PackedVector2Array()
+                        for i in 4:
+                                var ang: float = float(turn) + TAU * i / 4.0
+                                points.append(at + Vector2(cos(ang), sin(ang)) * star)
+                        points.append(points[0])
+                        draw_polyline(points, tint, 1.1, true)
 
 
 ## A one-pixel rule the colour of the page's edges: for dividing a card's
@@ -139,6 +269,14 @@ static func paper_backdrop() -> Control:
         return rect
 
 
+## The star lattice, full-rect, behind the page's margins.
+static func paper_pattern() -> PaperPattern:
+        var pattern := PaperPattern.new()
+        pattern.name = "Pattern"
+        pattern.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        return pattern
+
+
 ## The engine's scrollbar is a grey plastic ridge from another app. This one
 ## is a slim rail the colour of the page's edges, with a gold thumb while it
 ## is being dragged -- present when needed, invisible when not. The item
@@ -162,6 +300,217 @@ static func style_scroll(scroll: ScrollContainer) -> void:
         bar.add_theme_stylebox_override("grabber", grabber)
         bar.add_theme_stylebox_override("grabber_highlight", grabber)
         bar.add_theme_stylebox_override("grabber_pressed", grabbed)
+
+
+# --- the shared buttons -----------------------------------------------------------
+
+
+## Every button answers the hand before the click lands: a small settle
+## toward its centre while it is held, a return the moment it lets go. One
+## helper, wired once, so the whole app agrees on what a press feels like --
+## on the mouse and, through the same pop, on the keyboard.
+static func pressable(button: Button, press_scale := 0.965) -> void:
+        button.resized.connect(func() -> void:
+                if button.size.x > 0.0:
+                        button.pivot_offset = button.size / 2.0
+        )
+        button.button_down.connect(func() -> void: _scale_to(button, press_scale, 0.08))
+        button.pressed.connect(func() -> void: _scale_to(button, 1.0, 0.16))
+        button.button_up.connect(func() -> void: _scale_to(button, 1.0, 0.16))
+
+
+static func _scale_to(button: Button, to: float, duration: float) -> void:
+        var running: Variant = button.get_meta("_press_tween", null)
+        if running is Tween and (running as Tween).is_valid():
+                (running as Tween).kill()
+        var tween := button.create_tween()
+        button.set_meta("_press_tween", tween)
+        tween.tween_property(button, "scale", Vector2(to, to), duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+## The filled green: the one button on a screen that means "go".
+static func primary_button(label_text: String, height := 56) -> Button:
+        var button := Button.new()
+        button.text = label_text
+        button.custom_minimum_size = Vector2(0, height)
+        button.add_theme_font_override("font", vazir(BODY + 2, true))
+        button.add_theme_font_size_override("font_size", BODY + 2)
+        button.add_theme_color_override("font_color", Color.WHITE)
+        button.add_theme_color_override("font_hover_color", Color.WHITE)
+        button.add_theme_color_override("font_pressed_color", Color.WHITE)
+        button.add_theme_color_override("font_focus_color", Color.WHITE)
+        button.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.72))
+        button.add_theme_stylebox_override("normal", button_stylebox(GREEN))
+        button.add_theme_stylebox_override("hover", button_stylebox(GREEN_DEEP))
+        button.add_theme_stylebox_override("pressed", button_stylebox(GREEN_DEEP))
+        button.add_theme_stylebox_override("disabled", button_stylebox(Color("#9AA79E")))
+        var focus := button_stylebox(GREEN_DEEP)
+        focus.border_color = Color(GOLD.r, GOLD.g, GOLD.b, 0.9)
+        focus.set_border_width_all(2)
+        button.add_theme_stylebox_override("focus", focus)
+        pressable(button)
+        return button
+
+
+## The outline: a second thought, in the tone of whatever it leads to.
+static func ghost_button(label_text: String, tone: Color, height := 46, radius := 23) -> Button:
+        var button := Button.new()
+        button.text = label_text
+        button.custom_minimum_size = Vector2(0, height)
+        button.add_theme_font_override("font", vazir(BODY))
+        button.add_theme_font_size_override("font_size", BODY)
+        button.add_theme_color_override("font_color", tone)
+        button.add_theme_color_override("font_hover_color", tone)
+        button.add_theme_color_override("font_pressed_color", tone)
+        button.add_theme_color_override("font_focus_color", tone)
+        button.add_theme_stylebox_override("normal", outline_stylebox(tone, 2, radius))
+        var held := outline_stylebox(tone, 2, radius)
+        held.bg_color = Color(tone.r, tone.g, tone.b, 0.10)
+        button.add_theme_stylebox_override("hover", held)
+        button.add_theme_stylebox_override("pressed", held)
+        var ring := outline_stylebox(Color(tone.r, tone.g, tone.b, 0.55), 2, radius)
+        button.add_theme_stylebox_override("focus", ring)
+        pressable(button)
+        return button
+
+
+## The styleboxes of a quiet square icon button (back marks, corner gears):
+## nothing at rest, a wash while visited, a soft ring while focused.
+static func mark_button_styles(tone: Color = INK) -> Dictionary:
+        var rest := StyleBoxFlat.new()
+        rest.bg_color = Color(0, 0, 0, 0)
+        rest.set_corner_radius_all(24)
+        var hover := StyleBoxFlat.new()
+        hover.bg_color = Color(tone.r, tone.g, tone.b, 0.08)
+        hover.set_corner_radius_all(24)
+        var focus := StyleBoxFlat.new()
+        focus.bg_color = Color(0, 0, 0, 0)
+        focus.border_color = Color(tone.r, tone.g, tone.b, 0.55)
+        focus.set_border_width_all(2)
+        focus.set_corner_radius_all(24)
+        return {"normal": rest, "hover": hover, "pressed": hover, "focus": focus}
+
+
+## One shared header for the screens that sit on top of home: a back mark
+## that says where it goes, a title in the middle, room on the right for
+## whatever only that screen needs. The same bones everywhere, so leaving is
+## never a new thing to learn.
+static func top_bar(title_text: String) -> Dictionary:
+        var row := HBoxContainer.new()
+        row.name = "TopBar"
+        row.custom_minimum_size = Vector2(0, 48)
+
+        var back := Button.new()
+        back.name = "Back"
+        back.custom_minimum_size = Vector2(48, 48)
+        var styles := mark_button_styles()
+        back.add_theme_stylebox_override("normal", styles["normal"])
+        back.add_theme_stylebox_override("hover", styles["hover"])
+        back.add_theme_stylebox_override("pressed", styles["hover"])
+        back.add_theme_stylebox_override("focus", styles["focus"])
+        back.add_child(_centered_mark(BackMark.new(INK)))
+        pressable(back)
+        row.add_child(back)
+
+        var title := Label.new()
+        title.name = "Title"
+        title.text = title_text
+        title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        title.add_theme_font_override("font", vazir(TITLE, true))
+        title.add_theme_font_size_override("font_size", TITLE)
+        title.add_theme_color_override("font_color", GREEN_DEEP)
+        row.add_child(title)
+
+        var right := Control.new()
+        right.name = "Right"
+        right.custom_minimum_size = Vector2(48, 48)
+        row.add_child(right)
+        return {"row": row, "back": back, "title": title, "right": right}
+
+
+static func _centered_mark(mark: Control) -> CenterContainer:
+        var center := CenterContainer.new()
+        center.name = "Mark"
+        center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        center.add_child(mark)
+        return center
+
+
+## A small key cap, the way a key looks on the keyboard it names.
+static func key_chip(label_text: String) -> PanelContainer:
+        var chip := PanelContainer.new()
+        chip.add_theme_stylebox_override("panel", soft_stylebox(Color(INK.r, INK.g, INK.b, 0.07), 7))
+        chip.add_theme_constant_override("margin_left", 7)
+        chip.add_theme_constant_override("margin_right", 7)
+        chip.add_theme_constant_override("margin_top", 2)
+        chip.add_theme_constant_override("margin_bottom", 3)
+        var label := Label.new()
+        label.text = label_text
+        label.add_theme_font_override("font", vazir(12, true))
+        label.add_theme_font_size_override("font_size", 12)
+        label.add_theme_color_override("font_color", INK_SOFT)
+        chip.add_child(label)
+        return chip
+
+
+# --- motion ---------------------------------------------------------------------
+
+
+## Fade a control in, sliding it a breath upward. One shot, then it settles.
+static func appear(control: Control, delay := 0.0, distance := 14.0) -> void:
+        if control == null:
+                return
+        var target_y: float = control.position.y
+        control.modulate.a = 0.0
+        control.position.y = target_y + distance
+        var tween := control.create_tween()
+        if delay > 0.0:
+                tween.tween_interval(delay)
+        tween.set_parallel(true)
+        tween.tween_property(control, "modulate:a", 1.0, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+        tween.tween_property(control, "position:y", target_y, 0.34).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## Fade out and free. Screen changes call this on the outgoing screen.
+static func vanish(control: Control) -> void:
+        if control == null:
+                return
+        var tween := control.create_tween()
+        tween.tween_property(control, "modulate:a", 0.0, 0.16)
+        tween.tween_callback(control.queue_free)
+
+
+## Fade a control in where it stands -- for the children of containers, whose
+## layout a position tween would fight. One shot, then it settles.
+static func settle_in(control: Control, delay := 0.0, duration := 0.22) -> void:
+        if control == null:
+                return
+        var running: Variant = control.get_meta("_settle_tween", false)
+        if running is Tween and (running as Tween).is_valid():
+                (running as Tween).kill()
+        control.modulate.a = 0.0
+        var tween := control.create_tween()
+        control.set_meta("_settle_tween", tween)
+        if delay > 0.0:
+                tween.tween_interval(delay)
+        tween.tween_property(control, "modulate:a", 1.0, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+## Arrive one after another: every child of a container settles in, each a
+## beat behind the last, so a reveal reads as a sequence instead of one swap.
+static func stagger_in(box: Container, step := 0.07, duration := 0.24) -> void:
+        var i := 0
+        for child in box.get_children():
+                if child is Control:
+                        settle_in(child, step * i, duration)
+                        i += 1
+
+
+# --- type -----------------------------------------------------------------------
+
 
 static func vazir(size: int, bold := false) -> Font:
         return load(VAZIR_BOLD if bold else VAZIR) as Font
@@ -221,15 +570,21 @@ static func font_for(script: String, size: int, bold := false) -> Font:
                         return vazir(size, bold)
 
 
+# --- surfaces -------------------------------------------------------------------
+
+
+## A page lying on the desk: white, warm-edged, lifted by one deep soft
+## shadow instead of a hard outline. The shadow is the app's sense of depth;
+## everything that matters sits on a card like this.
 static func card_stylebox(accent: Color = CARD) -> StyleBoxFlat:
         var box := StyleBoxFlat.new()
         box.bg_color = accent
         box.border_color = LINE
         box.set_border_width_all(1)
         box.set_corner_radius_all(RADIUS)
-        box.shadow_color = Color(0.16, 0.2, 0.17, 0.08)
-        box.shadow_size = 10
-        box.shadow_offset = Vector2(0, 3)
+        box.shadow_color = Color(0.42, 0.34, 0.16, 0.13)
+        box.shadow_size = 24
+        box.shadow_offset = Vector2(0, 10)
         return box
 
 
@@ -254,43 +609,3 @@ static func outline_stylebox(color: Color, width := 2, radius := 22) -> StyleBox
         box.set_border_width_all(width)
         box.set_corner_radius_all(radius)
         return box
-
-
-## Fade a control in, sliding it a breath upward. One shot, then it settles.
-static func appear(control: Control, delay := 0.0, distance := 14.0) -> void:
-        if control == null:
-                return
-        var target_y: float = control.position.y
-        control.modulate.a = 0.0
-        control.position.y = target_y + distance
-        var tween := control.create_tween()
-        if delay > 0.0:
-                tween.tween_interval(delay)
-        tween.set_parallel(true)
-        tween.tween_property(control, "modulate:a", 1.0, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-        tween.tween_property(control, "position:y", target_y, 0.34).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-
-
-## Fade out and free. Screen changes call this on the outgoing screen.
-static func vanish(control: Control) -> void:
-        if control == null:
-                return
-        var tween := control.create_tween()
-        tween.tween_property(control, "modulate:a", 0.0, 0.16)
-        tween.tween_callback(control.queue_free)
-
-
-## Fade a control in where it stands -- for the children of containers, whose
-## layout a position tween would fight. One shot, then it settles.
-static func settle_in(control: Control, delay := 0.0, duration := 0.22) -> void:
-        if control == null:
-                return
-        var running: Variant = control.get_meta("_settle_tween", false)
-        if running is Tween and (running as Tween).is_valid():
-                (running as Tween).kill()
-        control.modulate.a = 0.0
-        var tween := control.create_tween()
-        control.set_meta("_settle_tween", tween)
-        if delay > 0.0:
-                tween.tween_interval(delay)
-        tween.tween_property(control, "modulate:a", 1.0, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)

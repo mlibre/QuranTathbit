@@ -32,7 +32,7 @@ func _ready() -> void:
         add_child(center)
 
         var panel := PanelContainer.new()
-        panel.custom_minimum_size = Vector2(340, 0)
+        panel.custom_minimum_size = Vector2(360, 0)
         panel.add_theme_stylebox_override("panel", ThemeScript.card_stylebox())
         center.add_child(panel)
 
@@ -46,6 +46,14 @@ func _ready() -> void:
         var box := VBoxContainer.new()
         box.add_theme_constant_override("separation", 10)
         pad.add_child(box)
+
+        # The two circular arrows, at rest above the words: what is happening,
+        # before a single line is read.
+        var mark_row := CenterContainer.new()
+        var mark := ThemeScript.SyncMark.new(ThemeScript.GREEN)
+        mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        mark_row.add_child(mark)
+        box.add_child(mark_row)
 
         var title := Label.new()
         title.text = "Syncing"

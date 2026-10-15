@@ -65,6 +65,11 @@ jobs:
       - name: Stage the npm package
         run: |
           sed -i 's/"background_color":"#000000"/"background_color":"#faf5ed","theme_color":"#14513d"/' builds/web/index.manifest.json
+          # The browser-shortcut gate (qt-browser-keys) must ride along: it is
+          # part of the page's head, and the npm package serves that same page.
+          grep -q "qt-browser-keys" builds/web/index.html
+          grep -q "stopImmediatePropagation" builds/web/index.html
+          grep -q "addEventListener('keydown'" builds/web/index.html
           mkdir -p pkg
           cp builds/web/index.html builds/web/index.js builds/web/index.wasm \
                 builds/web/index.pck builds/web/index.png \

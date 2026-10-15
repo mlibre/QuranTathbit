@@ -76,7 +76,7 @@ func _check_study_session(main: Node) -> void:
         if study == null:
                 return
 
-        var view = study.get_node("Margin/Column/Surface/CardPanel/Padding/View")
+        var view = study.get_node("Margin/Column/Surface/Fill/CardPanel/Padding/View")
         _ok(view.get_child_count() >= 1, "the card's question is on screen")
 
         study._reveal()
@@ -84,10 +84,17 @@ func _check_study_session(main: Node) -> void:
         var answers: GridContainer = study.get_node("Margin/Column/Answers")
         _ok(answers.get_child_count() == 4, "four answers appear behind the reveal")
         var labels := []
+        var waits := []
         for button in answers.get_children():
                 labels.append(button.get_node("Center/Row/Stack/Word").text)
+                waits.append(button.get_node("Center/Row/Stack/Wait").text)
         _ok(labels.any(func(l: String) -> bool: return l.begins_with("Again")), "one answer is Again")
         _ok(labels.any(func(l: String) -> bool: return l.begins_with("Good")), "one answer is Good")
+        _ok(waits.all(func(w: String) -> bool: return not w.is_empty()), "every answer names its interval")
+        # The answer side carries the question's own reference, small and gold,
+        # so the verse is never read without knowing which one was asked for.
+        var eyebrow := view.get_node_or_null("Eyebrow")
+        _ok(eyebrow != null and str(eyebrow.text).length() > 0, "the question rides along above the answer")
         # The back of the first card is Arabic plus Persian plus audio.
         var texts := []
         for child in view.get_children():

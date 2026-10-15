@@ -9,7 +9,9 @@ const VersionScript := preload("res://scripts/data/version.gd")
 
 ## Settings is short on purpose: connect GitHub, name the repo, sync. The
 ## deck itself is edited as files -- in any editor, on any machine -- so
-## there is deliberately nothing here to build a card with.
+## there is deliberately nothing here to build a card with. What is here
+## reads in the order a person arrives in: the deck in hand, the account
+## beside it, and where the words come from at the end.
 
 signal closed
 signal account_changed
@@ -38,12 +40,13 @@ func setup(http: HttpClientScript, auth: GitHubAuthScript, settings: SettingsScr
 func _build() -> void:
         set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
         add_child(ThemeScript.paper_backdrop())
+        add_child(ThemeScript.paper_pattern())
         var margin := MarginContainer.new()
         margin.name = "Margin"
         margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-        margin.add_theme_constant_override("margin_left", 24)
-        margin.add_theme_constant_override("margin_right", 24)
-        margin.add_theme_constant_override("margin_top", 28)
+        margin.add_theme_constant_override("margin_left", 26)
+        margin.add_theme_constant_override("margin_right", 26)
+        margin.add_theme_constant_override("margin_top", 22)
         margin.add_theme_constant_override("margin_bottom", 28)
         add_child(margin)
 
@@ -56,38 +59,18 @@ func _build() -> void:
         var column := VBoxContainer.new()
         column.name = "Column"
         column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        column.add_theme_constant_override("separation", 22)
+        column.add_theme_constant_override("separation", 18)
         scroll.add_child(column)
 
-        var header := HBoxContainer.new()
-        header.name = "Header"
-        var title := Label.new()
-        title.text = "Settings"
-        title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        title.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.TITLE, true))
-        title.add_theme_font_size_override("font_size", ThemeScript.TITLE)
-        title.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
-        header.add_child(title)
-        var close := Button.new()
-        close.name = "Close"
-        close.text = "×"
-        close.custom_minimum_size = Vector2(44, 40)
-        close.add_theme_font_override("font", ThemeScript.vazir(24))
-        close.add_theme_font_size_override("font_size", 24)
-        close.add_theme_color_override("font_color", ThemeScript.INK)
-        close.add_theme_color_override("font_hover_color", ThemeScript.INK)
-        close.add_theme_stylebox_override("normal", ThemeScript.outline_stylebox(ThemeScript.LINE, 1, 20))
-        close.add_theme_stylebox_override("hover", ThemeScript.soft_stylebox(Color(0.95, 0.94, 0.91), 20))
-        close.add_theme_stylebox_override("pressed", ThemeScript.soft_stylebox(Color(0.95, 0.94, 0.91), 20))
-        close.add_theme_stylebox_override("focus", ThemeScript.outline_stylebox(ThemeScript.LINE, 1, 20))
-        close.pressed.connect(func() -> void: closed.emit())
-        header.add_child(close)
-        column.add_child(header)
+        # The same header every screen above home wears: back the way they came.
+        var bar: Dictionary = ThemeScript.top_bar("Settings")
+        var back: Button = bar["back"]
+        back.pressed.connect(func() -> void: closed.emit())
+        column.add_child(bar["row"])
 
+        column.add_child(_deck_body())
         column.add_child(_section("GitHub"))
         column.add_child(_github_body())
-        column.add_child(_section("Deck"))
-        column.add_child(_deck_body())
         column.add_child(_section("Data source"))
         column.add_child(_source_body())
         column.add_child(_about())
@@ -102,7 +85,7 @@ func _section(title: String) -> Control:
         label.text = title
         label.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION, true))
         label.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        label.add_theme_color_override("font_color", ThemeScript.GOLD)
+        label.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP)
         row.add_child(label)
         var rule := ThemeScript.hairline(ThemeScript.LINE)
         rule.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -133,13 +116,13 @@ func _text(what: String, color: Color, size: int, center := false, bold := false
 func _style_field(field: LineEdit) -> void:
         var rest := StyleBoxFlat.new()
         rest.bg_color = ThemeScript.CARD
-        rest.border_color = ThemeScript.LINE
+        rest.border_color = Color("#D9CFBB")
         rest.set_border_width_all(1)
         rest.set_corner_radius_all(12)
         rest.content_margin_left = 14
         rest.content_margin_right = 14
-        rest.content_margin_top = 10
-        rest.content_margin_bottom = 10
+        rest.content_margin_top = 8
+        rest.content_margin_bottom = 8
         var focused := rest.duplicate() as StyleBoxFlat
         focused.border_color = ThemeScript.GREEN
         focused.set_border_width_all(2)
@@ -150,9 +133,11 @@ func _style_field(field: LineEdit) -> void:
         field.add_theme_color_override("font_placeholder_color", ThemeScript.INK_SOFT)
         field.add_theme_color_override("selection_color", ThemeScript.GREEN_SOFT)
 
-func _github_body() -> Control:
+## One card's bones: the panel, the padding, the column. Settings' cards all
+## wear the same frame, so only their contents differ.
+func _card(card_name: String, box_name := "Box") -> Array:
         var card := PanelContainer.new()
-        card.name = "GitHub"
+        card.name = card_name
         card.add_theme_stylebox_override("panel", ThemeScript.card_stylebox())
         var pad := MarginContainer.new()
         pad.name = "Padding"
@@ -162,9 +147,24 @@ func _github_body() -> Control:
         pad.add_theme_constant_override("margin_bottom", 18)
         card.add_child(pad)
         var box := VBoxContainer.new()
-        box.name = "Box"
+        box.name = box_name
         box.add_theme_constant_override("separation", 12)
         pad.add_child(box)
+        return [card, box]
+
+## A field's label, close enough to belong to it and no closer.
+func _field_label(text: String) -> Label:
+        var label := Label.new()
+        label.text = text
+        label.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION, true))
+        label.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+        label.add_theme_color_override("font_color", ThemeScript.INK)
+        return label
+
+func _github_body() -> Control:
+        var parts := _card("GitHub")
+        var card: PanelContainer = parts[0]
+        var box: VBoxContainer = parts[1]
 
         var state := _text("", ThemeScript.INK, ThemeScript.BODY)
         state.name = "State"
@@ -198,17 +198,8 @@ func _github_body() -> Control:
         hint.name = "Hint"
         flow.add_child(hint)
 
-        var open := Button.new()
+        var open := ThemeScript.ghost_button("Open GitHub", ThemeScript.GREEN, 44)
         open.name = "Open"
-        open.text = "Open GitHub"
-        open.custom_minimum_size = Vector2(0, 44)
-        open.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY))
-        open.add_theme_font_size_override("font_size", ThemeScript.BODY)
-        open.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
-        open.add_theme_stylebox_override("normal", ThemeScript.outline_stylebox(ThemeScript.GREEN))
-        open.add_theme_stylebox_override("hover", ThemeScript.soft_stylebox(ThemeScript.GREEN_SOFT, 23))
-        open.add_theme_stylebox_override("pressed", ThemeScript.soft_stylebox(ThemeScript.GREEN_SOFT, 23))
-        open.add_theme_stylebox_override("focus", ThemeScript.outline_stylebox(ThemeScript.GREEN))
         open.pressed.connect(func() -> void:
                 if not _flow_uri.is_empty():
                         OS.shell_open(_flow_uri)
@@ -220,43 +211,19 @@ func _github_body() -> Control:
         buttons.add_theme_constant_override("separation", 10)
         box.add_child(buttons)
 
-        var connect := Button.new()
+        var connect := ThemeScript.primary_button("Connect GitHub", 46)
         connect.name = "Connect"
-        connect.text = "Connect GitHub"
         connect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        connect.custom_minimum_size = Vector2(0, 46)
-        connect.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY, true))
-        connect.add_theme_font_size_override("font_size", ThemeScript.BODY)
-        connect.add_theme_color_override("font_color", Color.WHITE)
-        connect.add_theme_color_override("font_hover_color", Color.WHITE)
-        connect.add_theme_stylebox_override("normal", ThemeScript.button_stylebox(ThemeScript.GREEN, 23))
-        connect.add_theme_stylebox_override("hover", ThemeScript.button_stylebox(ThemeScript.GREEN_DEEP, 23))
-        connect.add_theme_stylebox_override("pressed", ThemeScript.button_stylebox(ThemeScript.GREEN_DEEP, 23))
-        connect.add_theme_stylebox_override("focus", ThemeScript.button_stylebox(ThemeScript.GREEN_DEEP, 23))
         connect.pressed.connect(_begin_device_flow)
         buttons.add_child(connect)
 
-        var disconnect := Button.new()
+        var disconnect := ThemeScript.ghost_button("Disconnect", ThemeScript.DANGER, 46)
         disconnect.name = "Disconnect"
-        disconnect.text = "Disconnect"
-        disconnect.custom_minimum_size = Vector2(0, 46)
-        disconnect.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY))
-        disconnect.add_theme_font_size_override("font_size", ThemeScript.BODY)
-        disconnect.add_theme_color_override("font_color", ThemeScript.DANGER)
-        disconnect.add_theme_stylebox_override("normal", ThemeScript.outline_stylebox(ThemeScript.DANGER, 1, 23))
-        disconnect.add_theme_stylebox_override("hover", ThemeScript.soft_stylebox(Color(0.7, 0.33, 0.25, 0.12), 23))
-        disconnect.add_theme_stylebox_override("pressed", ThemeScript.soft_stylebox(Color(0.7, 0.33, 0.25, 0.12), 23))
-        disconnect.add_theme_stylebox_override("focus", ThemeScript.outline_stylebox(ThemeScript.DANGER, 1, 23))
+        disconnect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         disconnect.pressed.connect(_disconnect)
         buttons.add_child(disconnect)
 
-        var token_label := Label.new()
-        token_label.name = "TokenLabel"
-        token_label.text = "Personal access token"
-        token_label.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION, true))
-        token_label.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        token_label.add_theme_color_override("font_color", ThemeScript.INK)
-        box.add_child(token_label)
+        box.add_child(_field_label("Personal access token"))
         var token_row := HBoxContainer.new()
         token_row.name = "TokenRow"
         token_row.add_theme_constant_override("separation", 8)
@@ -271,17 +238,9 @@ func _github_body() -> Control:
         token.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
         _style_field(token)
         token_row.add_child(token)
-        var save_token := Button.new()
+        var save_token := ThemeScript.ghost_button("Save", ThemeScript.GREEN, 44, 12)
         save_token.name = "SaveToken"
-        save_token.text = "Save"
         save_token.custom_minimum_size = Vector2(88, 44)
-        save_token.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-        save_token.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        save_token.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
-        save_token.add_theme_stylebox_override("normal", ThemeScript.outline_stylebox(ThemeScript.GREEN, 1, 22))
-        save_token.add_theme_stylebox_override("hover", ThemeScript.soft_stylebox(ThemeScript.GREEN_SOFT, 22))
-        save_token.add_theme_stylebox_override("pressed", ThemeScript.soft_stylebox(ThemeScript.GREEN_SOFT, 22))
-        save_token.add_theme_stylebox_override("focus", ThemeScript.outline_stylebox(ThemeScript.GREEN, 1, 22))
         save_token.pressed.connect(_save_token)
         token_row.add_child(save_token)
         var token_hint := _text(
@@ -291,13 +250,7 @@ func _github_body() -> Control:
         token_hint.name = "TokenHint"
         box.add_child(token_hint)
 
-        var repo_label := Label.new()
-        repo_label.name = "RepoLabel"
-        repo_label.text = "Repository"
-        repo_label.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION, true))
-        repo_label.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        repo_label.add_theme_color_override("font_color", ThemeScript.INK)
-        box.add_child(repo_label)
+        box.add_child(_field_label("Repository"))
         var repo := LineEdit.new()
         repo.name = "Repo"
         repo.placeholder_text = "Repository name"
@@ -314,18 +267,8 @@ func _github_body() -> Control:
         repo_hint.name = "RepoHint"
         box.add_child(repo_hint)
 
-        var sync := Button.new()
+        var sync := ThemeScript.primary_button("Sync now", 46)
         sync.name = "Sync"
-        sync.text = "Sync now"
-        sync.custom_minimum_size = Vector2(0, 46)
-        sync.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY, true))
-        sync.add_theme_font_size_override("font_size", ThemeScript.BODY)
-        sync.add_theme_color_override("font_color", Color.WHITE)
-        sync.add_theme_color_override("font_hover_color", Color.WHITE)
-        sync.add_theme_stylebox_override("normal", ThemeScript.button_stylebox(ThemeScript.GREEN, 23))
-        sync.add_theme_stylebox_override("hover", ThemeScript.button_stylebox(ThemeScript.GREEN_DEEP, 23))
-        sync.add_theme_stylebox_override("pressed", ThemeScript.button_stylebox(ThemeScript.GREEN_DEEP, 23))
-        sync.add_theme_stylebox_override("focus", ThemeScript.button_stylebox(ThemeScript.GREEN_DEEP, 23))
         sync.pressed.connect(func() -> void: sync_requested.emit())
         box.add_child(sync)
 
@@ -335,20 +278,10 @@ func _github_body() -> Control:
         return card
 
 func _deck_body() -> Control:
-        var card := PanelContainer.new()
-        card.name = "DeckInfo"
-        card.add_theme_stylebox_override("panel", ThemeScript.card_stylebox())
-        var pad := MarginContainer.new()
-        pad.name = "Padding"
-        pad.add_theme_constant_override("margin_left", ThemeScript.PAD)
-        pad.add_theme_constant_override("margin_right", ThemeScript.PAD)
-        pad.add_theme_constant_override("margin_top", 16)
-        pad.add_theme_constant_override("margin_bottom", 16)
-        card.add_child(pad)
-        var box := VBoxContainer.new()
-        box.name = "Box"
+        var parts := _card("DeckInfo")
+        var card: PanelContainer = parts[0]
+        var box: VBoxContainer = parts[1]
         box.add_theme_constant_override("separation", 8)
-        pad.add_child(box)
 
         var name := _text("", ThemeScript.INK, ThemeScript.BODY, false, true)
         name.name = "Name"
@@ -364,20 +297,10 @@ func _deck_body() -> Control:
         return card
 
 func _source_body() -> Control:
-        var card := PanelContainer.new()
-        card.name = "DataSource"
-        card.add_theme_stylebox_override("panel", ThemeScript.card_stylebox())
-        var pad := MarginContainer.new()
-        pad.name = "Padding"
-        pad.add_theme_constant_override("margin_left", ThemeScript.PAD)
-        pad.add_theme_constant_override("margin_right", ThemeScript.PAD)
-        pad.add_theme_constant_override("margin_top", 16)
-        pad.add_theme_constant_override("margin_bottom", 16)
-        card.add_child(pad)
-        var box := VBoxContainer.new()
-        box.name = "Box"
+        var parts := _card("DataSource")
+        var card: PanelContainer = parts[0]
+        var box: VBoxContainer = parts[1]
         box.add_theme_constant_override("separation", 8)
-        pad.add_child(box)
 
         var what := RichTextLabel.new()
         what.name = "What"
@@ -398,18 +321,8 @@ func _source_body() -> Control:
         what.meta_clicked.connect(func(meta: Variant) -> void: OS.shell_open(str(meta)))
         box.add_child(what)
 
-        var open := Button.new()
+        var open := ThemeScript.ghost_button("Open quran.makarem.ir", ThemeScript.GOLD_DEEP, 42)
         open.name = "Open"
-        open.text = "Open quran.makarem.ir"
-        open.custom_minimum_size = Vector2(0, 42)
-        open.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-        open.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        open.add_theme_color_override("font_color", ThemeScript.GOLD)
-        open.add_theme_color_override("font_hover_color", ThemeScript.GOLD)
-        open.add_theme_stylebox_override("normal", ThemeScript.outline_stylebox(ThemeScript.GOLD, 1, 21))
-        open.add_theme_stylebox_override("hover", ThemeScript.soft_stylebox(ThemeScript.GOLD_SOFT, 21))
-        open.add_theme_stylebox_override("pressed", ThemeScript.soft_stylebox(ThemeScript.GOLD_SOFT, 21))
-        open.add_theme_stylebox_override("focus", ThemeScript.outline_stylebox(ThemeScript.GOLD, 1, 21))
         # The deck's source is read when the button is pressed: the screen
         # builds before its setup() brings the deck in.
         open.pressed.connect(func() -> void:
