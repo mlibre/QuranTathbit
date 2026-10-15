@@ -4,4 +4,4 @@
 
 ![002008.mp3](002008.mp3)
 
-[https://quran.makarem.ir/#2:8](https://quran.makarem.ir/#2:8)
+[quran.makarem.ir · 2:8](https://quran.makarem.ir/#2:8)

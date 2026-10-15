@@ -4,4 +4,4 @@
 
 ![002001.mp3](002001.mp3)
 
-[https://quran.makarem.ir/#2:1](https://quran.makarem.ir/#2:1)
+[quran.makarem.ir · 2:1](https://quran.makarem.ir/#2:1)

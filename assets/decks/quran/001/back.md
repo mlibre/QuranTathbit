@@ -10,4 +10,4 @@
 
 ![001002.mp3](001002.mp3)
 
-[https://quran.makarem.ir/#1:1](https://quran.makarem.ir/#1:1)
+[quran.makarem.ir · 1:1](https://quran.makarem.ir/#1:1)

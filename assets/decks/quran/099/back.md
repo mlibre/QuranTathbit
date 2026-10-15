@@ -4,4 +4,4 @@
 
 ![002093.mp3](002093.mp3)
 
-[https://quran.makarem.ir/#2:93](https://quran.makarem.ir/#2:93)
+[quran.makarem.ir · 2:93](https://quran.makarem.ir/#2:93)

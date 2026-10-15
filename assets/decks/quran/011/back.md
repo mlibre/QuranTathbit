@@ -4,4 +4,4 @@
 
 ![002005.mp3](002005.mp3)
 
-[https://quran.makarem.ir/#2:5](https://quran.makarem.ir/#2:5)
+[quran.makarem.ir · 2:5](https://quran.makarem.ir/#2:5)

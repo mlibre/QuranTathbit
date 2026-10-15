@@ -4,4 +4,4 @@
 
 ![001006.mp3](001006.mp3)
 
-[https://quran.makarem.ir/#1:6](https://quran.makarem.ir/#1:6)
+[quran.makarem.ir · 1:6](https://quran.makarem.ir/#1:6)

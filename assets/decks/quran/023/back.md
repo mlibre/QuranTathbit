@@ -4,4 +4,4 @@
 
 ![002017.mp3](002017.mp3)
 
-[https://quran.makarem.ir/#2:17](https://quran.makarem.ir/#2:17)
+[quran.makarem.ir · 2:17](https://quran.makarem.ir/#2:17)

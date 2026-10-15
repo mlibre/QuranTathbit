@@ -4,4 +4,4 @@
 
 ![002078.mp3](002078.mp3)
 
-[https://quran.makarem.ir/#2:78](https://quran.makarem.ir/#2:78)
+[quran.makarem.ir · 2:78](https://quran.makarem.ir/#2:78)

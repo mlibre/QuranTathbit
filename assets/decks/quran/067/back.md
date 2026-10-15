@@ -4,4 +4,4 @@
 
 ![002061.mp3](002061.mp3)
 
-[https://quran.makarem.ir/#2:61](https://quran.makarem.ir/#2:61)
+[quran.makarem.ir · 2:61](https://quran.makarem.ir/#2:61)

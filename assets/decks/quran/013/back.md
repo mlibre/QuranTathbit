@@ -4,4 +4,4 @@
 
 ![002007.mp3](002007.mp3)
 
-[https://quran.makarem.ir/#2:7](https://quran.makarem.ir/#2:7)
+[quran.makarem.ir · 2:7](https://quran.makarem.ir/#2:7)

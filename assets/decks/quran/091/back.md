@@ -4,4 +4,4 @@
 
 ![002085.mp3](002085.mp3)
 
-[https://quran.makarem.ir/#2:85](https://quran.makarem.ir/#2:85)
+[quran.makarem.ir · 2:85](https://quran.makarem.ir/#2:85)

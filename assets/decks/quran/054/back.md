@@ -4,4 +4,4 @@
 
 ![002048.mp3](002048.mp3)
 
-[https://quran.makarem.ir/#2:48](https://quran.makarem.ir/#2:48)
+[quran.makarem.ir · 2:48](https://quran.makarem.ir/#2:48)

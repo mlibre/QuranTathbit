@@ -4,4 +4,4 @@
 
 ![002060.mp3](002060.mp3)
 
-[https://quran.makarem.ir/#2:60](https://quran.makarem.ir/#2:60)
+[quran.makarem.ir · 2:60](https://quran.makarem.ir/#2:60)

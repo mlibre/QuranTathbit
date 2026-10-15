@@ -4,4 +4,4 @@
 
 ![002012.mp3](002012.mp3)
 
-[https://quran.makarem.ir/#2:12](https://quran.makarem.ir/#2:12)
+[quran.makarem.ir · 2:12](https://quran.makarem.ir/#2:12)

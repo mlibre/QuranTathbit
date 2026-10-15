@@ -4,4 +4,4 @@
 
 ![002090.mp3](002090.mp3)
 
-[https://quran.makarem.ir/#2:90](https://quran.makarem.ir/#2:90)
+[quran.makarem.ir · 2:90](https://quran.makarem.ir/#2:90)

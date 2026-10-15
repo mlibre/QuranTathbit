@@ -4,4 +4,4 @@
 
 ![002065.mp3](002065.mp3)
 
-[https://quran.makarem.ir/#2:65](https://quran.makarem.ir/#2:65)
+[quran.makarem.ir · 2:65](https://quran.makarem.ir/#2:65)
