@@ -85,7 +85,7 @@ func _check_study_session(main: Node) -> void:
         _ok(answers.get_child_count() == 4, "four answers appear behind the reveal")
         var labels := []
         for button in answers.get_children():
-                labels.append(button.text)
+                labels.append(button.get_node("Center/Row/Stack/Word").text)
         _ok(labels.any(func(l: String) -> bool: return l.begins_with("Again")), "one answer is Again")
         _ok(labels.any(func(l: String) -> bool: return l.begins_with("Good")), "one answer is Good")
         # The back of the first card is Arabic plus Persian plus audio.
@@ -95,7 +95,9 @@ func _check_study_session(main: Node) -> void:
                         texts.append((child as RichTextLabel).text)
         var joined := "\n".join(texts)
         _ok(joined.length() > 20, "the answer shows real content")
-        _ok(view.get_children().any(func(c: Node) -> bool: return c is Button and (c as Button).text.begins_with("▶")), "audio is offered as a button")
+        _ok(view.get_children().any(func(c: Node) -> bool:
+                return c is Button and c.has_node("Center/Row/Icon") and "Listen" in c.get_node("Center/Row/Label").text
+        ), "audio is offered as a button")
 
         # Answer the card and check the state moves.
         study._answer("good")

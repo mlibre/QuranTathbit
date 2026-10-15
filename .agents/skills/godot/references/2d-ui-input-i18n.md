@@ -164,6 +164,8 @@ Theme lookup considers local overrides, type variations/class hierarchy, ancesto
 
 Test contrast, focus visibility, disabled states, hover/pressed, high text scale, and color-blind usability. Godot 4.7 accessibility landmarks and live-region controls can improve screen-reader context, but verify the exact `AccessibilityServer` APIs and platform support.
 
+- Verify theme item names against the installed default theme before overriding (`ThemeDB.get_default_theme().get_stylebox_list(type)` / `get_color_list(type)`). A wrong item name is a silent no-op with no warning: ScrollBar's 4.x style items are `scroll`, `scroll_focus`, `grabber`, `grabber_highlight`, `grabber_pressed` -- the 3.x names (`background`, `grabber_stylebox`) do nothing and leave the default grey bar on screen while the code looks correct.
+
 ### Rich text and dialogs
 
 Use `RichTextLabel` for BBCode/styled text, not every label. Its image API changed in 4.7: use float dimensions and `ImageUnit` (`PIXEL`, `PERCENT`, `EM`). Use `Popup`/`PopupPanel`/`ConfirmationDialog`/`AcceptDialog` for modal workflows and parent them to the correct Window/UI root. Pause/process mode must match the desired modal behavior.

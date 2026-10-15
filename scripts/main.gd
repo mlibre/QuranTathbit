@@ -92,7 +92,7 @@ func _go_home() -> void:
         var home := HomeScript.new()
         home.name = "Home"
         _swap(home)
-        home.setup(_deck, SchedulerScript.counts(_deck, _now()), _sync_line(), _settings.has_token())
+        home.setup(_deck, SchedulerScript.counts(_deck, _now()), _sync_line(), _settings.has_token(), _sync_state())
         home.study_pressed.connect(_start_session)
         home.sync_pressed.connect(_on_sync_pressed)
         home.settings_pressed.connect(_on_settings_pressed)
@@ -133,7 +133,7 @@ func _on_account_changed() -> void:
         _settings = SettingsScript.load_settings()
         if _screen is HomeScript:
                 var home: HomeScript = _screen
-                home.setup(_deck, SchedulerScript.counts(_deck, _now()), _sync_line(), _settings.has_token())
+                home.setup(_deck, SchedulerScript.counts(_deck, _now()), _sync_line(), _settings.has_token(), _sync_state())
         # Connecting is itself the request for a first sync: the user just
         # chose to keep their deck on GitHub, so carry it there without
         # making them find the button and wonder whether anything happened.
@@ -184,7 +184,7 @@ func _run_sync() -> void:
                 line = "Sync could not finish (%s). Your cards are safe here." % str(result.get("error", "?"))
         if _screen is HomeScript:
                 var home: HomeScript = _screen
-                home.setup(_deck, SchedulerScript.counts(_deck, _now()), line, _settings.has_token())
+                home.setup(_deck, SchedulerScript.counts(_deck, _now()), line, _settings.has_token(), _sync_state())
         elif _screen is SettingsScreenScript:
                 var screen: SettingsScreenScript = _screen
                 screen.note_sync_result(line)
@@ -196,6 +196,16 @@ func _sync_line() -> String:
         if _settings.last_sync > 0:
                 return "Last synced %s" % _ago(_now() - _settings.last_sync)
         return "Connected — not synced yet"
+
+
+## Which of the three states the home dot is in: agreed with the repo at
+## least once, connected but never yet taken there, or not connected at all.
+func _sync_state() -> String:
+        if not _settings.has_token():
+                return "off"
+        if _settings.last_sync > 0:
+                return "synced"
+        return "pending"
 
 
 static func _ago(seconds: int) -> String:

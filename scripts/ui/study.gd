@@ -49,6 +49,7 @@ func start(cards: Array) -> void:
 
 func _build() -> void:
         set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        add_child(ThemeScript.paper_backdrop())
         var margin := MarginContainer.new()
         margin.name = "Margin"
         margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -79,13 +80,13 @@ func _session_bar() -> Control:
         var bar := ProgressBar.new()
         bar.name = "SessionBar"
         bar.show_percentage = false
-        bar.custom_minimum_size = Vector2(0, 5)
+        bar.custom_minimum_size = Vector2(0, 7)
         var track := StyleBoxFlat.new()
-        track.bg_color = ThemeScript.LINE
-        track.set_corner_radius_all(3)
+        track.bg_color = Color("#DCD2BD")
+        track.set_corner_radius_all(4)
         var fill := StyleBoxFlat.new()
-        fill.bg_color = ThemeScript.GREEN
-        fill.set_corner_radius_all(3)
+        fill.bg_color = ThemeScript.GREEN_DEEP
+        fill.set_corner_radius_all(4)
         bar.add_theme_stylebox_override("background", track)
         bar.add_theme_stylebox_override("fill", fill)
         return bar
@@ -111,7 +112,7 @@ func _top_bar() -> Control:
         close.custom_minimum_size = Vector2(44, 40)
         close.add_theme_font_override("font", ThemeScript.vazir(24))
         close.add_theme_font_size_override("font_size", 24)
-        close.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
+        close.add_theme_color_override("font_color", ThemeScript.INK)
         close.add_theme_color_override("font_hover_color", ThemeScript.INK)
         close.add_theme_stylebox_override("normal", ThemeScript.outline_stylebox(ThemeScript.LINE, 1, 20))
         close.add_theme_stylebox_override("hover", ThemeScript.soft_stylebox(Color(0.95, 0.94, 0.91), 20))
@@ -139,13 +140,16 @@ func _surface() -> Control:
         scroll.name = "Surface"
         scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
         scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+        ThemeScript.style_scroll(scroll)
 
         # The view fills the panel directly: a fit-content label inside a
         # centering container collapses the card to the width of its widest
-        # word. The width is pinned by _layout(); the content centres itself.
+        # word. The width is pinned by _layout(); the content centres itself,
+        # and the panel shrinks to the measure rather than the window.
         var card := PanelContainer.new()
         card.name = "CardPanel"
-        card.custom_minimum_size = Vector2(640, 240)
+        card.custom_minimum_size = Vector2(640, 200)
+        card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         card.add_theme_stylebox_override("panel", ThemeScript.card_stylebox())
         scroll.add_child(card)
 
@@ -153,8 +157,8 @@ func _surface() -> Control:
         pad.name = "Padding"
         pad.add_theme_constant_override("margin_left", ThemeScript.PAD)
         pad.add_theme_constant_override("margin_right", ThemeScript.PAD)
-        pad.add_theme_constant_override("margin_top", 30)
-        pad.add_theme_constant_override("margin_bottom", 30)
+        pad.add_theme_constant_override("margin_top", 34)
+        pad.add_theme_constant_override("margin_bottom", 34)
         card.add_child(pad)
 
         var view: CardViewScript = CardViewScript.new(_player)
@@ -170,7 +174,7 @@ func _answers() -> Control:
         grid.columns = 2
         grid.add_theme_constant_override("h_separation", 10)
         grid.add_theme_constant_override("v_separation", 10)
-        grid.custom_minimum_size = Vector2(0, 58)
+        grid.custom_minimum_size = Vector2(0, 64)
         return grid
 
 func _footer() -> Control:
@@ -212,10 +216,14 @@ func _layout() -> void:
         if size.x <= 0.0:
                 return
         _layout_answers()
-        # The card spans the column: as wide as the window allows, which keeps it
-        # centred by construction on every screen this app runs on.
+        # The card is a page, not a banner: it never runs wider than a
+        # comfortable measure, whatever the window does with itself. Narrow
+        # windows still get everything they can hold. The height is a floor,
+        # not a fixed size -- a short reference gets a modest card, and a long
+        # verse grows the page as far as the words need.
         var card: PanelContainer = get_node("Margin/Column/Surface/CardPanel")
-        card.custom_minimum_size = Vector2(maxf(size.x - 44.0, 280.0), 240.0)
+        var width: float = minf(size.x - 44.0, ThemeScript.MEASURE)
+        card.custom_minimum_size = Vector2(maxf(width, 280.0), 200.0)
 
 func _layout_answers() -> void:
         var grid: GridContainer = get_node("Margin/Column/Answers")
@@ -226,9 +234,15 @@ func _show_front() -> void:
         if _index >= _cards.size():
                 _show_done()
                 return
+        # A finished session leaves its summary behind; a new one takes the
+        # card's own view back.
+        var summary := get_node_or_null("Margin/Column/Surface/CardPanel/Padding/Summary")
+        if summary != null:
+                summary.queue_free()
+        _view.visible = true
         var card: CardScript = _cards[_index]
         var progress: Label = get_node("Margin/Column/TopBar/Progress")
-        progress.text = "%d / %d" % [_index + 1, _cards.size()]
+        progress.text = "%d of %d" % [_index + 1, _cards.size()]
         (get_node("Margin/Column/SessionBar") as ProgressBar).value = 100.0 * float(_index) / float(_cards.size())
         _view.show_text(card.front, card.folder, true)
         ThemeScript.settle_in(_view)
@@ -257,39 +271,95 @@ func _reveal() -> void:
                 child.queue_free()
         _options = SchedulerScript.options(SchedulerScript.id_seed(card.id), card.state, int(Time.get_unix_time_from_system()))
         for i in _options.size():
-                var button := _answer_button(_options[i])
+                var button := _answer_button(_options[i], i)
                 grid.add_child(button)
                 ThemeScript.settle_in(button, 0.05 * i, 0.18)
         _layout_answers()
         if grid.get_child_count() > 0:
                 grid.get_child(0).grab_focus()
 
-func _answer_button(option: Dictionary) -> Control:
+## One answer, one button. The button says three things at once: what it
+## means (the word, in the grade's colour), what it costs (the interval,
+## small and soft underneath), and -- where a keyboard is attached -- which
+## key presses it (a chip, because the hints line above already promised
+## 1-4 would work).
+func _answer_button(option: Dictionary, index: int) -> Control:
         var button := Button.new()
         button.name = str(option.button).capitalize()
-        button.custom_minimum_size = Vector2(0, 54)
+        button.custom_minimum_size = Vector2(0, 64)
         button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        var caption := "%s\n%s" % [str(option.button).capitalize(), str(option.interval)]
-        button.text = caption
-        button.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY))
-        button.add_theme_font_size_override("font_size", ThemeScript.BODY)
-        var color: Color = ThemeScript.INK
+        var grade: Color = ThemeScript.INK
         match str(option.button):
                 "again":
-                        color = AGAIN_COLOR
+                        grade = AGAIN_COLOR
                 "hard":
-                        color = ThemeScript.GOLD
+                        grade = ThemeScript.GOLD
                 "good":
-                        color = ThemeScript.GREEN
+                        grade = ThemeScript.GREEN
                 "easy":
-                        color = ThemeScript.GREEN_DEEP
-        button.add_theme_color_override("font_color", color)
-        button.add_theme_color_override("font_hover_color", color)
-        button.add_theme_stylebox_override("normal", ThemeScript.outline_stylebox(color, 2, 14))
-        button.add_theme_stylebox_override("hover", ThemeScript.soft_stylebox(_wash(color), 16))
-        button.add_theme_stylebox_override("pressed", ThemeScript.soft_stylebox(_wash(color), 16))
-        button.add_theme_stylebox_override("focus", ThemeScript.outline_stylebox(color, 2, 14))
+                        grade = ThemeScript.GREEN_DEEP
+        # A wash fill at rest -- an empty outline reads as disabled -- with the
+        # grade's border arriving on hover and staying while pressed.
+        var rest := StyleBoxFlat.new()
+        rest.bg_color = _wash(grade)
+        rest.set_corner_radius_all(16)
+        var held := StyleBoxFlat.new()
+        held.bg_color = Color(grade.r, grade.g, grade.b, 0.20)
+        held.border_color = grade
+        held.set_border_width_all(2)
+        held.set_corner_radius_all(16)
+        button.add_theme_stylebox_override("normal", rest)
+        button.add_theme_stylebox_override("hover", held)
+        button.add_theme_stylebox_override("pressed", held)
+        button.add_theme_stylebox_override("focus", held)
         button.pressed.connect(_answer.bind(str(option.button)))
+
+        var center := CenterContainer.new()
+        center.name = "Center"
+        center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        button.add_child(center)
+        var row := HBoxContainer.new()
+        row.name = "Row"
+        row.alignment = BoxContainer.ALIGNMENT_CENTER
+        row.add_theme_constant_override("separation", 10)
+        center.add_child(row)
+
+        if not DisplayServer.is_touchscreen_available():
+                var chip := PanelContainer.new()
+                chip.name = "Key"
+                chip.custom_minimum_size = Vector2(30, 30)
+                chip.add_theme_stylebox_override("panel", ThemeScript.soft_stylebox(_wash(grade), 9))
+                var digit := Label.new()
+                digit.text = str(index + 1)
+                digit.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                digit.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+                digit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+                digit.size_flags_vertical = Control.SIZE_EXPAND_FILL
+                digit.add_theme_font_override("font", ThemeScript.vazir(15, true))
+                digit.add_theme_font_size_override("font_size", 15)
+                digit.add_theme_color_override("font_color", grade)
+                chip.add_child(digit)
+                row.add_child(chip)
+
+        var stack := VBoxContainer.new()
+        stack.name = "Stack"
+        stack.alignment = BoxContainer.ALIGNMENT_CENTER
+        stack.add_theme_constant_override("separation", 2)
+        row.add_child(stack)
+        var word := Label.new()
+        word.name = "Word"
+        word.text = str(option.button).capitalize()
+        word.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY, true))
+        word.add_theme_font_size_override("font_size", ThemeScript.BODY)
+        word.add_theme_color_override("font_color", grade)
+        stack.add_child(word)
+        var wait := Label.new()
+        wait.name = "Wait"
+        wait.text = str(option.interval)
+        wait.add_theme_font_override("font", ThemeScript.vazir(15))
+        wait.add_theme_font_size_override("font_size", 15)
+        wait.add_theme_color_override("font_color", ThemeScript.INK)
+        stack.add_child(wait)
         return button
 
 static func _wash(color: Color) -> Color:
@@ -308,13 +378,51 @@ func _answer(button: String) -> void:
 
 func _show_done() -> void:
         (get_node("Margin/Column/SessionBar") as ProgressBar).value = 100.0
-        var view: CardViewScript = get_node("Margin/Column/Surface/CardPanel/Padding/View")
-        view.show_text("**Session complete**\n\nYou answered %d cards. Everything is saved.\n\nRest is part of learning." % _answered_count, "")
-        ThemeScript.settle_in(view)
+        var progress: Label = get_node("Margin/Column/TopBar/Progress")
+        progress.text = "complete"
+        _view.visible = false
+        var pad: MarginContainer = get_node("Margin/Column/Surface/CardPanel/Padding")
+        var summary := VBoxContainer.new()
+        summary.name = "Summary"
+        summary.alignment = BoxContainer.ALIGNMENT_CENTER
+        summary.add_theme_constant_override("separation", 14)
+        pad.add_child(summary)
+
+        summary.add_child(ThemeScript.CheckMark.new())
+
+        var title := Label.new()
+        title.name = "Title"
+        title.text = "Session complete"
+        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        title.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.TITLE, true))
+        title.add_theme_font_size_override("font_size", ThemeScript.TITLE)
+        title.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
+        summary.add_child(title)
+
+        var body := Label.new()
+        body.name = "Body"
+        body.text = "You answered %d cards. Everything is saved." % _answered_count
+        body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        body.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY))
+        body.add_theme_font_size_override("font_size", ThemeScript.BODY)
+        body.add_theme_color_override("font_color", ThemeScript.INK)
+        summary.add_child(body)
+
+        summary.add_child(ThemeScript.hairline())
+
+        var rest := Label.new()
+        rest.name = "Rest"
+        rest.text = "Rest is part of learning."
+        rest.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        rest.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
+        rest.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+        rest.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
+        summary.add_child(rest)
+
+        ThemeScript.settle_in(summary)
         get_node("Margin/Column/Footer/ShowAnswer").visible = false
         get_node("Margin/Column/Footer/Done").visible = true
-        var progress: Label = get_node("Margin/Column/TopBar/Progress")
-        progress.text = "done"
 
 func _input(event: InputEvent) -> void:
         if not visible:

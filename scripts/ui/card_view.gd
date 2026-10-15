@@ -24,6 +24,8 @@ var _player: AudioStreamPlayer
 var _folder := ""
 var _buttons: Array = []
 var _fetching := false
+var _playing_path := ""
+var _playing_button: Button = null
 
 func _init(p_player: AudioStreamPlayer) -> void:
         _player = p_player
@@ -61,7 +63,10 @@ func _add_text(markdown: String, link: String, lead := false) -> void:
         if script == "arabic" or script == "persian":
                 label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
         else:
-                label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+                # A plain line in a centred card -- the citation under a verse,
+                # usually -- sits centred like the rest of the page, not
+                # orphaned against the left edge.
+                label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         label.add_theme_font_override("normal_font", ThemeScript.font_for(script, ThemeScript.BODY))
         label.add_theme_font_size_override("normal_font_size", _size_for(script, lead))
         label.text = _bbcode(markdown)
@@ -82,7 +87,6 @@ func _add_media(name: String) -> void:
 func _add_audio_button(name: String, path: String) -> void:
         var button := Button.new()
         button.name = "Audio:" + name
-        button.text = "▶  " + name.get_basename()
         button.custom_minimum_size = Vector2(0, 44)
         button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         button.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
@@ -93,7 +97,27 @@ func _add_audio_button(name: String, path: String) -> void:
         button.add_theme_stylebox_override("hover", ThemeScript.button_stylebox(ThemeScript.GREEN_SOFT, 22))
         button.add_theme_stylebox_override("pressed", ThemeScript.button_stylebox(ThemeScript.GREEN_SOFT, 22))
         button.add_theme_stylebox_override("focus", ThemeScript.button_stylebox(ThemeScript.GOLD_SOFT, 22))
-        button.pressed.connect(_play_audio.bind(path, button))
+        button.pressed.connect(_toggle_audio.bind(path, button))
+        # The triangle is drawn, not typed: no font in this app carries the
+        # glyph, and a tofu box where a play mark should be is worse than none.
+        var center := CenterContainer.new()
+        center.name = "Center"
+        center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        button.add_child(center)
+        var row := HBoxContainer.new()
+        row.name = "Row"
+        row.add_theme_constant_override("separation", 9)
+        center.add_child(row)
+        var icon := ThemeScript.PlayIcon.new(ThemeScript.GREEN_DEEP)
+        icon.name = "Icon"
+        row.add_child(icon)
+        var label := Label.new()
+        label.name = "Label"
+        label.text = "Listen"
+        label.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
+        label.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+        label.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
+        row.add_child(label)
         add_child(button)
         _buttons.append(button)
 
@@ -111,38 +135,70 @@ func _add_image(path: String) -> void:
         rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         add_child(rect)
 
-func _play_audio(path: String, button: Button) -> void:
+## One press speaks; a second press on the same button takes it back. The
+## button that is speaking wears gold, and only that one.
+func _toggle_audio(path: String, button: Button) -> void:
+        if _player.playing and _playing_path == path:
+                _stop_audio()
+                return
         if FileAccess.file_exists(path):
-                _start_stream(FileAccess.get_file_as_bytes(path), button)
+                _speak(path, button, FileAccess.get_file_as_bytes(path))
                 return
         # A browser build carries the deck's text but streams its audio from
         # the site it was served from, next to index.html under decks/.
         if OS.has_feature("web"):
                 _stream_from_site(path, button)
                 return
-        push_warning("CardView: audio missing %s" % path)
+        _set_button_state(button, "missing")
 
-
-func _start_stream(bytes: PackedByteArray, button: Button) -> void:
+func _speak(path: String, button: Button, bytes: PackedByteArray) -> void:
         if bytes.is_empty():
-                button.text = "audio unavailable"
+                _set_button_state(button, "missing")
                 return
         var stream := AudioStreamMP3.new()
         stream.data = bytes
         _player.stream = stream
         _player.play()
-        _highlight(button)
+        if _playing_button != null and is_instance_valid(_playing_button):
+                _set_button_state(_playing_button, "idle")
+        _playing_path = path
+        _playing_button = button
+        _set_button_state(button, "playing")
 
+func _stop_audio() -> void:
+        if _player.playing:
+                _player.stop()
+        if _playing_button != null and is_instance_valid(_playing_button):
+                _set_button_state(_playing_button, "idle")
+        _playing_path = ""
+        _playing_button = null
+
+## What a button says while it works, speaks, or cannot: one place, so every
+## state dresses the same on every button.
+func _set_button_state(button: Button, state: String) -> void:
+        var icon: ThemeScript.PlayIcon = button.get_node("Center/Row/Icon")
+        var label: Label = button.get_node("Center/Row/Label")
+        match state:
+                "playing":
+                        icon.color = ThemeScript.GOLD
+                "loading":
+                        label.text = "Fetching…"
+                "missing":
+                        icon.color = ThemeScript.INK_SOFT
+                        label.text = "Unavailable"
+                _:
+                        icon.color = ThemeScript.GREEN_DEEP
+                        label.text = "Listen"
+        icon.queue_redraw()
 
 func _stream_from_site(path: String, button: Button) -> void:
         if _fetching:
                 return
         if _web_cache.has(path):
-                _start_stream(_web_cache[path], button)
+                _speak(path, button, _web_cache[path])
                 return
         _fetching = true
-        var label := button.text
-        button.text = "…  " + label.get_basename()
+        _set_button_state(button, "loading")
         button.disabled = true
         var fetcher := HTTPRequest.new()
         add_child(fetcher)
@@ -155,11 +211,10 @@ func _stream_from_site(path: String, button: Button) -> void:
         fetcher.queue_free()
         button.disabled = false
         if bytes.is_empty():
-                button.text = "audio unavailable"
+                _set_button_state(button, "missing")
         else:
-                button.text = label
                 _web_cache[path] = bytes
-                _start_stream(bytes, button)
+                _speak(path, button, bytes)
         _fetching = false
 
 
@@ -181,17 +236,6 @@ static func _site_url(path: String) -> String:
                 encoded.append(part.uri_encode())
         return base + "/".join(encoded)
 
-func _highlight(button: Button) -> void:
-        for other in _buttons:
-                other.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
-        button.add_theme_color_override("font_color", ThemeScript.GOLD)
-        var tween := create_tween()
-        tween.tween_interval(1.2)
-        tween.tween_callback(func() -> void:
-                if is_instance_valid(button):
-                        button.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
-        )
-
 func _open_link(meta: Variant) -> void:
         OS.shell_open(str(meta))
 
@@ -201,11 +245,11 @@ func _size_for(script: String, lead := false) -> int:
         if lead:
                 match script:
                         "arabic":
-                                return 46
+                                return 54
                         "persian":
-                                return 28
+                                return 30
                         _:
-                                return 22
+                                return 24
         match script:
                 "arabic":
                         return 30
@@ -225,7 +269,7 @@ static func _bbcode(markdown: String) -> String:
 ## media pass owns those, and their brackets must not be touched here.
 static func _links(text: String) -> String:
         var re := RegEx.create_from_string("(?<!!)\\[([^\\]]+)\\]\\(([^)]+)\\)")
-        return re.sub(text, "[url=$2]$1[/url]", true)
+        return re.sub(text, "[url=$2][color=#1E6B52]$1[/color][/url]", true)
 
 static func _bold(text: String) -> String:
         var re := RegEx.create_from_string("\\*\\*(?P<inner>[^*]+)\\*\\*")
@@ -236,9 +280,10 @@ static func _italic(text: String) -> String:
         return re.sub(text, "[i]$1[/i]", true)
 
 func _clear() -> void:
+        _stop_audio()
         for child in get_children():
                 remove_child(child)
                 child.queue_free()
         _buttons.clear()
-        if _player.playing:
-                _player.stop()
+        _playing_button = null
+        _playing_path = ""

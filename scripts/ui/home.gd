@@ -20,7 +20,7 @@ func _ready() -> void:
         _build()
         ThemeScript.appear(self)
 
-func setup(deck: DeckScript, counts: Dictionary, sync_line: String, connected: bool) -> void:
+func setup(deck: DeckScript, counts: Dictionary, sync_line: String, connected: bool, sync_state := "off") -> void:
         if not is_node_ready():
                 await ready
         _counts = counts
@@ -28,7 +28,12 @@ func setup(deck: DeckScript, counts: Dictionary, sync_line: String, connected: b
         var title: Label = get_node("Margin/Column/DeckCard/Box/Title")
         var caption: Label = get_node("Margin/Column/DeckCard/Box/Caption")
         title.text = deck.name
-        caption.text = "%d cards · %d learned · %d waiting" % [deck.cards.size(), counts["learned"], counts["due"] + counts["new"]]
+        var waiting: int = counts["due"] + counts["new"]
+        caption.text = (
+                "%d cards · %d learned · nothing waiting" % [deck.cards.size(), counts["learned"]]
+                if waiting == 0
+                else "%d cards · %d learned · %d waiting" % [deck.cards.size(), counts["learned"], waiting]
+        )
 
         var due_pill: Label = get_node("Margin/Column/Stats/Due/Box/Value")
         var new_pill: Label = get_node("Margin/Column/Stats/New/Box/Value")
@@ -38,8 +43,8 @@ func setup(deck: DeckScript, counts: Dictionary, sync_line: String, connected: b
         learned_pill.text = str(counts["learned"])
 
         var study: Button = get_node("Margin/Column/Study")
-        if counts["due"] + counts["new"] == 0:
-                study.text = "Nothing due — come back tomorrow"
+        if waiting == 0:
+                study.text = "All caught up"
                 study.disabled = true
         else:
                 study.text = "Study" if counts["due"] > 0 else "Learn new cards"
@@ -47,20 +52,41 @@ func setup(deck: DeckScript, counts: Dictionary, sync_line: String, connected: b
 
         var sync_label: Label = get_node("Margin/Column/Buttons/Sync/SyncBox/Label")
         sync_label.text = "Sync" if connected else "Connect GitHub"
-        var sync_caption: Label = get_node("Margin/Column/SyncLine")
-        sync_caption.text = sync_line
+        _set_sync_line(sync_line, sync_state)
 
         # The one line that answers "what am I about to study?": the next
         # card's own heading, read from its front, dressed for its script.
         var next_up: Label = get_node("Margin/Column/DeckCard/Box/NextUp")
+        var eyebrow: Label = get_node("Margin/Column/DeckCard/Box/Eyebrow")
         var reference := _next_reference()
         next_up.visible = not reference.is_empty()
+        eyebrow.visible = not reference.is_empty()
         if not reference.is_empty():
-                next_up.text = "Next up · %s" % reference
+                next_up.text = reference
                 var script := ThemeScript.script_of(reference)
                 next_up.add_theme_font_override("font", ThemeScript.font_for(script, ThemeScript.BODY))
                 next_up.add_theme_font_size_override("font_size", _size_for(script))
                 next_up.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
+
+## The quiet row under everything: a dot that says the state before the words
+## do -- filled green when the deck and the repo last agreed, gold when the
+## promise is still unkept, hollow when there is no connection at all.
+func _set_sync_line(text: String, state: String) -> void:
+        var row: HBoxContainer = get_node("Margin/Column/SyncLine")
+        var label: Label = row.get_node("Text")
+        label.text = text
+        var dot: ThemeScript.StatusDot = row.get_node("Dot")
+        match state:
+                "synced":
+                        dot.color = ThemeScript.GREEN
+                        dot.filled = true
+                "pending":
+                        dot.color = ThemeScript.GOLD
+                        dot.filled = true
+                _:
+                        dot.color = ThemeScript.INK
+                        dot.filled = false
+        dot.queue_redraw()
 
 ## The next card's heading: the first line of its front, plain text. The
 ## scheduler's queue already knows which card is truly next -- due before new --
@@ -80,9 +106,9 @@ func _next_reference() -> String:
 
 func _size_for(script: String) -> int:
         if script == "arabic":
-                return 24
+                return 30
         if script == "persian":
-                return 19
+                return 21
         return ThemeScript.BODY
 
 func _build() -> void:
@@ -101,7 +127,7 @@ func _build() -> void:
         column.name = "Column"
         column.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
         column.alignment = BoxContainer.ALIGNMENT_CENTER
-        column.add_theme_constant_override("separation", 18)
+        column.add_theme_constant_override("separation", 16)
         margin.add_child(column)
 
         var wordmark := _wordmark()
@@ -119,30 +145,17 @@ func _build() -> void:
         var buttons := _bottom_buttons()
         column.add_child(buttons)
 
-        var sync_line := Label.new()
-        sync_line.name = "SyncLine"
-        sync_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        sync_line.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-        sync_line.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        sync_line.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
+        var sync_line := _sync_line_row()
         column.add_child(sync_line)
 
-## A slow paper gradient behind everything: the screen breathes top-to-bottom
-## instead of sitting on one flat colour.
+## A slow paper gradient behind everything, shared by every screen: the
+## screen breathes top-to-bottom instead of sitting on one flat colour.
 func _backdrop() -> Control:
-        var rect := ColorRect.new()
-        rect.name = "Backdrop"
-        rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-        var gradient := Gradient.new()
-        gradient.colors = PackedColorArray([Color("#FBF8F0"), Color("#F0E8D5")])
-        var texture := GradientTexture2D.new()
-        texture.gradient = gradient
-        texture.fill_from = Vector2(0, 0)
-        texture.fill_to = Vector2(0, 1)
-        rect.color = Color.WHITE
-        rect.texture = texture
-        return rect
+        return ThemeScript.paper_backdrop()
 
+## The app's name in both of its languages: the Arabic reads as the name it
+## was given, the Latin as the name it types. The gold rule between the marks
+## and the card keeps the wordmark from floating off the page.
 func _wordmark() -> Control:
         var row := CenterContainer.new()
         row.name = "Wordmark"
@@ -150,7 +163,16 @@ func _wordmark() -> Control:
         var stack := VBoxContainer.new()
         stack.alignment = BoxContainer.ALIGNMENT_CENTER
         stack.add_theme_constant_override("separation", 8)
+        var arabic := Label.new()
+        arabic.name = "Arabic"
+        arabic.text = "تثبيت القرآن"
+        arabic.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        arabic.add_theme_font_override("font", ThemeScript.amiri(18))
+        arabic.add_theme_font_size_override("font_size", 18)
+        arabic.add_theme_color_override("font_color", ThemeScript.GOLD)
+        stack.add_child(arabic)
         var label := Label.new()
+        label.name = "Latin"
         label.text = "QuranTathbit"
         label.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.TITLE, true))
         label.add_theme_font_size_override("font_size", ThemeScript.TITLE)
@@ -179,8 +201,10 @@ func _deck_card() -> Control:
         var title := Label.new()
         title.name = "Title"
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        title.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.DISPLAY, true))
-        title.add_theme_font_size_override("font_size", ThemeScript.DISPLAY)
+        # The deck's name is the hero of this card, but not of the screen:
+        # one size below the app's own wordmark weight class.
+        title.add_theme_font_override("font", ThemeScript.vazir(30, true))
+        title.add_theme_font_size_override("font_size", 30)
         title.add_theme_color_override("font_color", ThemeScript.INK)
         box.add_child(title)
 
@@ -191,6 +215,19 @@ func _deck_card() -> Control:
         caption.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
         caption.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
         box.add_child(caption)
+
+        # The card's lower half is an editor's block: a hairline, an eyebrow
+        # that says what is coming, and the reference itself in its own script.
+        box.add_child(ThemeScript.hairline())
+
+        var eyebrow := Label.new()
+        eyebrow.name = "Eyebrow"
+        eyebrow.text = "NEXT UP"
+        eyebrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        eyebrow.add_theme_font_override("font", ThemeScript.vazir(12, true))
+        eyebrow.add_theme_font_size_override("font_size", 12)
+        eyebrow.add_theme_color_override("font_color", ThemeScript.GOLD)
+        box.add_child(eyebrow)
 
         var next_up := Label.new()
         next_up.name = "NextUp"
@@ -290,10 +327,10 @@ func _bottom_buttons() -> Control:
         sync.add_theme_font_size_override("font_size", ThemeScript.BODY)
         sync.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
         sync.add_theme_color_override("font_hover_color", ThemeScript.GREEN_DEEP)
-        sync.add_theme_stylebox_override("normal", ThemeScript.outline_stylebox(ThemeScript.GREEN))
+        sync.add_theme_stylebox_override("normal", ThemeScript.outline_stylebox(ThemeScript.GREEN, 2, 23))
         sync.add_theme_stylebox_override("hover", ThemeScript.soft_stylebox(ThemeScript.GREEN_SOFT, 23))
         sync.add_theme_stylebox_override("pressed", ThemeScript.soft_stylebox(ThemeScript.GREEN_SOFT, 23))
-        sync.add_theme_stylebox_override("focus", ThemeScript.outline_stylebox(ThemeScript.GREEN))
+        sync.add_theme_stylebox_override("focus", ThemeScript.outline_stylebox(ThemeScript.GREEN, 2, 23))
         var sync_box := VBoxContainer.new()
         sync_box.name = "SyncBox"
         sync_box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -322,6 +359,26 @@ func _bottom_buttons() -> Control:
         settings.text = "Settings"
         settings.pressed.connect(func() -> void: settings_pressed.emit())
         row.add_child(settings)
+        return row
+
+## The row itself: a drawn dot, a breath of space, the words. Built once;
+## setup() only ever changes what they say and which of the three states the
+## dot is in.
+func _sync_line_row() -> Control:
+        var row := HBoxContainer.new()
+        row.name = "SyncLine"
+        row.alignment = BoxContainer.ALIGNMENT_CENTER
+        row.add_theme_constant_override("separation", 8)
+        row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        var dot := ThemeScript.StatusDot.new(ThemeScript.INK_SOFT, false)
+        dot.name = "Dot"
+        row.add_child(dot)
+        var text := Label.new()
+        text.name = "Text"
+        text.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
+        text.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+        text.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
+        row.add_child(text)
         return row
 
 func refresh(counts: Dictionary) -> void:

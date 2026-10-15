@@ -40,6 +40,129 @@ const RADIUS := 18
 const PAD := 24
 const GAP := 14
 
+## The widest a card's text may run. Scripture set across a whole window is
+## scripture nobody can recite: a page has edges, and the eye keeps its place
+## between them. Everything wider than this centres itself instead.
+const MEASURE := 720
+
+
+# --- drawn marks ----------------------------------------------------------------
+#
+# Neither Vazirmatn nor Amiri carries a play triangle, a status dot or a check
+# mark -- typed into a button they render as tofu. So they are drawn, which
+# also lets each mark sit at its own weight beside the type.
+
+
+## A play triangle, the size of a word: for buttons that speak.
+class PlayIcon extends Control:
+        var color := GREEN
+
+        func _init(p_color: Color = GREEN) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(15, 17)
+
+        func _draw() -> void:
+                draw_colored_polygon(
+                        PackedVector2Array([Vector2(2.5, 2), Vector2(14, 8.5), Vector2(2.5, 15)]),
+                        color
+                )
+
+
+## A small status dot. Filled says "alive"; hollow says "off, by choice".
+class StatusDot extends Control:
+        var color := GREEN
+        var filled := true
+
+        func _init(p_color: Color = GREEN, p_filled := true) -> void:
+                color = p_color
+                filled = p_filled
+                custom_minimum_size = Vector2(11, 11)
+
+        func _draw() -> void:
+                var center := Vector2(5.5, 5.5)
+                if filled:
+                        draw_circle(center, 4.2, color)
+                else:
+                        draw_arc(center, 3.6, 0.0, TAU, 24, color, 1.7, true)
+
+
+## A check inside a soft medal: the end-of-session mark, quiet as a stamp.
+class CheckMark extends Control:
+        func _init() -> void:
+                custom_minimum_size = Vector2(64, 64)
+
+        func _draw() -> void:
+                draw_circle(Vector2(32, 32), 31.0, GOLD_SOFT)
+                draw_circle(Vector2(32, 32), 31.0, Color(GOLD.r, GOLD.g, GOLD.b, 0.35))
+                var points := PackedVector2Array([Vector2(21, 33), Vector2(29, 41), Vector2(44, 23)])
+                draw_polyline(points, GOLD, 5.5, true)
+                draw_circle(points[0], 2.75, GOLD)
+                draw_circle(points[1], 2.75, GOLD)
+                draw_circle(points[2], 2.75, GOLD)
+
+
+## A one-pixel rule the colour of the page's edges: for dividing a card's
+## interior without drawing a box around it.
+static func hairline(color: Color = LINE) -> Control:
+        var rule := PanelContainer.new()
+        rule.name = "Hairline"
+        rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        rule.custom_minimum_size = Vector2(0, 2)
+        rule.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        var box := StyleBoxFlat.new()
+        box.bg_color = Color(color.r, color.g, color.b, 0.55)
+        box.set_corner_radius_all(1)
+        box.content_margin_top = 0.5
+        box.content_margin_bottom = 0.5
+        rule.add_theme_stylebox_override("panel", box)
+        return rule
+
+
+## A slow paper gradient behind everything: the screen breathes top-to-bottom
+## instead of sitting on one flat colour. Every screen wears the same one, so
+## moving between them feels like turning pages of the same book. A
+## TextureRect, not a ColorRect -- a ColorRect cannot carry a texture, and
+## assigning one to it is silently swallowed on every build.
+static func paper_backdrop() -> Control:
+        var rect := TextureRect.new()
+        rect.name = "Backdrop"
+        rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        var gradient := Gradient.new()
+        gradient.colors = PackedColorArray([Color("#FBF8F0"), Color("#F0E8D5")])
+        var texture := GradientTexture2D.new()
+        texture.gradient = gradient
+        texture.fill_from = Vector2(0, 0)
+        texture.fill_to = Vector2(0, 1)
+        rect.texture = texture
+        rect.stretch_mode = TextureRect.STRETCH_SCALE
+        return rect
+
+
+## The engine's scrollbar is a grey plastic ridge from another app. This one
+## is a slim rail the colour of the page's edges, with a gold thumb while it
+## is being dragged -- present when needed, invisible when not. The item
+## names are 4.x's own ("scroll", "grabber"): the 3.x names do nothing
+## here, quietly, which is how a grey scrollbar sneaks back in.
+static func style_scroll(scroll: ScrollContainer) -> void:
+        var empty := StyleBoxEmpty.new()
+        var grabber := StyleBoxFlat.new()
+        grabber.bg_color = Color("#DCD2BD")
+        grabber.set_corner_radius_all(4)
+        grabber.content_margin_left = 3
+        grabber.content_margin_right = 3
+        var grabbed := StyleBoxFlat.new()
+        grabbed.bg_color = GOLD_SOFT
+        grabbed.set_corner_radius_all(4)
+        grabbed.content_margin_left = 3
+        grabbed.content_margin_right = 3
+        var bar := scroll.get_v_scroll_bar()
+        bar.add_theme_stylebox_override("scroll", empty)
+        bar.add_theme_stylebox_override("scroll_focus", empty)
+        bar.add_theme_stylebox_override("grabber", grabber)
+        bar.add_theme_stylebox_override("grabber_highlight", grabber)
+        bar.add_theme_stylebox_override("grabber_pressed", grabbed)
+
 static func vazir(size: int, bold := false) -> Font:
         return load(VAZIR_BOLD if bold else VAZIR) as Font
 

@@ -61,7 +61,9 @@ func _ready() -> void:
         _phase.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY))
         _phase.add_theme_font_size_override("font_size", ThemeScript.BODY)
         _phase.add_theme_color_override("font_color", ThemeScript.INK)
-        _phase.text = str(PHRASES["reading repo"]) + "…"
+        # What it says before anything has reported: the first thing sync
+        # actually does is sign in, so that is the first thing a person reads.
+        _phase.text = str(PHRASES["signing in"]) + "…"
         box.add_child(_phase)
 
         _bar = ProgressBar.new()

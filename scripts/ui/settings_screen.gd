@@ -37,6 +37,7 @@ func setup(http: HttpClientScript, auth: GitHubAuthScript, settings: SettingsScr
 
 func _build() -> void:
         set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        add_child(ThemeScript.paper_backdrop())
         var margin := MarginContainer.new()
         margin.name = "Margin"
         margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -49,12 +50,13 @@ func _build() -> void:
         var scroll := ScrollContainer.new()
         scroll.name = "Scroll"
         scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+        ThemeScript.style_scroll(scroll)
         margin.add_child(scroll)
 
         var column := VBoxContainer.new()
         column.name = "Column"
         column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        column.add_theme_constant_override("separation", 16)
+        column.add_theme_constant_override("separation", 22)
         scroll.add_child(column)
 
         var header := HBoxContainer.new()
@@ -72,7 +74,7 @@ func _build() -> void:
         close.custom_minimum_size = Vector2(44, 40)
         close.add_theme_font_override("font", ThemeScript.vazir(24))
         close.add_theme_font_size_override("font_size", 24)
-        close.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
+        close.add_theme_color_override("font_color", ThemeScript.INK)
         close.add_theme_color_override("font_hover_color", ThemeScript.INK)
         close.add_theme_stylebox_override("normal", ThemeScript.outline_stylebox(ThemeScript.LINE, 1, 20))
         close.add_theme_stylebox_override("hover", ThemeScript.soft_stylebox(Color(0.95, 0.94, 0.91), 20))
@@ -90,13 +92,22 @@ func _build() -> void:
         column.add_child(_source_body())
         column.add_child(_about())
 
+## A section header is a small gold word and a rule that runs to the edge of
+## the page: the word names what follows, the rule says where it ends.
 func _section(title: String) -> Control:
+        var row := HBoxContainer.new()
+        row.name = "Section_" + title
+        row.add_theme_constant_override("separation", 10)
         var label := Label.new()
         label.text = title
         label.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION, true))
         label.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
         label.add_theme_color_override("font_color", ThemeScript.GOLD)
-        return label
+        row.add_child(label)
+        var rule := ThemeScript.hairline(ThemeScript.LINE)
+        rule.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+        row.add_child(rule)
+        return row
 
 ## Every line of explanation on this screen is a selectable RichTextLabel:
 ## a person reads with their eyes and copies with their mouse, and neither
@@ -116,6 +127,28 @@ func _text(what: String, color: Color, size: int, center := false, bold := false
         label.add_theme_color_override("default_color", color)
         label.text = what
         return label
+
+## The engine's LineEdit arrives as a grey plastic trench. This dresses it
+## as a ruled line on the page: white, thin border, green while focused.
+func _style_field(field: LineEdit) -> void:
+        var rest := StyleBoxFlat.new()
+        rest.bg_color = ThemeScript.CARD
+        rest.border_color = ThemeScript.LINE
+        rest.set_border_width_all(1)
+        rest.set_corner_radius_all(12)
+        rest.content_margin_left = 14
+        rest.content_margin_right = 14
+        rest.content_margin_top = 10
+        rest.content_margin_bottom = 10
+        var focused := rest.duplicate() as StyleBoxFlat
+        focused.border_color = ThemeScript.GREEN
+        focused.set_border_width_all(2)
+        field.add_theme_stylebox_override("normal", rest)
+        field.add_theme_stylebox_override("focus", focused)
+        field.add_theme_color_override("font_color", ThemeScript.INK)
+        field.add_theme_color_override("caret_color", ThemeScript.GREEN_DEEP)
+        field.add_theme_color_override("font_placeholder_color", ThemeScript.INK_SOFT)
+        field.add_theme_color_override("selection_color", ThemeScript.GREEN_SOFT)
 
 func _github_body() -> Control:
         var card := PanelContainer.new()
@@ -143,9 +176,23 @@ func _github_body() -> Control:
         flow.add_theme_constant_override("separation", 10)
         box.add_child(flow)
 
-        var code := _text("", ThemeScript.GREEN_DEEP, 30, true, true)
-        code.name = "Code"
-        flow.add_child(code)
+        # The code sits in a chip of its own, the way a code looks on a ticket:
+        # set apart, big, and centred under the words that explain it.
+        var chip := PanelContainer.new()
+        chip.name = "Code"
+        chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        chip.add_theme_stylebox_override("panel", ThemeScript.soft_stylebox(ThemeScript.GREEN_SOFT, 14))
+        var chip_pad := MarginContainer.new()
+        chip_pad.name = "Pad"
+        chip_pad.add_theme_constant_override("margin_left", 20)
+        chip_pad.add_theme_constant_override("margin_right", 20)
+        chip_pad.add_theme_constant_override("margin_top", 8)
+        chip_pad.add_theme_constant_override("margin_bottom", 8)
+        chip.add_child(chip_pad)
+        var code := _text("", ThemeScript.GREEN_DEEP, 34, true, true)
+        code.name = "CodeText"
+        chip_pad.add_child(code)
+        flow.add_child(chip)
 
         var hint := _text("Type this code at github.com/login/device, then wait here.", ThemeScript.INK_SOFT, ThemeScript.CAPTION, true)
         hint.name = "Hint"
@@ -203,6 +250,13 @@ func _github_body() -> Control:
         disconnect.pressed.connect(_disconnect)
         buttons.add_child(disconnect)
 
+        var token_label := Label.new()
+        token_label.name = "TokenLabel"
+        token_label.text = "Personal access token"
+        token_label.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION, true))
+        token_label.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+        token_label.add_theme_color_override("font_color", ThemeScript.INK)
+        box.add_child(token_label)
         var token_row := HBoxContainer.new()
         token_row.name = "TokenRow"
         token_row.add_theme_constant_override("separation", 8)
@@ -215,6 +269,7 @@ func _github_body() -> Control:
         token.custom_minimum_size = Vector2(0, 44)
         token.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
         token.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+        _style_field(token)
         token_row.add_child(token)
         var save_token := Button.new()
         save_token.name = "SaveToken"
@@ -229,15 +284,35 @@ func _github_body() -> Control:
         save_token.add_theme_stylebox_override("focus", ThemeScript.outline_stylebox(ThemeScript.GREEN, 1, 22))
         save_token.pressed.connect(_save_token)
         token_row.add_child(save_token)
+        var token_hint := _text(
+                "From github.com/settings/tokens — needs the repo scope. Stays on this device.",
+                ThemeScript.INK_SOFT, ThemeScript.CAPTION
+        )
+        token_hint.name = "TokenHint"
+        box.add_child(token_hint)
 
+        var repo_label := Label.new()
+        repo_label.name = "RepoLabel"
+        repo_label.text = "Repository"
+        repo_label.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION, true))
+        repo_label.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+        repo_label.add_theme_color_override("font_color", ThemeScript.INK)
+        box.add_child(repo_label)
         var repo := LineEdit.new()
         repo.name = "Repo"
         repo.placeholder_text = "Repository name"
         repo.custom_minimum_size = Vector2(0, 44)
         repo.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY))
         repo.add_theme_font_size_override("font_size", ThemeScript.BODY)
+        _style_field(repo)
         repo.text_submitted.connect(_save_repo)
         box.add_child(repo)
+        var repo_hint := _text(
+                "Where your deck lives on GitHub — created on first sync if it does not exist.",
+                ThemeScript.INK_SOFT, ThemeScript.CAPTION
+        )
+        repo_hint.name = "RepoHint"
+        box.add_child(repo_hint)
 
         var sync := Button.new()
         sync.name = "Sync"
@@ -245,11 +320,12 @@ func _github_body() -> Control:
         sync.custom_minimum_size = Vector2(0, 46)
         sync.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY, true))
         sync.add_theme_font_size_override("font_size", ThemeScript.BODY)
-        sync.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
-        sync.add_theme_stylebox_override("normal", ThemeScript.outline_stylebox(ThemeScript.GREEN))
-        sync.add_theme_stylebox_override("hover", ThemeScript.soft_stylebox(ThemeScript.GREEN_SOFT, 23))
-        sync.add_theme_stylebox_override("pressed", ThemeScript.soft_stylebox(ThemeScript.GREEN_SOFT, 23))
-        sync.add_theme_stylebox_override("focus", ThemeScript.outline_stylebox(ThemeScript.GREEN))
+        sync.add_theme_color_override("font_color", Color.WHITE)
+        sync.add_theme_color_override("font_hover_color", Color.WHITE)
+        sync.add_theme_stylebox_override("normal", ThemeScript.button_stylebox(ThemeScript.GREEN, 23))
+        sync.add_theme_stylebox_override("hover", ThemeScript.button_stylebox(ThemeScript.GREEN_DEEP, 23))
+        sync.add_theme_stylebox_override("pressed", ThemeScript.button_stylebox(ThemeScript.GREEN_DEEP, 23))
+        sync.add_theme_stylebox_override("focus", ThemeScript.button_stylebox(ThemeScript.GREEN_DEEP, 23))
         sync.pressed.connect(func() -> void: sync_requested.emit())
         box.add_child(sync)
 
@@ -351,9 +427,26 @@ func _source_body() -> Control:
         return card
 
 func _about() -> Control:
-        var label := _text("QuranTathbit v%s\na quiet memorisation companion" % VersionScript.VERSION, ThemeScript.INK_SOFT, ThemeScript.CAPTION, true)
-        label.name = "About"
-        return label
+        var box := VBoxContainer.new()
+        box.name = "About"
+        box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        box.alignment = BoxContainer.ALIGNMENT_CENTER
+        box.add_theme_constant_override("separation", 4)
+        # The name in the script it was given, then the line it works by.
+        var arabic := Label.new()
+        arabic.text = "تثبيت القرآن"
+        arabic.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        arabic.add_theme_font_override("font", ThemeScript.amiri(16))
+        arabic.add_theme_font_size_override("font_size", 16)
+        arabic.add_theme_color_override("font_color", ThemeScript.GOLD)
+        box.add_child(arabic)
+        var label := _text(
+                "QuranTathbit v%s\na quiet memorisation companion" % VersionScript.VERSION,
+                ThemeScript.INK_SOFT, ThemeScript.CAPTION, true
+        )
+        label.name = "Line"
+        box.add_child(label)
+        return box
 
 # --- state ---------------------------------------------------------------------
 
@@ -401,7 +494,7 @@ func _begin_device_flow() -> void:
                 return
         var began: Dictionary = await _auth.begin(_http)
         var flow: VBoxContainer = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Flow")
-        var code: RichTextLabel = flow.get_node("Code")
+        var code: PanelContainer = flow.get_node("Code")
         var open: Button = flow.get_node("Open")
         var connect: Button = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Buttons/Connect")
         if began.has("error"):
@@ -413,7 +506,8 @@ func _begin_device_flow() -> void:
                 else:
                         state.text = "Could not reach GitHub. Check your connection and try again."
                 return
-        code.text = _pretty_code(str(began.user_code))
+        (code.get_node("Pad/CodeText") as RichTextLabel).text = _pretty_code(str(began.user_code))
+        code.visible = true
         _flow_uri = str(began.verification_uri)
         connect.disabled = true
         flow.visible = true
@@ -459,7 +553,7 @@ func _begin_web_connect() -> void:
         var state: RichTextLabel = get_node("Margin/Scroll/Column/GitHub/Padding/Box/State")
         state.text = "Signing in inside a browser takes a token — GitHub's sign-in page cannot be opened from another site, and no static site can change that. One minute, three steps:"
         var flow: VBoxContainer = get_node("Margin/Scroll/Column/GitHub/Padding/Box/Flow")
-        var code: RichTextLabel = flow.get_node("Code")
+        var code: PanelContainer = flow.get_node("Code")
         var hint: RichTextLabel = flow.get_node("Hint")
         var open: Button = flow.get_node("Open")
         code.visible = false
