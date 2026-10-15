@@ -96,21 +96,17 @@ jobs:
             -dname "CN=QuranTathbit, O=mlibre, C=US"
         env:
           KEYSTORE_PASSWORD: tathbit-keep-it-close
-      # The preset ships with empty keystore fields so a local editor export is
-      # never surprised; CI fills them in here, for this run only. The grep
-      # afterwards makes a silent no-op impossible: if the pattern ever stops
-      # matching the preset, the job stops instead of exporting an unsigned apk.
-      - name: Point the preset at the keystore
-        run: |
-          sed -i \
-            -e 's|^release=""|release="'"$PWD"'/tathbit.keystore"|' \
-            -e 's|^release_user=""|release_user="qurantathbit"|' \
-            -e 's|^release_pass=""|release_pass="tathbit-keep-it-close"|' \
-            export_presets.cfg
-          grep -q '^release=".*tathbit.keystore"' export_presets.cfg
-          grep -q '^release_user="qurantathbit"' export_presets.cfg
-          grep -q '^release_pass="' export_presets.cfg
+      # Godot 4.7 reads the release keystore through get_or_env, and the
+      # environment always wins there: GODOT_ANDROID_KEYSTORE_RELEASE_PATH /
+      # _USER / _PASSWORD (the password one ends in _PASSWORD -- _PASS is a
+      # name Godot never read). The [preset.N.keystore] section of the cfg is
+      # dead legacy that load_config() never parses, which is why the preset
+      # route silently produced an unsigned export.
       - name: Export Android build
+        env:
+          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ github.workspace }}/tathbit.keystore
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: qurantathbit
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: tathbit-keep-it-close
         run: |
           mkdir -p builds/android
           touch builds/.gdignore
