@@ -115,4 +115,14 @@ jobs:
         working-directory: pkg
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
+        # A publish that races itself (a re-pushed tag, a hand re-run) must
+        # be a skip, not a red X: the registry refuses to overwrite a
+        # version, and the same tree publishing the same version again has
+        # nothing left to do.
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "qurantathbit@$VERSION" version 2>/dev/null | grep -qx "$VERSION"; then
+            echo "qurantathbit@$VERSION is already on the registry; nothing to publish."
+          else
+            npm publish --access public
+          fi
