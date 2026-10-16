@@ -217,6 +217,21 @@ func _layout() -> void:
         if size.x <= 0.0:
                 return
         _layout_answers()
+        # The page answers the notch: the top margin rides below whatever the
+        # display keeps for itself, so the way back is never under a camera.
+        var margin: MarginContainer = get_node("Margin")
+        margin.add_theme_constant_override("margin_top", int(24.0 + ThemeScript.top_inset()))
+        # The way a thumb swipes the phone itself lives at the bottom edge:
+        # the answers and the footer stand above it.
+        margin.add_theme_constant_override("margin_bottom", int(24.0 + ThemeScript.bottom_inset()))
+        # A phone's card breathes with smaller margins: the words keep the
+        # room the desktop's generous padding would have taken.
+        var narrow := size.x < ThemeScript.NARROW
+        var pad: MarginContainer = get_node(PANEL + "/Padding")
+        pad.add_theme_constant_override("margin_left", 24 if narrow else 40)
+        pad.add_theme_constant_override("margin_right", 24 if narrow else 40)
+        pad.add_theme_constant_override("margin_top", 30 if narrow else 44)
+        pad.add_theme_constant_override("margin_bottom", 30 if narrow else 44)
         # The card is a page, not a banner: it never runs wider than a
         # comfortable measure, whatever the window does with itself. Narrow
         # windows still get everything they can hold. The height is a floor,

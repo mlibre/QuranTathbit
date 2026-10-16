@@ -96,6 +96,9 @@ jobs:
           path = "builds/web/index.manifest.json"
           manifest = json.load(open(path))
           manifest["short_name"] = "QuranTathbit"
+          # The app is built for a hand: the installed web app stands upright,
+          # the way the Android build does (its export preset locks portrait).
+          manifest["orientation"] = "portrait"
           manifest["description"] = "A calm app for memorising the Qur'an."
           manifest["icons"] = [{"sizes": "192x192", "src": "index.192x192.png", "type": "image/png"}] + [
               i for i in manifest["icons"] if i.get("sizes") != "192x192"

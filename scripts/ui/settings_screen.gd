@@ -92,10 +92,15 @@ func _build() -> void:
 
 ## The page answers the window: the cards keep a reader's measure on a
 ## desktop -- never a stripe the width of a whole window -- and fill a phone
-## to its edges.
+## to its edges. The top margin also answers the display: on a phone with a
+## notch the way back sits below whatever the system draws up there.
 func _layout() -> void:
         if size.x <= 0.0:
                 return
+        var margin: MarginContainer = get_node_or_null("Margin")
+        if margin != null:
+                margin.add_theme_constant_override("margin_top", int(22.0 + ThemeScript.top_inset()))
+                margin.add_theme_constant_override("margin_bottom", int(28.0 + ThemeScript.bottom_inset()))
         var column: VBoxContainer = get_node_or_null("Margin/Scroll/Wrap/Column")
         if column == null:
                 return
@@ -272,7 +277,7 @@ func _github_body() -> Control:
         box.add_child(token_row)
         var token := LineEdit.new()
         token.name = "Token"
-        token.placeholder_text = ("Paste the token GitHub shows you" if OS.has_feature("web") else "…or paste a token with repo scope")
+        token.placeholder_text = ("Paste the token GitHub shows you" if OS.has_feature("web") else "…or paste a repo token")
         token.secret = true
         token.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         token.custom_minimum_size = Vector2(0, 44)

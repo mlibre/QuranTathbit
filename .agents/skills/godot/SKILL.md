@@ -88,6 +88,7 @@ Read [architecture-editor.md](references/architecture-editor.md) as well when a 
 ### Input, UI, physics, and rendering
 
 - Define remappable input actions and separate gameplay input from UI focus/consumption.
+- Pick the stretch base resolution for the smallest device you support, not the largest: with `canvas_items` + `expand`, a desktop-sized base hands a phone a desktop-wide design canvas at a fraction of its scale, and every width-keyed responsive branch silently never fires. Read live sizes (the visible rect, not `Window.size`) for breakpoints, and assert the canvas itself in layout tests (see [2d-ui-input-i18n.md](references/2d-ui-input-i18n.md)).
 - Map `Input.get_vector()` to 3D with negated Y (`right * v.x + forward * -v.y`); `y = -1` is forward/up, so the non-negated form inverts up/down. Keep custom sticks on the same sign convention.
 - Use containers, anchors, theme resources, and safe-area-aware layout; test keyboard, controller, touch/mouse, text expansion, and relevant accessibility behavior.
 - Use fixed physics ticks and explicit collision layers/masks. Check the project's actual 2D/3D backend before backend-specific work.
@@ -161,6 +162,7 @@ godot --headless --path <project> --export-release "<preset>" <output>
 - Ownership, freeing, scene changes, awaits, pause behavior, quit/close-request paths, process mode, and repeated starts are handled.
 - Deferred callbacks, timers, and tweens outliving their captured nodes are handled by capturing an `int` instance id rather than an `Object` (see `references/gdscript.md`); a freed capture fails before any in-body validity guard can run.
 - Anchored UI is positioned in absolute parent coordinates, and autowrapped labels carry a width floor, at every tested viewport size (see `references/2d-ui-input-i18n.md`).
+- Phone-sized windows get a phone-sized design canvas, safe-area insets are applied where the display reports them, and touch-only realities (no tooltips, no hover, ≥44-unit targets, back button as Escape) are handled — verified by a display-run layout suite, not only headless (see `references/2d-ui-input-i18n.md` and `references/performance-debug-testing.md`).
 - Saves and external/network inputs are bounded, checked, versioned, and recoverable where applicable.
 - Relevant input, resolution, localization, accessibility, renderer, audio, and platform cases were considered.
 - Import, parse, targeted tests, runtime smoke checks, and relevant export checks were actually run—or their blockers were reported.

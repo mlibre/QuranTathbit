@@ -97,6 +97,26 @@ first session, and `tools/make_gif.py` assembles the frames into the GIF
 the README carries (`python3 tools/make_gif.py /tmp/gifframes
 docs/media/app.gif`).
 
+The same rig answers the phone question. `tests/capture_window.gd` runs
+the journey inside a window the caller names and asserts the layout
+invariants for that shape — the design canvas the stretch mode hands the
+app, the answer grid's column count, every button inside the window, the
+corner coins on top where a tap lands. A phone window must get a phone
+canvas: the app's base resolution is the phone's own width, so a window
+narrower than the desktop's aspect lays out as a hand's page, and the
+suite fails if the canvas, or anything on it, says otherwise:
+
+```bash
+Xvfb :99 -screen 0 1920x2400x24 &
+godot --path . --script tests/capture_window.gd -- 390x844 /tmp/shots-phone
+godot --path . --script tests/capture_window.gd -- 1280x800 /tmp/shots-desk
+python3 tools/shot_qa.py /tmp/shots-phone
+```
+
+The window is asked for before the tree runs its first frame: under a bare
+X server the canvas follows a programmatic resize only then, so each size
+gets its own run rather than one run resizing midway.
+
 ## Deck fidelity
 
 The deck ships from one source: `quran-cards-2026-10-14.apkg`, and nothing

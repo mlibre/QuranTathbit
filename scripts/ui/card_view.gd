@@ -176,7 +176,9 @@ func _add_audio_button(name: String, path: String) -> void:
                 font.get_string_size("Listening…", HORIZONTAL_ALIGNMENT_LEFT, -1, ThemeScript.CAPTION).x,
                 font.get_string_size(idle_text, HORIZONTAL_ALIGNMENT_LEFT, -1, ThemeScript.CAPTION).x
         )
-        button.custom_minimum_size = Vector2(ceil(widest) + 15 + 9 + 42, 46)
+        # 48 tall, not 46: a fingertip deserves the whole guideline, and on a
+        # phone's canvas this is the button a verse is heard by.
+        button.custom_minimum_size = Vector2(ceil(widest) + 15 + 9 + 42, 48)
         button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         button.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
         button.add_theme_font_size_override("font_size", ThemeScript.CAPTION)

@@ -58,6 +58,14 @@ No installer, no dependencies, no account: the download *is* the app.
 
 ![The app at work — home, a card, its answer, the next card](docs/media/app.gif)
 
+On a phone the same session lays out for a hand — a phone's own page
+width, two answer buttons to a row, every target a thumb tall:
+
+<p>
+  <img src="docs/media/phone_home.png" alt="Home on a phone" width="200"/>
+  <img src="docs/media/phone_answer.png" alt="A card's answer on a phone" width="200"/>
+</p>
+
 1. **Home** — today's waiting count and one big **Study** button.
 2. **Question** — the surah and āyāt in Arabic, set large in the middle of
    the page. Press **Space** (or **Show answer**) when you are ready.

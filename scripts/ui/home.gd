@@ -26,11 +26,32 @@ func _ready() -> void:
 ## The page answers the window: pills and the study button grow to fill a
 ## phone and stop at their own measure on a desktop, so nothing ever
 ## overflows and nothing ever floats narrower than the content it holds.
-## Runs on every resize; reads nothing but the window's own width.
+## The margins answer it too -- a phone's page sits closer to its edges and
+## gives its card more of what is left -- and everything answers the notch:
+## the top margin and the corner coins ride below whatever the display
+## keeps for itself. Runs on every resize; reads nothing but the window's
+## own width and the display's own safe area.
 func _layout() -> void:
         if size.x <= 0.0:
                 return
-        var avail := size.x - 56.0  # the margin's 28 on each side
+        var inset := ThemeScript.top_inset()
+        var narrow := size.x < ThemeScript.NARROW
+        var side := 20.0 if narrow else 28.0
+        var margin: MarginContainer = get_node("Margin")
+        margin.add_theme_constant_override("margin_left", int(side))
+        margin.add_theme_constant_override("margin_right", int(side))
+        margin.add_theme_constant_override("margin_top", int(36.0 + inset))
+        margin.add_theme_constant_override("margin_bottom", int(30.0 + ThemeScript.bottom_inset()))
+        # The deck card's own padding leans in with the page: the phone's
+        # card gives its words the room the tighter margins took.
+        var pad: MarginContainer = get_node("Margin/Column/DeckCard/Pad")
+        pad.add_theme_constant_override("margin_left", 20 if narrow else 30)
+        pad.add_theme_constant_override("margin_right", 20 if narrow else 30)
+        for coin_name in ["SyncCoin", "SettingsCorner"]:
+                var coin: Button = get_node(coin_name)
+                coin.offset_top = 22.0 + inset
+                coin.offset_bottom = 70.0 + inset
+        var avail := size.x - 2.0 * side  # the margin on each side
         var gap := 12.0
         var pill_w := clampf((avail - 2.0 * gap) / 3.0, 64.0, 116.0)
         for name in ["Due", "New", "Learned"]:
@@ -112,6 +133,9 @@ func _set_sync_state(text: String, state: String) -> void:
         mark.color = mark_tone
         mark.queue_redraw()
         coin.tooltip_text = text
+        var line: Label = get_node_or_null("Margin/Column/SyncLine")
+        if line != null:
+                line.text = text
 
 
 ## The next card's heading: the first line of its front, plain text. The
@@ -162,6 +186,7 @@ func _build() -> void:
         column.add_child(_deck_card())
         column.add_child(_stats())
         column.add_child(_study_button())
+        column.add_child(_sync_line())
 
         # The corner coins go on last, not first: children added later sit
         # above earlier ones in both drawing and hit-testing, and a full-rect
@@ -353,6 +378,20 @@ func _pill_fg(key: String) -> Color:
                         return ThemeScript.GREEN_DEEP
                 _:
                         return ThemeScript.INK_SOFT
+
+## The sync coin's state in words, under the day's button: a tooltip says
+## it to a mouse, but a fingertip has no hover to carry one, so the line
+## stands on the page itself -- quiet, small, and there for whichever kind
+## of hand asks.
+func _sync_line() -> Control:
+        var line := Label.new()
+        line.name = "SyncLine"
+        line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        ThemeScript.dress(line, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
+        line.text = ""
+        return line
 
 func _study_button() -> Control:
         var button := ThemeScript.primary_button("Study", 60)

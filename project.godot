@@ -17,11 +17,15 @@ config/icon="res://assets/icons/icon.svg"
 
 [display]
 
-; The app is built to be held as readily as it is run on a desktop: one
-; expanding canvas, a centered column, and comfortable from phone to
-; window. The interface is all 2D, so the compatibility renderer carries
-; every platform — web included — with nothing to drop.
-window/size/viewport_width=1280
+; The app is built to be held as readily as it is run on a desktop. The
+; base canvas is the phone: 420 wide, 800 tall. With the expand aspect the
+; engine pins the design canvas at the base's own width for any window
+; narrower than the base's aspect -- a phone -- and at the base's height
+; for any window wider -- a desktop -- so a hand gets a hand's layout at a
+; hand's scale, and a desk keeps the 1280x800 window it has always had,
+; pixel for pixel. A desktop base here would pin the canvas at 1280 wide
+; on a phone instead, drawing the whole desktop UI at a third of its size.
+window/size/viewport_width=420
 window/size/viewport_height=800
 window/size/window_width_override=1280
 window/size/window_height_override=800

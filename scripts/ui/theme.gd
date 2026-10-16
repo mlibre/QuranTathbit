@@ -50,6 +50,54 @@ const GAP := 14
 ## between them. Everything wider than this centres itself instead.
 const MEASURE := 720
 
+## The line between a hand and a desk: narrower than this the page is a
+## phone's -- margins tighten, rows halve, the layout leans in. The base
+## canvas is 420 wide, so every phone lands below it and every desktop
+## window above it.
+const NARROW := 480
+
+
+# --- the window the phone gives the app -----------------------------------------
+
+
+## The top the phone keeps for itself -- notches, status bars, camera holes:
+## whatever the display says belongs to the system above the app, read from
+## the safe area against the window's own place on the screen and returned
+## in design units. Zero on every desktop, where the window is its own
+## whole world, and zero wherever the display reports no insets; a number a
+## screen's chrome can trust only when the system actually drew one.
+static func top_inset() -> float:
+        return _inset_from(true)
+
+
+## The same, from below: the home indicator's strip, the gesture bar -- the
+## place a thumb swipes the phone itself, and so the last place a button
+## should sit. Answer rows and footers ride above it.
+static func bottom_inset() -> float:
+        return _inset_from(false)
+
+
+static func _inset_from(top: bool) -> float:
+        var window := DisplayServer.window_get_size()
+        if window.y <= 0:
+                return 0.0
+        var safe := DisplayServer.get_display_safe_area()
+        var window_pos := DisplayServer.window_get_position()
+        # How far the window reaches past the safe area, in the direction
+        # asked about -- and no further: a window merely sitting inside the
+        # safe area (every desktop window) owes nothing.
+        var px := 0.0
+        if top:
+                px = float(safe.position.y - window_pos.y)
+        else:
+                px = float(window_pos.y + window.y - (safe.position.y + safe.size.y))
+        if px <= 0.0 or px >= float(window.y):
+                return 0.0
+        var canvas := (Engine.get_main_loop() as SceneTree).root.get_visible_rect().size
+        if canvas.y <= 0.0:
+                return 0.0
+        return px * canvas.y / float(window.y)
+
 
 # --- drawn marks ----------------------------------------------------------------
 #
