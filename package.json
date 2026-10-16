@@ -40,7 +40,7 @@
     "index.180x180.png",
     "index.512x512.png",
     "decks/",
-    "README.npm.md",
+    "README.md",
     "LICENSE"
   ],
   "scripts": {

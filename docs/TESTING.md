@@ -1,8 +1,8 @@
 # Testing
 
 The app is verified headlessly: every suite is a Godot SceneTree script that
-runs, prints what it checked, and exits non-zero on failure. Nothing needs a
-display, a GPU, or an editor.
+runs, prints what it checked, and exits non-zero on failure — no display,
+no GPU, no editor.
 
 ```bash
 scripts/check_indent.sh     # indentation guard
@@ -12,32 +12,29 @@ godot --headless --path . --script tests/regression_<name>.gd   # one suite
 
 ## The suites
 
-| suite                  | what it holds the app to                                                                                                                                                                                                                             |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `regression_scheduler` | Anki's SM-2, with Anki's own numbers: interval bands, fuzz bounds, step delays, lapse/relearn round trips, ease moves, queue caps                                                                                                                                    |
-| `regression_deck`      | the deck as folders and files: load, card discovery, media resolution, progress round-trip, and repair of a hand-corrupted or partial `progress.json`                                                                                                              |
-| `regression_sync`      | sync against a fake GitHub: first push, second device pulling, local-edit-wins vs remote-follows, progress merge by card, single-commit batches, ref-conflict retry, failed transfers retrying, foreign repo files untouched, a shared deck arriving, editor metadata never travelling, web builds skipping media |
-| `regression_markdown`  | the card markdown subset, and the Arabic/Persian/Latin script detection that dresses each block                                                                                                                                                                     |
-| `regression_boot`      | a cold first run: the bundled deck installs itself into `user://`, home shows the real numbers, a session renders a real card and records its answer, settings opens and returns                                                                                   |
+| suite                  | what it holds the app to                                              |
+| --- | --- |
+| `regression_scheduler` | Anki's SM-2 with Anki's numbers: interval bands, fuzz bounds, step delays, lapse/relearn round trips, ease moves, queue caps |
+| `regression_deck`      | the deck as folders and files: load, card discovery, media resolution, progress round-trip, repair of a hand-corrupted `progress.json` |
+| `regression_sync`      | sync against a fake GitHub: first push, second device, local-edit-wins, progress merge by card, single-commit batches, ref-conflict retry, foreign files untouched, editor metadata never travelling, web builds skipping media |
+| `regression_markdown`  | the card markdown subset, and the Arabic/Persian/Latin script detection that dresses each block |
+| `regression_boot`      | a cold first run: the bundled deck installs itself, home shows the real numbers, a session renders a real card, settings opens and returns |
 
 ## Why the battery runs twice
 
 Pass 1 runs the suites as the machine sits. Pass 2 removes
-`.godot/global_script_class_cache.cfg` first and restores it afterwards — the
-state of any machine that pulled new classes but has not opened the editor
-since. GDScript resolves bare `class_name` references through that cache, so a
-project that references another file's class by name boots in the editor and
-fails everywhere else.
-
+`.godot/global_script_class_cache.cfg` first — the state of any machine that
+pulled new classes but has not opened the editor since. GDScript resolves
+bare `class_name` references through that cache, so a project that references
+another file's class by name boots in the editor and fails everywhere else.
 Every cross-file reference is therefore pinned behind a `preload` constant
-(`const DeckScript := preload("res://scripts/data/deck.gd")`) and `extends`
-paths are quoted. The cold pass is what proves it; a suite that only passes
-warm is not green.
+and quoted `extends` paths; the cold pass proves it — a suite that only
+passes warm is not green.
 
 ## Live checks
 
-Two tools speak to GitHub's real servers, for when the fakes are not enough.
-They cost nothing, store nothing, and never need credentials to pass:
+Three tools speak to GitHub's real servers. They cost nothing, store nothing,
+and never need credentials to pass:
 
 ```bash
 godot --headless --path . --script tools/live_http_check.gd   # the HTTP pipeline
@@ -46,30 +43,28 @@ godot --headless --path . --script tools/live_sync_check.gd   # the sync engine
 ```
 
 `live_http_check` sends one request through the app's own `HttpClient` and
-accepts any HTTP status back — it proves the network plumbing, not GitHub's
-answer. `live_auth_check` goes further with the real OAuth app id: it mints a
-genuine device/user code pair, polls once and expects the specific
-`authorization_pending` answer (a bad id would return `invalid_client`
-instead), and — if you export `QURAN_TATHBIT_LIVE_TOKEN` with a classic token
-first — ends with the same `whoami` call every sign-in path finishes with.
-`live_sync_check` exercises the full sync path: it creates a scratch private
-repo (named `quran-tathbit-smoke`, or `QURAN_TATHBIT_LIVE_REPO`), pushes the
-bundled deck as a single commit, reads the tree back to confirm every file
-landed with no editor metadata riding along, then runs a quiet second sync
-that moves nothing. Setting `QURAN_TATHBIT_LIVE_CLEANUP=1` deletes the scratch
-repo at the end, leaving the account as it was found. Tokens are read from the
-environment and never written anywhere except the in-memory settings used by
-the engine.
+accepts any HTTP status back — it proves the plumbing, not GitHub's answer.
+`live_auth_check` mints a genuine device/user code pair with the real OAuth
+app id, polls once and expects `authorization_pending` (a bad id would
+return `invalid_client`); with `QURAN_TATHBIT_LIVE_TOKEN` exported it ends
+with the same `whoami` call every sign-in finishes with. `live_sync_check`
+creates a scratch private repo (`quran-tathbit-smoke`, or
+`QURAN_TATHBIT_LIVE_REPO`), pushes the bundled deck as a single commit,
+reads the tree back — no editor metadata riding along — then runs a quiet
+second sync that moves nothing; `QURAN_TATHBIT_LIVE_CLEANUP=1` deletes the
+scratch repo at the end. Tokens are read from the environment and never
+written anywhere.
 
 ## Adding a suite
 
 Name it `tests/regression_<subject>.gd`; the battery picks it up
-automatically. Extend `SceneTree`, set a `_failures` counter, and finish with:
+automatically. Extend `SceneTree`, set a `_failures` counter, and finish
+with:
 
 ```gdscript
 if _failures > 0:
-    print("subject: %d FAILURE(S)" % _failures)
-    quit(1)
+        print("subject: %d FAILURE(S)" % _failures)
+        quit(1)
 print("subject: all checks passed")
 quit(0)
 ```
@@ -77,8 +72,8 @@ quit(0)
 Two conventions worth keeping:
 
 - **Test the contract, not the implementation.** The sync suite drives the
-  engine through a fake `HttpClient` that speaks the slice of GitHub's API the
-  app uses — no network, no fixtures to record.
+  engine through a fake `HttpClient` that speaks the slice of GitHub's API
+  the app uses — no network, no fixtures to record.
 - **Assert on observable state.** Read `progress.json` off disk, walk the
   scene tree, count the cards in the repo. A suite that could pass while the
   app is broken is worse than no suite.
@@ -86,8 +81,8 @@ Two conventions worth keeping:
 ## Visual QA
 
 Headless runs cannot prove what a person sees. `tests/capture_shots.gd`
-drives the real app through a fresh install and its first session and saves a
-PNG at each step; `tools/shot_qa.py` reads them back (luminance, dark voids,
+drives the app through a fresh install and its first session, saving a PNG
+at each step; `tools/shot_qa.py` reads them back (luminance, dark voids,
 palette). It needs a display — Xvfb is enough:
 
 ```bash
@@ -98,9 +93,9 @@ python3 tools/shot_qa.py /tmp/shots
 
 ## Deck fidelity
 
-The deck ships from one source: `quran-cards-2026-10-14.apkg`. Nothing may
-alter it on its way into the app. `tools/verify_deck.py` enforces that: it
-re-extracts the package into a scratch folder through the converter's own
+The deck ships from one source: `quran-cards-2026-10-14.apkg`, and nothing
+may alter it on its way into the app. `tools/verify_deck.py` enforces that:
+it re-extracts the package into a scratch folder through the converter's own
 code and compares the shipped deck file by file.
 
 ```bash
@@ -110,20 +105,13 @@ python3 tools/verify_deck.py
 
 - `front.md`, `back.md` and every media file must be **byte-identical** to
   the extraction.
-- `deck.json` may differ only in the deck's *name* (the package calls it
-  "Default"; the app ships "Quran") — the card list and the recorded source
-  URL (`https://quran.makarem.ir/`) must match exactly.
-- `*.import` files (Godot editor metadata) and `progress.json` (runtime
-  state) are ignored; anything else in the deck folder fails the run.
+- `deck.json` may differ only in the deck's *name*; the card list and source
+  URL must match exactly.
+- `*.import` files and `progress.json` are ignored; anything else in the
+  deck folder fails the run.
 
 CI runs it before every Pages deploy and release build, so a deck that
-drifted from the package — edited by hand, mangled by a tool, or written
-from memory — fails the build instead of reaching a user.
-
-The 12 MB `.apkg` itself is intentionally absent from the repo: the deck
-was proven byte-identical at the commit that introduced it, and the
-`source` field in `deck.json` still records where every byte came from.
-When the package is missing, `verify_deck.py` prints a single `skip`
-line and exits 0 — CI keeps moving. Drop the developer's local copy of
-`quran-cards-2026-10-14.apkg` back into the root to run the proof again
-and catch any drift.
+drifted from the package fails the build instead of reaching a user. The
+12 MB `.apkg` is intentionally absent from the repo; when it is missing,
+`verify_deck.py` prints a `skip` line and exits 0. Drop a local copy into
+the root to run the proof again.

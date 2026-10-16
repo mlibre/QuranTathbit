@@ -81,7 +81,8 @@ jobs:
                 pkg/ 2>/dev/null || true
           cp -r builds/web/decks pkg/decks
           cp start.js pkg/start.js
-          cp README.npm.md pkg/README.npm.md
+          # Shipped as README.md so the npm registry page displays it.
+          cp docs/README.npm.md pkg/README.md
           cp LICENSE pkg/LICENSE
           cp package.json pkg/package.json
           # Show what we are about to publish, so the log is auditable.
