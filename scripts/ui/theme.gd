@@ -735,17 +735,23 @@ class DisclosureMark extends Control:
                 )
 
 
-## A chevron pointing back the way the user came: the universal way out.
+## A chevron pointing back the way the user came: the universal way out. A
+## page that reads from the right points back to the right, so the mark
+## carries its own mirror and the way out is never a way onward.
 class BackMark extends Control:
         var color := INK
+        var flip := false
 
-        func _init(p_color: Color = INK) -> void:
+        func _init(p_color: Color = INK, p_flip := false) -> void:
                 color = p_color
+                flip = p_flip
                 custom_minimum_size = Vector2(14, 22)
 
         func _draw() -> void:
+                var tip := 11.0 if not flip else 3.0
+                var bend := 4.0 if not flip else 10.0
                 draw_polyline(
-                        PackedVector2Array([Vector2(11, 3), Vector2(4, 11), Vector2(11, 19)]),
+                        PackedVector2Array([Vector2(tip, 3), Vector2(bend, 11), Vector2(tip, 19)]),
                         color,
                         2.4,
                         true
@@ -1157,17 +1163,21 @@ static func dress(label: Label, size: int, color: Color, bold := false) -> Label
 ## One shared header for the screens that sit on top of home: a back mark
 ## that says where it goes, a title in the middle, room on the right for
 ## whatever only that screen needs. The same bones everywhere, so leaving is
-## never a new thing to learn.
-static func top_bar(title_text: String) -> Dictionary:
+## never a new thing to learn. A page whose tongue reads from the right
+## (rtl) turns the whole bar around -- the way back stands at the reading's
+## start, and the mark points the way it goes.
+static func top_bar(title_text: String, rtl := false) -> Dictionary:
         var row := HBoxContainer.new()
         row.name = "TopBar"
         row.custom_minimum_size = Vector2(0, 48)
+        if rtl:
+                row.layout_direction = Control.LAYOUT_DIRECTION_RTL
 
         var back := Button.new()
         back.name = "Back"
         back.custom_minimum_size = Vector2(48, 48)
         apply_mark_styles(back, mark_button_styles())
-        back.add_child(_centered_mark(BackMark.new(INK)))
+        back.add_child(_centered_mark(BackMark.new(INK, rtl)))
         pressable(back)
         row.add_child(back)
 
@@ -1364,6 +1374,87 @@ static func quran() -> Font:
 
 static func noto_naskh(bold := false) -> Font:
         return load(NOTO_NASKH_BOLD if bold else NOTO_NASKH) as Font
+
+
+## How far a line's ink reaches past the box its font declares: the marks a
+## verse stacks above its tallest letters -- Amiri's damma over a hamza'd
+## alef in أُنزِلَ, Noto Naskh's over the same -- and the kasra that hangs
+## beneath a final letter. The engine's text controls clip at the font's own
+## ascent and descent, so a mark beyond them is drawn nowhere at all: the
+## hidden damma a reader reported was exactly that. Measured from the shaped
+## glyphs themselves (the same anchors the renderer places them by), so it
+## is exact for any text in any face at any size, and honest about the faces
+## whose marks live beyond their box (Amiri) and the one whose mushaf cut
+## carries them inside it (Amiri Quran).
+##
+## Returns (pixels above the ascent, pixels below the descent), never below
+## zero: a line whose ink fits its font's own box asks for no room.
+static func ink_room(text: String, font: Font, size: int) -> Vector2i:
+        if text.is_empty() or size <= 0 or font == null:
+                return Vector2i.ZERO
+        var rids: Array = font.get_rids()
+        if rids.is_empty():
+                return Vector2i.ZERO
+        var ts := TextServerManager.get_primary_interface()
+        var shaped := ts.create_shaped_text()
+        ts.shaped_text_add_string(shaped, text, [rids[0]], size)
+        ts.shaped_text_shape(shaped)
+        var highest := 1.0e9
+        var lowest := -1.0e9
+        for glyph in ts.shaped_text_get_glyphs(shaped):
+                var rid: RID = glyph["font_rid"]
+                if not rid.is_valid():
+                        continue
+                var cell := Vector2i(size, 0)
+                var offset: Vector2 = ts.font_get_glyph_offset(rid, cell, glyph["index"])
+                var gsize: Vector2 = ts.font_get_glyph_size(rid, cell, glyph["index"])
+                var top: float = glyph["offset"].y + offset.y
+                highest = minf(highest, top)
+                lowest = maxf(lowest, top + gsize.y)
+        ts.free_rid(shaped)
+        return Vector2i(
+                maxi(ceili(-highest - font.get_ascent(size)), 0),
+                maxi(ceili(lowest - font.get_descent(size)), 0),
+        )
+
+
+## The room a RichTextLabel's ink needs, given inside the control itself: a
+## stylebox's content margins grow the control and push its text down into
+## it, so the marks that stood above the ascent are drawn inside the edge
+## the control clips at (4.7 has no margin constants of its own to ask --
+## the stylebox is the one voice that speaks). An empty stylebox draws
+## nothing, so the page's own look does not move an inch. More than one face
+## can be named when the line may wear any of them (a verse's bold runs lean
+## on a bolder twin); the room asked is the most any of them needs.
+static func give_rtl_room(label: RichTextLabel, text: String, faces: Array, size: int) -> void:
+        var top := 0
+        var bottom := 0
+        for face in faces:
+                var room := ink_room(text, face, size)
+                top = maxi(top, room.x)
+                bottom = maxi(bottom, room.y)
+        if top <= 0 and bottom <= 0:
+                return
+        var box := StyleBoxEmpty.new()
+        box.content_margin_top = top
+        box.content_margin_bottom = bottom
+        label.add_theme_stylebox_override("normal", box)
+
+
+## The same room for a plain Label (the shelf's verse preview): a Label
+## clips at its rect when clip_text is on, and its rect is only as tall as
+## the font's box -- so the room arrives as height, with the line centred
+## in it: half above, half below, whatever the ink needs on either side.
+static func give_label_room(label: Label, text: String, font: Font, size: int) -> void:
+        var room := ink_room(text, font, size)
+        var need := maxi(room.x, room.y)
+        if need <= 0:
+                return
+        label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+        label.custom_minimum_size = Vector2(
+                label.custom_minimum_size.x,
+                ceili(font.get_height(size)) + 2 * need
+        )
 
 
 ## The face a verse wears, wherever scripture itself is shown: the study

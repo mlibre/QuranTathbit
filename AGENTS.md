@@ -75,6 +75,20 @@ Windows, web) in Godot 4.7 with GDScript only.
 - **Cache-free boot safety.** A fresh clone has no editor-built class cache,
   so every cross-file class reference is pinned behind a `preload` constant
   and quoted `extends` paths — `tools/battery.sh`'s cold pass enforces it.
+- **The whole word is drawn, whatever its marks reach.** A verse's stacked
+  vowels reach past the box its font declares, and every text control in the
+  engine clips at that box — so the app measures the ink itself
+  (`ThemeScript.ink_room`, from the shaped glyphs) and gives each surface the
+  room it asks for: a RichTextLabel via its "normal" stylebox's content
+  margins, a clipped Label via extra height around a centred line, the
+  editor's mirror via per-line margins paid back out of the VBox separation
+  so the pitch the TextEdit lays never drifts. Never pad by a guessed
+  constant, never blame the font, never clip a mark.
+- **A page reads from the edge its tongue reads from.** When the UI language
+  is right-to-left (`I18n.is_rtl()`), the page's root turns
+  (`LAYOUT_DIRECTION_RTL`), every title, label, field and line stands at the
+  right edge, and the way back points right from the right corner; a page
+  said again in another tongue says its own direction again.
 - **The chrome speaks the reader's tongue; the deck never changes.** Every
   user-visible string of the interface goes through `scripts/ui/i18n.gd`'s
   `t()` (English is the key and the fallback), in English, فارسی and

@@ -72,8 +72,17 @@ A few quiet extras:
 - **The app speaks your language.** Menus and messages in English, فارسی or
   العربية — asked once the first time you open the app, changeable anytime
   in Settings. Numbers come in the language's own digits (۱ ۲ ۳, not 1 2 3),
-  and waits are spoken in words — ۱ روز, not 1d. The verses and their
-  Persian translation always stay exactly as they are.
+  and waits are spoken in words — ۱ روز, not 1d. When the tongue reads from
+  the right, Settings is laid out from the right too — titles, labels,
+  fields and the way back all standing where the reading starts. The verses
+  and their Persian translation always stay exactly as they are.
+- **Every mark is drawn, whole.** The vowels a verse stacks above its
+  tallest letters reach past the box a font declares for itself, and a
+  renderer that clips at that box would draw them nowhere at all. The app
+  measures where the ink really goes — in whatever face you chose, at
+  whatever size — and gives it the room it asks for, so a damma above a
+  hamza'd alef (أُنزِلَ) is never hidden again, on the study card, in the
+  library, or in the editor.
 - **Keep the deck as one file.** Settings → *Backup* packs the whole deck —
   verses, recitations, and all your progress — into a single zip that lands
   in your Downloads folder (in a browser, it downloads). Import joins a

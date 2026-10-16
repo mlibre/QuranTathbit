@@ -15,7 +15,7 @@ extends SceneTree
 const MainScript := preload("res://scripts/main.gd")
 const DeckZipScript := preload("res://scripts/data/deck_zip.gd")
 
-const SHOTS := 22
+const SHOTS := 23
 
 var _out := "/tmp/shots"
 var _saved := 0
@@ -173,6 +173,16 @@ func _init() -> void:
                 await _shot("study_fa_back")
                 study_fa.closed.emit()
                 await create_timer(0.7).timeout
+        # The settings page said in Persian: laid out from the right, the
+        # whole page -- titles, labels, fields, the way back -- reading the
+        # way its words do.
+        main._on_settings_pressed()
+        await create_timer(0.8).timeout
+        await _shot("settings_fa")
+        var settings_fa: Control = main.get_node_or_null("Settings")
+        if settings_fa != null:
+                settings_fa.closed.emit()
+                await create_timer(0.6).timeout
         # The library in Persian: the shelf's pills and counts carry the
         # tongue's own digits too.
         main._on_browse_pressed()

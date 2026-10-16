@@ -115,6 +115,15 @@ static func lang_label(code: String) -> String:
         return str(LANG_LABELS.get(code, code))
 
 
+## Does the tongue being spoken read from the right? A page laid out for a
+## left-to-right reader is a page the right-to-left reader has to translate
+## twice -- once the words, then where everything stands. The tongues this
+## app speaks that run right to left answer here, and every page that has a
+## direction asks this one question.
+static func is_rtl() -> bool:
+        return _lang in ["fa", "ar"]
+
+
 const STRINGS := {
         # --- home ------------------------------------------------------------------
         "Study": {"fa": "مطالعه", "ar": "دراسة"},
@@ -386,10 +395,6 @@ const STRINGS := {
                 "fa": "همگام‌سازی آرام پس از هر جلسه",
                 "ar": "مزامنة هادئة بعد كل جلسة",
         },
-        "after each session, and when the app opens": {
-                "fa": "پس از هر جلسه، و هنگام گشودن برنامه",
-                "ar": "بعد كل جلسة، وعند فتح التطبيق",
-        },
         "Sync now": {"fa": "همگام‌سازی", "ar": "زامِن الآن"},
         "Sync with GitHub": {"fa": "همگام‌سازی با GitHub", "ar": "المزامنة مع GitHub"},
         "Cards are folders on your disk. Edit them anywhere; sync carries them.": {
@@ -411,7 +416,7 @@ const STRINGS := {
         },
         "Data source": {"fa": "سرچشمهٔ داده", "ar": "مصدر البيانات"},
         "The deck's verses, Persian translation and recitations come from [url=https://quran.makarem.ir/]quran.makarem.ir[/url], carried unchanged from the deck package.": {
-                "fa": "آیه‌های مجموعه، ترجمهٔ فارسی و تلاوت‌ها از [url=https://quran.makarem.ir/]quran.makarem.ir[/url] می‌آیند، بی‌کم‌وکاست از بستهٔ مجموعه.",
+                "fa": "آیه‌های مجموعه، ترجمهٔ فارسی و تلاوت‌ها از [url=https://quran.makarem.ir/]quran.makarem.ir[/url] می‌آیند.",
                 "ar": "آيات المجموعة وترجمتها الفارسية وتلاواتها من [url=https://quran.makarem.ir/]quran.makarem.ir[/url]، منقولةً دون تغيير من حزمة المجموعة.",
         },
         "Open quran.makarem.ir": {"fa": "گشودن quran.makarem.ir", "ar": "فتح quran.makarem.ir"},

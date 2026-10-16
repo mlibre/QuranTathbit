@@ -41,6 +41,14 @@ const PITCH := 4  # the engine's line spacing and the mirror's, kept equal
 
 var one_line := false  # a reference is one line; Enter hands the keyboard on
 
+# The room the mirror's ink needs above and below each line: marks stacked
+# past the font's own box would be drawn nowhere (a RichTextLabel clips at
+# its rect), so every line label carries this much margin inside itself.
+# The same amount comes back off the VBox's separation, keeping the pitch
+# the TextEdit lays its own invisible lines at -- the mirror and the engine
+# never drift apart, however many lines a verse wraps into.
+var _room := 0
+
 var _editor: TextEdit
 var _lines: VBoxContainer
 var _pending_text := ""
@@ -84,7 +92,6 @@ func _ready() -> void:
         _lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
         _lines.add_theme_constant_override("separation", PITCH)
         add_child(_lines)
-
         _editor = TextEdit.new()
         _editor.name = "Source"
         _editor.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
@@ -201,7 +208,13 @@ func _sort_now() -> void:
                 maxf(size.y - _field_look.content_margin_top - _field_look.content_margin_bottom, 1.0),
         )
         fit_child_in_rect(_lines, Rect2(pad, Vector2(inner.x, _lines.get_combined_minimum_size().y)))
-        fit_child_in_rect(_editor, Rect2(pad, inner))
+        # The engine's own lines sit the room's distance below the mirror's
+        # label tops -- where the words themselves stand -- so a click beside
+        # a word lands on the very word it meant.
+        fit_child_in_rect(
+                _editor,
+                Rect2(pad + Vector2(0, _room), Vector2(inner.x, maxf(inner.y - _room, 1.0)))
+        )
         # The mirror's lines are the engine's own wraps; the engine wraps at
         # the width it is given, which is only honest once the field has been
         # laid out. A width that moved means the wraps move with it -- and the
@@ -236,6 +249,18 @@ func _rebuild() -> void:
                 to_line = _editor.get_selection_to_line()
                 to_col = _editor.get_selection_to_column()
         var line_count := _editor.get_line_count()
+        # The room the words on this page ask for, said once for them all: a
+        # verse's tall stacks need it, a plain line needs none of it, and the
+        # pitch gives back whatever the margins take -- so the mirror never
+        # drifts from the engine that takes its keys.
+        _room = 0
+        for line in maxi(line_count, 1):
+                if line >= line_count:
+                        continue
+                for part in _editor.get_line_wrapped_text(line):
+                        var part_room := ThemeScript.ink_room(part, ThemeScript.vazir(SIZE), SIZE)
+                        _room = maxi(_room, maxi(part_room.x, part_room.y))
+        _lines.add_theme_constant_override("separation", PITCH - 2 * _room)
         for line in maxi(line_count, 1):
                 var source := _editor.get_line(line) if line < line_count else ""
                 var parts := _editor.get_line_wrapped_text(line) if line < line_count else PackedStringArray([""])
@@ -268,7 +293,13 @@ func _line_label(part: String, start: int, line: int, from_line: int, from_col: 
         label.mouse_filter = Control.MOUSE_FILTER_IGNORE
         label.add_theme_font_override("normal_font", ThemeScript.vazir(SIZE))
         label.add_theme_font_size_override("normal_font_size", SIZE)
-        label.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+        # The room each line carries inside itself, so the marks that stand
+        # past the font's box are drawn -- and the separation above gives it
+        # back, so the lines stay on the engine's own pitch.
+        var box := StyleBoxEmpty.new()
+        box.content_margin_top = _room
+        box.content_margin_bottom = _room
+        label.add_theme_stylebox_override("normal", box)
         label.add_theme_constant_override("line_separation", 0)
         var plain := ThemeScript.script_of(part)
         var color := ThemeScript.INK if plain != "plain" else ThemeScript.GOLD_DEEP
@@ -324,7 +355,9 @@ func _reposition_caret() -> void:
         visual += wrap
         var y := _field_look.content_margin_top
         if visual < _lines.get_child_count():
-                y += _lines.get_child(visual).position.y
+                # The line's own words begin the room's distance inside its
+                # label, and the caret stands where the words stand.
+                y += _lines.get_child(visual).position.y + _room
         else:
                 _caret.visible = false
                 return

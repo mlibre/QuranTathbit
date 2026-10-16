@@ -40,6 +40,7 @@ func _init() -> void:
         _check_own_digits()
         await _check_settings(main)
         await _check_browse(main)
+        await _check_marks_and_rtl(main)
         _check_settings_round_trip()
         _check_sync_retrying(main)
 
@@ -1079,6 +1080,147 @@ func _check_browse(main: Node) -> void:
         await create_timer(0.4).timeout
         _ok(main.get_node_or_null("Home") != null, "leaving the library returns home")
 
+
+## The whole word, whatever it wears: a verse's marks reach past the box its
+## font declares, and any control that clips at that box drew them nowhere --
+## the damma a reader lost on أُنزِلَ was exactly that. And a page whose tongue
+## reads from the right is laid out from the right, so nothing is asked to
+## stand at an edge it does not read from.
+func _check_marks_and_rtl(main: Node) -> void:
+        var i18n := load("res://scripts/ui/i18n.gd")
+        var word := "أُنزِلَ"
+
+        # The measurement itself: honest about every face, exact at any size.
+        _is(ThemeScript.ink_room("", ThemeScript.ayah_face_for("amiri"), 26), Vector2i.ZERO,
+                "an empty line asks for no room")
+        var amiri_room := ThemeScript.ink_room(word, ThemeScript.ayah_face_for("amiri"), 26)
+        _ok(amiri_room.x >= 5, "Amiri's damma over أُنزِلَ stands past its font's box (got %d px over)" % amiri_room.x)
+        var quran_room := ThemeScript.ink_room(word, ThemeScript.ayah_face_for("amiri_quran"), 40)
+        _is(quran_room.x, 0, "the mushaf cut carries its marks inside its own box")
+        var vazir_room := ThemeScript.ink_room(word, ThemeScript.vazir(15), 15)
+        _ok(vazir_room.x >= 2, "Vazirmatn's own marks stand past its box at the editor's size")
+
+        # A verse paragraph carries the room inside itself, so the ink is
+        # drawn whole: the label's own stylebox margins cover what the words
+        # ask for in the face they are worn in.
+        var CardViewForRoom := load("res://scripts/ui/card_view.gd")
+        var player := AudioStreamPlayer.new()
+        main.add_child(player)
+        var view = CardViewForRoom.new(player)
+        main.add_child(view)
+        ThemeScript.set_ayah_face("amiri")
+        var verse := FileAccess.get_file_as_string("res://assets/decks/quran/010/back.md")
+        view.show_text(verse, "res://assets/decks/quran/010")
+        await create_timer(0.2).timeout
+        var verse_label: RichTextLabel = null
+        for child in view.get_node("Body").get_children():
+                # An Arabic verse breathes inside its own Room wrapper.
+                var paragraph := child as RichTextLabel
+                if paragraph == null and child.get_child_count() > 0:
+                        paragraph = child.get_child(0) as RichTextLabel
+                if paragraph != null and paragraph.name == "Paragraph" and paragraph.text.contains("نزِلَ"):
+                        verse_label = paragraph
+                        break
+        _ok(verse_label != null, "the verse paragraph is on the page")
+        if verse_label != null:
+                var box: StyleBox = verse_label.get_theme_stylebox("normal")
+                var room_40 := ThemeScript.ink_room(word, ThemeScript.ayah_face_for("amiri"), 40)
+                _ok(
+                        box != null and box.content_margin_top >= room_40.x,
+                        "the verse label carries the room its damma asks for"
+                )
+        view.queue_free()
+        player.queue_free()
+        ThemeScript.set_ayah_face("amiri_quran")
+
+        # The library's preview gives the same room as height around a
+        # centred line, so a clipped Label cannot cut what it truncates.
+        ThemeScript.set_ayah_face("amiri")
+        main._on_browse_pressed()
+        await create_timer(0.4).timeout
+        var browse: Control = main.get_node_or_null("Browse")
+        if browse != null:
+                var found_room := false
+                var column: VBoxContainer = browse.get_node_or_null("Margin/Column/Scroll/Wrap/Column")
+                if column != null:
+                        for entry in column.get_children():
+                                var preview: Label = entry.get_node_or_null("Row/Pad/Line/Words/Preview")
+                                if preview != null and preview.text.contains("نزِلَ"):
+                                        var face: Font = ThemeScript.ayah_face_for("amiri")
+                                        found_room = preview.get_combined_minimum_size().y > face.get_height(26)
+                                        break
+                _ok(found_room, "the shelf's preview stands taller than its font's own box for a tall stack")
+                browse.closed.emit()
+                await create_timer(0.2).timeout
+        ThemeScript.set_ayah_face("amiri_quran")
+
+        # The editor's mirror gives the room back out of its separation, so
+        # the lines stay on the engine's own pitch however tall the words.
+        var RtlFieldForPitch := load("res://scripts/ui/rtl_field.gd")
+        var field = RtlFieldForPitch.new()
+        field.set_anchors_preset(Control.PRESET_FULL_RECT)
+        main.add_child(field)
+        field.set_text("بِمَا أُنزِلَ إِلَيْكَ\nو آنچه بر تو نازل شده")
+        await create_timer(0.3).timeout
+        _ok(field._room > 0, "the mirror's lines ask for the room their marks need")
+        var mirror: VBoxContainer = field.get_node_or_null("Lines")
+        if mirror != null and mirror.get_child_count() >= 2:
+                var first: Control = mirror.get_child(0)
+                var second: Control = mirror.get_child(1)
+                var pitch := second.position.y - first.position.y
+                _is(roundf(pitch), roundf(field._editor.get_line_height()),
+                        "the mirror's pitch stays the engine's own, room or no room")
+        field.queue_free()
+
+        # The quiet promise says itself once; the line beneath it that
+        # explained it again is gone.
+        i18n.set_lang("en")
+        _ok(not i18n.is_rtl(), "English reads from the left")
+        i18n.set_lang("fa")
+        _ok(i18n.is_rtl(), "Persian reads from the right")
+        i18n.set_lang("ar")
+        _ok(i18n.is_rtl(), "Arabic reads from the right")
+        # A page said in Persian is laid out from the right: the root turns,
+        # the titles and labels stand at the reading's edge, and the way back
+        # points the way it goes. Said again in English, everything returns.
+        main._apply_language("fa")
+        main._on_settings_pressed()
+        await create_timer(0.5).timeout
+        var settings_fa: Control = main.get_node_or_null("Settings")
+        if settings_fa != null:
+                _ok(settings_fa.layout_direction == Control.LAYOUT_DIRECTION_RTL,
+                        "a Persian settings page is laid out from the right")
+                var title_fa: Label = settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/CardTitle")
+                _ok(title_fa != null and title_fa.horizontal_alignment == HORIZONTAL_ALIGNMENT_RIGHT,
+                        "a Persian card title stands at the right edge")
+                var pace_label_fa: Label = settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/FieldLabel")
+                _ok(pace_label_fa != null and pace_label_fa.horizontal_alignment == HORIZONTAL_ALIGNMENT_RIGHT,
+                        "the Persian pace label stands at the right edge")
+                var repo_field: LineEdit = settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Repo")
+                _ok(repo_field != null and repo_field.alignment == HORIZONTAL_ALIGNMENT_RIGHT,
+                        "a Persian page's field meets its reader at the right edge")
+                _ok(settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/AutoRow/AutoPad/AutoLine/Words/Sub") == null,
+                        "the quiet promise carries no explainer beneath it")
+                var source_fa: RichTextLabel = settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/DataSource/Padding/Box/What")
+                _ok(source_fa != null and source_fa.text.contains("می‌آیند") and not source_fa.text.contains("بی‌کم‌وکاست"),
+                        "the Persian source line says its say and stops")
+                var back_fa: Button = settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/TopBar/Back")
+                _ok(back_fa != null and back_fa.get_global_rect().position.x > settings_fa.get_global_rect().size.x / 2.0,
+                        "the way back stands at the reading's start, the right")
+                settings_fa.closed.emit()
+                await create_timer(0.3).timeout
+        main._apply_language("en")
+        main._on_settings_pressed()
+        await create_timer(0.5).timeout
+        var settings_en: Control = main.get_node_or_null("Settings")
+        if settings_en != null:
+                _ok(settings_en.layout_direction != Control.LAYOUT_DIRECTION_RTL,
+                        "the English page returns to the left-reading layout")
+                var title_en: Label = settings_en.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/CardTitle")
+                _ok(title_en != null and title_en.horizontal_alignment == HORIZONTAL_ALIGNMENT_LEFT,
+                        "an English card title stands at the left edge")
+                settings_en.closed.emit()
+                await create_timer(0.3).timeout
 
 ## A sync the network interrupted is retried on the app's own, each retry
 ## a resume; a token the repo refuses is not retried at all, because that

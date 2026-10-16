@@ -96,14 +96,19 @@ func _add_eyebrow(ref_line: String) -> void:
         label.horizontal_alignment = (
                 HORIZONTAL_ALIGNMENT_RIGHT if script != "plain" else HORIZONTAL_ALIGNMENT_CENTER
         )
-        label.add_theme_font_override("normal_font", (
+        var face: Font = (
                 ThemeScript.ayah_face() if script == "arabic" else ThemeScript.vazir(15, true)
-        ))
-        label.add_theme_font_size_override("normal_font_size", 17 if script == "arabic" else 15)
+        )
+        label.add_theme_font_override("normal_font", face)
+        var face_size := 17 if script == "arabic" else 15
+        label.add_theme_font_size_override("normal_font_size", face_size)
         label.add_theme_color_override("default_color", ThemeScript.GOLD_DEEP)
         # The reader's hand rests on the page's own gold, not the engine's blue.
         label.add_theme_color_override("selection_color", ThemeScript.SELECT)
         label.text = ref_line  # bbcode is off here, so brackets can render literally
+        # A reference a hand-edited deck vocalised gets its marks the same
+        # air the verses get: the whole word, whatever it wears.
+        ThemeScript.give_rtl_room(label, ref_line, [face], face_size)
         _body.add_child(label)
 
 func _add_text(markdown: String, link: String, lead := false) -> void:
@@ -165,6 +170,16 @@ func _add_text(markdown: String, link: String, lead := false) -> void:
         label.add_theme_font_size_override("italics_font_size", face_size)
         label.add_theme_font_size_override("bold_italics_font_size", face_size)
         label.text = _bbcode(markdown, script)
+        # The ink's own room: the marks a verse stacks above its tallest
+        # letters reach past the box its font declares, and a control that
+        # clips at that box draws them nowhere at all -- the damma a reader
+        # lost on أُنزِلَ was never the font's fault. The label carries the
+        # measured room inside itself, so the whole word is drawn whatever
+        # face it wears and however tall it stands.
+        var room_faces: Array = [face]
+        if "**" in markdown:
+                room_faces.append(bold_face)
+        ThemeScript.give_rtl_room(label, MarkdownScript.plain(markdown), room_faces, face_size)
         label.add_theme_color_override("default_color", ThemeScript.INK if script != "plain" else ThemeScript.INK_SOFT)
         # Selection, too, wears the page's gold: the verse is the thing a
         # reader is most likely to reach for with the mouse.

@@ -86,6 +86,15 @@ func setup(http: HttpClientScript, auth: GitHubAuthScript, settings: SettingsScr
 
 func _build() -> void:
         set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        # A page whose tongue reads from the right is laid out from the right:
+        # the way back stands where the reading starts, titles and labels hug
+        # the reading's edge, rows run the way the words do. The root says it
+        # once and every container below inherits it -- a page said again in
+        # another tongue says its own direction again.
+        layout_direction = (
+                Control.LAYOUT_DIRECTION_RTL if I18nScript.is_rtl()
+                else Control.LAYOUT_DIRECTION_LTR
+        )
         add_child(ThemeScript.paper_backdrop())
         add_child(ThemeScript.paper_pattern())
         var margin := MarginContainer.new()
@@ -119,7 +128,7 @@ func _build() -> void:
         wrap.add_child(column)
 
         # The same header every screen above home wears: back the way they came.
-        var bar: Dictionary = ThemeScript.top_bar(I18nScript.t("Settings"))
+        var bar: Dictionary = ThemeScript.top_bar(I18nScript.t("Settings"), I18nScript.is_rtl())
         var back: Button = bar["back"]
         back.tooltip_text = I18nScript.t("Back to home")
         back.pressed.connect(func() -> void: closed.emit())
@@ -156,12 +165,16 @@ func _layout() -> void:
 
 ## A card's own name, said inside the card: a small gold word over a rule,
 ## so each card reads as its own page with a running title -- not a label
-## floating between cards, where the margin swallows it.
+## floating between cards, where the margin swallows it. The word stands at
+## the edge the page reads from.
 func _card_header(box: VBoxContainer, title: String) -> void:
         var label := Label.new()
         label.name = "CardTitle"
         label.text = title
-        label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+        label.horizontal_alignment = (
+                HORIZONTAL_ALIGNMENT_RIGHT if I18nScript.is_rtl()
+                else HORIZONTAL_ALIGNMENT_LEFT
+        )
         ThemeScript.dress(label, 12, ThemeScript.GOLD_DEEP, true)
         box.add_child(label)
         box.add_child(ThemeScript.hairline(ThemeScript.LINE))
@@ -179,6 +192,12 @@ func _text(what: String, color: Color, size: int, center := false, bold := false
         label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         if center:
                 label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        else:
+                # A line stands at the edge its page reads from.
+                label.horizontal_alignment = (
+                        HORIZONTAL_ALIGNMENT_RIGHT if I18nScript.is_rtl()
+                        else HORIZONTAL_ALIGNMENT_LEFT
+                )
         label.add_theme_font_override("normal_font", ThemeScript.vazir(size, bold))
         label.add_theme_font_size_override("normal_font_size", size)
         label.add_theme_color_override("default_color", color)
@@ -227,10 +246,16 @@ func _card(card_name: String, box_name := "Box") -> Array:
         pad.add_child(box)
         return [card, box]
 
-## A field's label, close enough to belong to it and no closer.
+## A field's label, close enough to belong to it and no closer. It stands
+## at the edge the page reads from, like every word that names what follows.
 func _field_label(text: String) -> Label:
         var label := Label.new()
+        label.name = "FieldLabel"
         label.text = text
+        label.horizontal_alignment = (
+                HORIZONTAL_ALIGNMENT_RIGHT if I18nScript.is_rtl()
+                else HORIZONTAL_ALIGNMENT_LEFT
+        )
         return ThemeScript.dress(label, ThemeScript.CAPTION, ThemeScript.INK, true)
 
 func _github_body() -> Control:
@@ -332,6 +357,12 @@ func _github_body() -> Control:
         token.secret = true
         token.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         token.custom_minimum_size = Vector2(0, 48)
+        # A field on a right-reading page meets its reader at the right edge;
+        # what is typed stays as it is written, Latin or otherwise.
+        token.alignment = (
+                HORIZONTAL_ALIGNMENT_RIGHT if I18nScript.is_rtl()
+                else HORIZONTAL_ALIGNMENT_LEFT
+        )
         token.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
         token.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
         _style_field(token)
@@ -370,6 +401,10 @@ func _github_body() -> Control:
         repo.name = "Repo"
         repo.placeholder_text = I18nScript.t("Repository name")
         repo.custom_minimum_size = Vector2(0, 44)
+        repo.alignment = (
+                HORIZONTAL_ALIGNMENT_RIGHT if I18nScript.is_rtl()
+                else HORIZONTAL_ALIGNMENT_LEFT
+        )
         repo.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY))
         repo.add_theme_font_size_override("font_size", ThemeScript.BODY)
         _style_field(repo)
@@ -389,7 +424,8 @@ func _github_body() -> Control:
         # of its own -- a page's worth of surface with a switch that reads
         # as a switch from across the room, and the whole row is the
         # button, so a thumb cannot miss it the way it missed a caption
-        # with a dot after it.
+        # with a dot after it. The promise's own words stand on their own;
+        # nothing beneath them explains what they already said.
         var auto_row := Button.new()
         auto_row.name = "AutoRow"
         auto_row.toggle_mode = true
@@ -421,11 +457,12 @@ func _github_body() -> Control:
         var auto_label := Label.new()
         auto_label.name = "Label"
         auto_label.text = I18nScript.t("Sync quietly after each session")
+        auto_label.horizontal_alignment = (
+                HORIZONTAL_ALIGNMENT_RIGHT if I18nScript.is_rtl()
+                else HORIZONTAL_ALIGNMENT_LEFT
+        )
         ThemeScript.dress(auto_label, ThemeScript.BODY, ThemeScript.INK, true)
         auto_words.add_child(auto_label)
-        var auto_sub := _text(I18nScript.t("after each session, and when the app opens"), ThemeScript.INK_SOFT, 12)
-        auto_sub.name = "Sub"
-        auto_words.add_child(auto_sub)
         var auto_switch := ThemeScript.SwitchMark.new(false)
         auto_switch.name = "Switch"
         auto_switch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -873,6 +910,10 @@ func _source_body() -> Control:
         what.scroll_active = false
         what.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         what.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        what.horizontal_alignment = (
+                HORIZONTAL_ALIGNMENT_RIGHT if I18nScript.is_rtl()
+                else HORIZONTAL_ALIGNMENT_LEFT
+        )
         what.text = I18nScript.t(
                 "The deck's verses, Persian translation and recitations come from [url=https://quran.makarem.ir/]quran.makarem.ir[/url], carried unchanged from the deck package."
         )

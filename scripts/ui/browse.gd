@@ -717,7 +717,9 @@ func _entry(card: CardScript, reference: String) -> Control:
         # The verse itself, the shelf's primary voice: a reader finds the
         # line they half-remember by its words, not its number. It stands
         # flush right, the edge the verse itself is read from, in the
-        # mushaf cut at a size its vowels keep every curl.
+        # mushaf cut at a size its vowels keep every curl -- and with the
+        # room the ink asks for, so a mark stacked past its font's own box
+        # is drawn whole, never cut into the row above.
         var preview_text := _preview_of(card)
         if not preview_text.is_empty():
                 var preview := Label.new()
@@ -728,10 +730,12 @@ func _entry(card: CardScript, reference: String) -> Control:
                 preview.text_direction = TextDirection.TEXT_DIRECTION_AUTO
                 preview.clip_text = true
                 var preview_script := ThemeScript.script_of(preview_text)
-                preview.add_theme_font_override("font", ThemeScript.verse_face(preview_script))
+                var preview_face: Font = ThemeScript.verse_face(preview_script)
                 var preview_size := 26 if preview_script == "arabic" else 14
+                preview.add_theme_font_override("font", preview_face)
                 preview.add_theme_font_size_override("font_size", preview_size)
                 preview.add_theme_color_override("font_color", ThemeScript.INK)
+                ThemeScript.give_label_room(preview, preview_text, preview_face, preview_size)
                 words.add_child(preview)
 
         # The row's second line: the card's standing written small in the
