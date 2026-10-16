@@ -474,7 +474,10 @@ func _stream_from_site(path: String, button: Button) -> void:
 static func _verse_label(name: String) -> String:
         var stem := name.get_basename()
         if stem.is_valid_int() and stem.length() == 6:
-                return "%d:%d" % [int(stem.substr(0, 3)), int(stem.substr(3, 3))]
+                # The address the button carries is chrome, not content: it
+                # is written in the reader's own digits, like every number
+                # the app says about itself.
+                return I18nScript.num("%d:%d" % [int(stem.substr(0, 3)), int(stem.substr(3, 3))])
         return ""
 
 

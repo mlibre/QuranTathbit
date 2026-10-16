@@ -22,6 +22,9 @@ signal closed
 signal answered(card: CardScript, button: String)
 signal volume_changed(value: float)
 signal edited(card: CardScript)
+## The verses' hand, chosen where they are read: main hears it, remembers
+## it on the device and stamps it into the deck's own travelling file.
+signal ayah_font_chosen(key: String)
 
 const PANEL := "Margin/Column/Surface/Fill/CardPanel"
 const AGAIN_COLOR := Color("#B4553F")
@@ -99,9 +102,10 @@ func _build() -> void:
         if not DisplayServer.is_touchscreen_available():
                 column.add_child(_key_hints())
         column.add_child(_footer())
-        # The volume's own small page floats above everything, last so it
-        # draws last, waiting in its corner until the hand asks for it.
+        # The small pages float above everything, added last so they draw
+        # last, waiting in their corners until the hand asks for them.
         add_child(_rig.popup())
+        add_child(_font_popup())
 
 ## The session's own quiet progress: a thin bar under the top row that fills
 ## as cards are answered. The count label above it stays for the exact number;
@@ -140,21 +144,22 @@ func _key_hints() -> Control:
 
 ## Back the way the user came, the count in the middle, room on the right:
 ## the same bones every screen's header shares. The right corner carries
-## two coins -- the pencil that opens the card for editing, and the speaker
-## that asks how loud -- with a spacer of the same width beside the way
-## back, so the count in the middle stays the middle.
+## three coins -- the pencil that opens the card for editing, the alif that
+## asks which hand the verses are written in, and the speaker that asks
+## how loud -- with a spacer of the same width beside the way back, so the
+## count in the middle stays the middle.
 func _top_bar() -> Control:
         var bar: Dictionary = ThemeScript.top_bar("")
         var row: HBoxContainer = bar["row"]
         var back: Button = bar["back"]
         back.tooltip_text = I18nScript.t("Back to home")
         back.pressed.connect(func() -> void: closed.emit())
-        # Two coins on the right move the centre left by their extra width;
-        # a quiet spacer of the same width after the way back keeps the
+        # The corner's coins move the centre left by their extra width; a
+        # quiet spacer of the same width after the way back keeps the
         # count where every other screen keeps it.
         var spacer := Control.new()
         spacer.name = "Spacer"
-        spacer.custom_minimum_size = Vector2(54, 0)
+        spacer.custom_minimum_size = Vector2(108, 0)
         spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
         row.add_child(spacer)
         row.move_child(spacer, 1)
@@ -165,10 +170,11 @@ func _top_bar() -> Control:
         progress.size_flags_vertical = Control.SIZE_SHRINK_CENTER
         progress.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
         ThemeScript.dress(progress, 15, ThemeScript.INK_SOFT, true)
-        # The corner every screen leaves empty gets this screen's own two
-        # questions: the card's own words, and how loud they are spoken.
+        # The corner every screen leaves empty gets this screen's own three
+        # questions: the card's own words, the hand they are written in, and
+        # how loud they are spoken.
         var right: Control = bar["right"]
-        right.custom_minimum_size = Vector2(102, 48)
+        right.custom_minimum_size = Vector2(156, 48)
         var pair := HBoxContainer.new()
         pair.name = "Pair"
         pair.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -194,6 +200,25 @@ func _top_bar() -> Control:
         edit.pressed.connect(_open_editor)
         pair.add_child(edit)
 
+        var face := Button.new()
+        face.name = "Font"
+        face.custom_minimum_size = Vector2(48, 48)
+        face.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        face.tooltip_text = I18nScript.t("Ayah font")
+        ThemeScript.apply_mark_styles(face, ThemeScript.mark_button_styles(ThemeScript.GREEN, true))
+        var alif := ThemeScript.TypeMark.new(ThemeScript.GREEN_DEEP)
+        alif.name = "TypeMark"
+        var face_center := CenterContainer.new()
+        face_center.name = "Mark"
+        face_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        face_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        alif.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        face_center.add_child(alif)
+        face.add_child(face_center)
+        ThemeScript.pressable(face)
+        face.pressed.connect(_toggle_font_popup)
+        pair.add_child(face)
+
         var coin := Button.new()
         coin.name = "Volume"
         coin.custom_minimum_size = Vector2(48, 48)
@@ -210,7 +235,7 @@ func _top_bar() -> Control:
         coin.add_child(center)
         coin.tooltip_text = I18nScript.t("Recitation volume")
         ThemeScript.pressable(coin)
-        coin.pressed.connect(_rig.toggle)
+        coin.pressed.connect(_toggle_volume)
         pair.add_child(coin)
         return row
 
@@ -323,19 +348,19 @@ func _layout() -> void:
         var avail := minf(320.0, size.x - 48.0)
         (get_node("Margin/Column/Footer/ShowAnswer") as Button).custom_minimum_size = Vector2(avail, 58.0)
         (get_node("Margin/Column/Footer/Done") as Button).custom_minimum_size = Vector2(avail, 58.0)
-        # The volume's page hangs from its own corner, under the coin and
-        # below the session's own bar, never past the window's edge on a
-        # phone: the bar keeps its whole width in view while loudness is
-        # being asked for.
-        var popup: Control = get_node_or_null("VolumePopup")
-        if popup != null:
-                var popup_w := popup.get_combined_minimum_size().x
-                var inset := ThemeScript.top_inset()
-                popup.anchor_left = 0.0
-                popup.anchor_right = 0.0
-                popup.anchor_top = 0.0
-                popup.offset_left = maxf(size.x - popup_w - 24.0, 16.0)
-                popup.offset_top = 24.0 + inset + 48.0 + 14.0 + 9.0 + 12.0
+        # The small pages that hang from the header's coins stay hung: the
+        # window may move under them, and the pages follow the coins the
+        # bar keeps in its corner.
+        var volume_page: Control = get_node_or_null("VolumePopup")
+        if volume_page != null:
+                ThemeScript.place_popover(
+                        volume_page, get_node("Margin/Column/TopBar/Right/Pair/Volume")
+                )
+        var font_page: Control = get_node_or_null("FontPopup")
+        if font_page != null:
+                ThemeScript.place_popover(
+                        font_page, get_node("Margin/Column/TopBar/Right/Pair/Font")
+                )
 
 func _layout_answers() -> void:
         var grid: GridContainer = get_node("Margin/Column/Answers")
@@ -354,7 +379,7 @@ func _show_front(incoming := false) -> void:
         _view.visible = true
         var card: CardScript = _cards[_index]
         var progress: Label = get_node("Margin/Column/TopBar/Progress")
-        progress.text = I18nScript.t("%d of %d") % [_index + 1, _cards.size()]
+        progress.text = I18nScript.f("%d of %d", [_index + 1, _cards.size()])
         _tween_bar(100.0 * float(_index) / float(_cards.size()))
         _view.show_text(card.front, card.folder, true)
         get_node("Margin/Column/Footer/ShowAnswer").visible = true
@@ -488,7 +513,7 @@ func _answer_button(option: Dictionary, index: int) -> Control:
         stack.add_child(word)
         var wait := Label.new()
         wait.name = "Wait"
-        wait.text = str(option.interval)
+        wait.text = I18nScript.wait(int(option.interval_secs))
         ThemeScript.dress(wait, 22, ThemeScript.INK, true)
         stack.add_child(wait)
         return button
@@ -550,7 +575,7 @@ func _duration() -> String:
                 return I18nScript.t("under a minute")
         if minutes == 1:
                 return I18nScript.t("1 minute")
-        return I18nScript.t("%d minutes") % minutes
+        return I18nScript.f("%d minutes", [minutes])
 
 ## The grades of this session, one line, in their own colours -- a look back
 ## at how it went, in the order the buttons stand.
@@ -565,7 +590,12 @@ func _grades_line() -> String:
         for key in ["again", "hard", "good", "easy"]:
                 var count := int(_grade_counts.get(key, 0))
                 if count > 0:
-                        parts.append("[color=%s]%d %s[/color]" % [tones[key], count, I18nScript.t(key)])
+                        # The count alone is dressed -- num() would reach
+                        # into the colour's own hex digits otherwise.
+                        parts.append(
+                                "[color=%s]%s %s[/color]"
+                                        % [tones[key], I18nScript.num(count), I18nScript.t(key)]
+                        )
         if parts.is_empty():
                 return ""
         return " · ".join(parts)
@@ -604,7 +634,10 @@ func _show_done() -> void:
 
         var body := Label.new()
         body.name = "Body"
-        body.text = I18nScript.t("You answered %d cards in %s. Everything is saved.") % [_answered_count, _duration()]
+        body.text = I18nScript.f(
+                "You answered %d cards in %s. Everything is saved.",
+                [_answered_count, _duration()]
+        )
         body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         ThemeScript.dress(body, ThemeScript.BODY, ThemeScript.INK)
@@ -668,6 +701,160 @@ func _on_editor_saved(card: CardScript) -> void:
         else:
                 _view.show_text(card.front, card.folder, true)
 
+# --- the verses' own hand, chosen where they are read ----------------------------
+
+## The verses' own hand, chosen mid-session: the same faces Settings
+## offers, each row named and sampled in the face itself, hung from the
+## alif coin in the header's corner. The choice is applied to the card on
+## the spot -- the reader watches the verse change hands without leaving
+## the session -- and travels with the deck the way every choice does.
+func _font_popup() -> Control:
+        var popup := ThemeScript.Popover.new(268.0)
+        popup.name = "FontPopup"
+        var pad := popup.content(14, 12, 14, 14)
+        var column := VBoxContainer.new()
+        column.name = "Column"
+        column.add_theme_constant_override("separation", 8)
+        pad.add_child(column)
+        var title := Label.new()
+        title.name = "Title"
+        title.text = I18nScript.t("Ayah font")
+        ThemeScript.dress(title, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
+        column.add_child(title)
+        var rows := VBoxContainer.new()
+        rows.name = "Faces"
+        rows.add_theme_constant_override("separation", 6)
+        column.add_child(rows)
+        var current := ThemeScript.ayah_face_key()
+        for face in ThemeScript.AYAH_FACES:
+                rows.add_child(_face_row(str(face["key"]), str(face["key"]) == current))
+        return popup
+
+## One face, one row: its name at the reading end, the basmala in the face
+## itself at the other -- the choice is judged on what it chooses, not on a
+## description of it, exactly as the Settings page judges the same choice.
+func _face_row(key: String, on: bool) -> Button:
+        var button := Button.new()
+        button.name = "Face" + key.capitalize()
+        button.set_meta("choice", key)
+        button.custom_minimum_size = Vector2(0, 54)
+        button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        _dress_face_row(button, on)
+        var pad := MarginContainer.new()
+        pad.name = "Pad"
+        pad.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        pad.add_theme_constant_override("margin_left", 12)
+        pad.add_theme_constant_override("margin_right", 12)
+        pad.add_theme_constant_override("margin_top", 6)
+        pad.add_theme_constant_override("margin_bottom", 6)
+        button.add_child(pad)
+        var row := HBoxContainer.new()
+        row.name = "Row"
+        row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        row.add_theme_constant_override("separation", 10)
+        pad.add_child(row)
+        var name := Label.new()
+        name.name = "Name"
+        name.text = ThemeScript.ayah_face_label(key)
+        name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        ThemeScript.dress(name, 13, ThemeScript.GREEN_DEEP if on else ThemeScript.INK, on)
+        row.add_child(name)
+        var sample := Label.new()
+        sample.name = "Sample"
+        sample.text = "بِسْمِ اللَّهِ"
+        sample.text_direction = TextDirection.TEXT_DIRECTION_AUTO
+        sample.add_theme_font_override("font", ThemeScript.ayah_face_for(key))
+        sample.add_theme_font_size_override("font_size", 19)
+        sample.add_theme_color_override("font_color", ThemeScript.INK)
+        row.add_child(sample)
+        ThemeScript.pressable(button)
+        button.pressed.connect(_choose_face.bind(key))
+        return button
+
+## A face row at rest is quiet paper; the face being worn carries the
+## page's own green wash -- the way a book's folios are marked.
+func _dress_face_row(button: Button, on: bool) -> void:
+        var rest := ThemeScript.soft_stylebox(Color(0, 0, 0, 0), 12)
+        rest.border_color = Color(
+                ThemeScript.GREEN.r, ThemeScript.GREEN.g, ThemeScript.GREEN.b, 0.42 if on else 0.16
+        )
+        rest.set_border_width_all(1)
+        var wash := rest.duplicate() as StyleBoxFlat
+        wash.bg_color = Color(ThemeScript.GREEN.r, ThemeScript.GREEN.g, ThemeScript.GREEN.b, 0.10)
+        var held := wash.duplicate() as StyleBoxFlat
+        held.bg_color = Color(ThemeScript.GREEN.r, ThemeScript.GREEN.g, ThemeScript.GREEN.b, 0.16)
+        if on:
+                rest.bg_color = wash.bg_color
+        button.add_theme_stylebox_override("normal", rest)
+        button.add_theme_stylebox_override("hover", held if not on else wash)
+        button.add_theme_stylebox_override("pressed", held)
+        button.add_theme_stylebox_override("focus", wash)
+
+## The face, chosen where it is read: the card re-says its words in the new
+## hand at once, the deck is stamped so every device the deck reaches reads
+## the same hand, and the page folds itself away -- the choice is made, and
+## there is nothing more to ask.
+func _choose_face(key: String) -> void:
+        if key != ThemeScript.ayah_face_key():
+                ThemeScript.set_ayah_face(key)
+                _resay_card()
+                ayah_font_chosen.emit(key)
+        var popup := get_node_or_null("FontPopup")
+        if popup != null:
+                popup.visible = false
+        _redress_face_rows(key)
+
+## The standing face said again on the rows, without rebuilding the page.
+func _redress_face_rows(chosen: String) -> void:
+        var rows: VBoxContainer = get_node_or_null("FontPopup/Sheet/Pad/Column/Faces")
+        if rows == null:
+                return
+        for child in rows.get_children():
+                var button := child as Button
+                if button == null:
+                        continue
+                var key := str(button.get_meta("choice", ""))
+                _dress_face_row(button, key == chosen)
+                var name: Label = button.get_node_or_null("Pad/Row/Name")
+                if name != null:
+                        ThemeScript.dress(name, 13, ThemeScript.GREEN_DEEP if key == chosen else ThemeScript.INK, key == chosen)
+
+## The card says its words again, in whatever hand it now wears -- on
+## whichever side was standing when the hand was changed. A finished
+## session's summary has no words to re-say and keeps its place.
+func _resay_card() -> void:
+        if _index >= _cards.size():
+                return
+        if get_node_or_null(PANEL + "/Padding/Summary") != null:
+                return
+        var card: CardScript = _cards[_index]
+        if _revealed:
+                _view.show_text(card.back, card.folder, false, _reference_of(card), true)
+        else:
+                _view.show_text(card.front, card.folder, true)
+
+## The two pages of the header's corner take turns: opening one closes the
+## other, the way one question at a time is asked.
+func _toggle_font_popup() -> void:
+        var popup := get_node_or_null("FontPopup")
+        if popup == null:
+                return
+        var volume_page := get_node_or_null("VolumePopup")
+        if volume_page != null:
+                volume_page.visible = false
+        popup.visible = not popup.visible
+        if popup.visible:
+                _redress_face_rows(ThemeScript.ayah_face_key())
+                ThemeScript.place_popover(popup, get_node("Margin/Column/TopBar/Right/Pair/Font"))
+                ThemeScript.settle_in(popup, 0.0, 0.16)
+
+func _toggle_volume() -> void:
+        var font_page := get_node_or_null("FontPopup")
+        if font_page != null:
+                font_page.visible = false
+        _rig.toggle()
+
 func _input(event: InputEvent) -> void:
         if not visible:
                 return
@@ -680,13 +867,19 @@ func _input(event: InputEvent) -> void:
         # coin that opened it is outside it too -- its own press will close
         # it, so the press is left alone here rather than closed and reopened
         # in the same breath.
-        var popup: PanelContainer = get_node_or_null("VolumePopup")
-        if popup != null and popup.visible and event is InputEventMouseButton and event.pressed:
+        if event is InputEventMouseButton and event.pressed:
                 var press := event as InputEventMouseButton
-                var coin: Button = get_node_or_null("Margin/Column/TopBar/Right/Pair/Volume")
-                var inside_coin := coin != null and coin.get_global_rect().has_point(press.position)
-                if not inside_coin and not popup.get_global_rect().has_point(press.position):
-                        popup.visible = false
+                for page_name in ["VolumePopup", "FontPopup"]:
+                        var page: Control = get_node_or_null(page_name)
+                        if page == null or not page.visible:
+                                continue
+                        var coin_name := "Volume" if page_name == "VolumePopup" else "Font"
+                        var coin: Button = get_node_or_null(
+                                "Margin/Column/TopBar/Right/Pair/" + coin_name
+                        )
+                        var inside_coin := coin != null and coin.get_global_rect().has_point(press.position)
+                        if not inside_coin and not page.get_global_rect().has_point(press.position):
+                                page.visible = false
         if event is InputEventKey and event.pressed and not event.echo:
                 match event.keycode:
                         KEY_ESCAPE:

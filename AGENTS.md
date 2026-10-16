@@ -71,7 +71,12 @@ Windows, web) in Godot 4.7 with GDScript only.
   العربية. The verses and their Persian translation are the deck's own
   content and are never translated. The language is asked once on first run
   and afterwards lives in Settings; like the day's pace, it travels with the
-  deck's `progress.json`, merging by its own moment.
+  deck's `progress.json`, merging by its own moment. Numbers are chrome too:
+  a line carrying them is formatted through `f()` and a bare number through
+  `num()`, so Persian and Arabic read their own digits (۱۰ دقیقه, ۱ روز —
+  never "10m", "1d"); mark-up is never passed through `num()` wholesale,
+  because a `[color=#B4553F]` tag's own hex digits would be dressed along
+  with the count it colours.
 - **Fail visibly.** A deck that will not load, a sync that cannot finish, a
   card whose media is missing — each says so, never silently.
 - **Simple, deep, robust.** Handle the real inputs (a hand-corrupted

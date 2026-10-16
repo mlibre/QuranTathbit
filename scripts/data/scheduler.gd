@@ -361,23 +361,32 @@ static func _card_day_roll(card_id: int, day: int) -> float:
 
 ## "10m", "3d", "1.2mo", "2.4y" -- the way Anki reads its intervals back.
 static func humanize(seconds: int) -> String:
+        var parts := humanize_parts(seconds)
+        return str(parts[0]) % parts[1]
+
+
+## The parts of a humanized wait -- the pattern and the number that fills
+## it -- so a tongue other than English can say the same wait in its own
+## words and its own digits (see i18n.wait). The pattern is the STRINGS
+## key; the number is exactly what the pattern expects, int or float.
+static func humanize_parts(seconds: int) -> Array:
         if seconds < MINUTE:
-                return "%ds" % seconds
+                return ["%ds", seconds]
         if seconds < HOUR:
-                return "%dm" % int(round(float(seconds) / 60.0))
+                return ["%dm", int(round(float(seconds) / 60.0))]
         if seconds < DAY:
                 var hours := float(seconds) / 3600.0
                 if hours == floor(hours):
-                        return "%dh" % int(hours)
-                return "%.1fh" % hours
+                        return ["%dh", int(hours)]
+                return ["%.1fh", hours]
         var days := float(seconds) / float(DAY)
         if days < 30:
                 if days == floor(days):
-                        return "%dd" % int(days)
-                return "%.1fd" % days
+                        return ["%dd", int(days)]
+                return ["%.1fd", days]
         var months := days / 30.0
         if months < 12:
                 if months == floor(months):
-                        return "%dmo" % int(months)
-                return "%.1fmo" % months
-        return "%.1fy" % (days / 365.0)
+                        return ["%dmo", int(months)]
+                return ["%.1fmo", months]
+        return ["%.1fy", days / 365.0]

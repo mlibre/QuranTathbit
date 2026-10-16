@@ -14,7 +14,7 @@ extends SceneTree
 
 const MainScript := preload("res://scripts/main.gd")
 
-const SHOTS := 16
+const SHOTS := 20
 
 var _out := "/tmp/shots"
 var _saved := 0
@@ -62,6 +62,13 @@ func _init() -> void:
         await create_timer(0.5).timeout
         await _shot("volume")
         study._rig.toggle()
+        await create_timer(0.3).timeout
+        # The verses' own hand, asked for where they are read: the alif coin
+        # opens the faces, each sampled in the hand it offers.
+        study._toggle_font_popup()
+        await create_timer(0.5).timeout
+        await _shot("font")
+        study._toggle_font_popup()
         await create_timer(0.3).timeout
         # The pencil: a card noticed mid-study is fixed mid-study, on the
         # card's own page over the session.
@@ -120,10 +127,30 @@ func _init() -> void:
         await create_timer(0.6).timeout
         await _shot("home_third")
         # The app said again in the reader's own tongue: the same home page,
-        # the same verses, only the chrome translated.
+        # the same verses, only the chrome translated -- and its numbers in
+        # the tongue's own script, a session's count included.
         main._apply_language("fa")
         await create_timer(0.8).timeout
         await _shot("home_fa")
+        main._start_session()
+        await create_timer(0.8).timeout
+        await _shot("study_fa")
+        var study_fa: Control = main.get_node_or_null("Study")
+        if study_fa != null:
+                study_fa._reveal()
+                await create_timer(0.9).timeout
+                await _shot("study_fa_back")
+                study_fa.closed.emit()
+                await create_timer(0.7).timeout
+        # The library in Persian: the shelf's pills and counts carry the
+        # tongue's own digits too.
+        main._on_browse_pressed()
+        await create_timer(1.4).timeout
+        await _shot("browse_fa")
+        var browse_fa: Control = main.get_node_or_null("Browse")
+        if browse_fa != null:
+                browse_fa.closed.emit()
+                await create_timer(0.6).timeout
         main._apply_language("en")
         await create_timer(0.5).timeout
 

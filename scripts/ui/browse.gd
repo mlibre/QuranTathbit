@@ -206,7 +206,7 @@ func _rebuild_filters() -> void:
         for key in ["all", "due", "new", "learned"]:
                 var pill := Button.new()
                 pill.name = "Pill" + key.capitalize()
-                pill.text = "%s %d" % [_pill_word(key), counts[key]]
+                pill.text = I18nScript.num("%s %d" % [_pill_word(key), counts[key]])
                 pill.custom_minimum_size = Vector2(0, 36)
                 pill.tooltip_text = _pill_tooltip(key)
                 ThemeScript.pressable(pill, 0.97, 1.0)
@@ -491,7 +491,7 @@ func _rebuild() -> void:
         # that repeats them is a dashboard, not a book.
         summary.visible = asking
         if asking:
-                summary.text = I18nScript.t("%d of %d cards") % [shown.size(), _deck.cards.size()]
+                summary.text = I18nScript.f("%d of %d cards", [shown.size(), _deck.cards.size()])
         if shown.is_empty():
                 column.add_child(_empty_state())
                 _update_sticky()
@@ -593,10 +593,14 @@ func _set_header_count(column: VBoxContainer, count: int, resting: int) -> void:
                 if child.name.begins_with("Header"):
                         header = child
         if header != null:
-                var cards := I18nScript.t("%d card") % count if count == 1 else I18nScript.t("%d cards") % count
+                var cards := (
+                        I18nScript.f("%d card", [count])
+                        if count == 1
+                        else I18nScript.f("%d cards", [count])
+                )
                 var line := cards
                 if resting > 0:
-                        line += " · " + I18nScript.t("%d in review") % resting
+                        line += " · " + I18nScript.f("%d in review", [resting])
                 (header.get_node("Line/Count") as Label).text = line
 
 ## A surah's own opening: its name in the gold of citations at a
@@ -1048,7 +1052,7 @@ func _standing_of(card: CardScript) -> Dictionary:
                         if due <= 0:
                                 return {"text": I18nScript.t("due now"), "color": ThemeScript.GOLD_DEEP, "hollow": false}
                         return {
-                                "text": I18nScript.t("in %s") % SchedulerScript.humanize(due),
+                                "text": I18nScript.f("in %s", [I18nScript.wait(due)]),
                                 "color": ThemeScript.GOLD_DEEP,
                                 "hollow": false,
                         }
@@ -1057,7 +1061,10 @@ func _standing_of(card: CardScript) -> Dictionary:
                         if int(state["due_day"]) <= today_idx:
                                 return {"text": I18nScript.t("due today"), "color": ThemeScript.GOLD_DEEP, "hollow": false}
                         return {
-                                "text": I18nScript.t("in %dd") % (int(state["due_day"]) - today_idx),
+                                "text": I18nScript.f(
+                                        "in %s",
+                                        [I18nScript.wait((int(state["due_day"]) - today_idx) * 86400)]
+                                ),
                                 "color": ThemeScript.GREEN_DEEP,
                                 "hollow": false,
                         }
@@ -1089,16 +1096,11 @@ func _layout() -> void:
                         scroll.get_global_rect().position.y - get_global_rect().position.y
                 )
                 _sticky.custom_minimum_size = Vector2(measure, 0.0)
-        # The volume's page hangs from its own corner, under the coin.
+        # The volume's page hangs from its own coin, wherever the bar put
+        # it -- centred under the coin, its roof pointing up at it.
         var popup: Control = get_node_or_null("VolumePopup")
         if popup != null:
-                var popup_w := popup.get_combined_minimum_size().x
-                var inset := ThemeScript.top_inset()
-                popup.anchor_left = 0.0
-                popup.anchor_right = 0.0
-                popup.anchor_top = 0.0
-                popup.offset_left = maxf(size.x - popup_w - 24.0, 16.0)
-                popup.offset_top = 22.0 + inset + 48.0 + 12.0
+                ThemeScript.place_popover(popup, get_node("Margin/Column/TopBar/Right/Volume"))
 
 ## The shelf answers the keyboard as a shelf: the arrows walk the rows, one
 ## card at a time, and Enter opens what stands under the hand.

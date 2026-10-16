@@ -75,9 +75,12 @@ func setup(deck: DeckScript, counts: Dictionary, sync_line: String, sync_state :
         title.text = deck.name
         var waiting: int = counts["due"] + counts["new"]
         caption.text = (
-                I18nScript.t("%d cards · %d learned · nothing waiting") % [deck.cards.size(), counts["learned"]]
+                I18nScript.f("%d cards · %d learned · nothing waiting", [deck.cards.size(), counts["learned"]])
                 if waiting == 0
-                else I18nScript.t("%d cards · %d learned · %d waiting") % [deck.cards.size(), counts["learned"], waiting]
+                else I18nScript.f(
+                        "%d cards · %d learned · %d waiting",
+                        [deck.cards.size(), counts["learned"], waiting]
+                )
         )
 
         _apply_counts(counts)

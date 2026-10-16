@@ -127,7 +127,7 @@ func report(text: String, done: int, total: int) -> void:
         _phase.text = I18nScript.t(str(PHRASES.get(text, text.capitalize()))) + "…"
         if total > 0:
                 _stop_sweep()
-                _count.text = I18nScript.t("%d of %d") % [done, total]
+                _count.text = I18nScript.f("%d of %d", [done, total])
                 _bar.value = 100.0 * float(done) / float(total)
         else:
                 _count.text = ""

@@ -445,10 +445,6 @@ func _deck_body() -> Control:
         name.name = "Name"
         box.add_child(name)
 
-        var folder := _text("", ThemeScript.INK_SOFT, ThemeScript.CAPTION)
-        folder.name = "Folder"
-        box.add_child(folder)
-
         var note := _text(I18nScript.t("Cards are folders on your disk. Edit them anywhere; sync carries them."), ThemeScript.INK_SOFT, ThemeScript.CAPTION)
         note.name = "Note"
         box.add_child(note)
@@ -511,7 +507,7 @@ func _step_new_per_day(delta: int) -> void:
                 _deck.new_per_day_mod = int(Time.get_unix_time_from_system())
                 _deck.save_progress()
         var value: Label = get_node("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/NewPerDay/Chip/StepValue")
-        value.text = str(_settings.new_per_day)
+        value.text = I18nScript.num(_settings.new_per_day)
         _ask_deck_push()
 
 ## How the reading reads: the hand the verses are written in, and the tongue
@@ -840,13 +836,11 @@ func _refresh() -> void:
         connect.visible = not _settings.has_token()
         disconnect.visible = _settings.has_token()
         var name: RichTextLabel = get_node("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/Name")
-        var folder: RichTextLabel = get_node("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/Folder")
-        name.text = "%s — %d cards" % [_deck.name, _deck.cards.size()]
-        folder.text = _deck.folder
+        name.text = I18nScript.f("%s — %d cards", [_deck.name, _deck.cards.size()])
         # The day's offer is said here too, not only on a press: a reader
         # returning to this page reads their pace off the chip.
         var pace_value: Label = get_node("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/NewPerDay/Chip/StepValue")
-        pace_value.text = str(_settings.new_per_day)
+        pace_value.text = I18nScript.num(_settings.new_per_day)
         note_sync_result("")
 
 # --- the device flow ------------------------------------------------------------

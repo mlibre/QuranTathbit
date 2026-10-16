@@ -198,6 +198,7 @@ func _start_session() -> void:
         study.edited.connect(_on_card_edited)
         study.closed.connect(_on_session_closed)
         study.volume_changed.connect(_on_volume_changed)
+        study.ayah_font_chosen.connect(_on_ayah_font_chosen)
 
 
 ## A moved volume rule is remembered the moment the hand stops moving it, so
@@ -205,6 +206,24 @@ func _start_session() -> void:
 func _on_volume_changed(value: float) -> void:
         _settings.volume = value
         _settings.save()
+
+
+## The verses' hand, chosen where they are read: remembered here, worn by
+## the theme from this breath on, stamped into the deck's own travelling
+## file so every device the deck reaches reads the same hand, and carried
+## to the repo the same quiet way every travelling choice is. A sync
+## already running drops the ask without losing the word -- the deck's file
+## already has it, and the next sync carries it.
+func _on_ayah_font_chosen(key: String) -> void:
+        ThemeScript.set_ayah_face(key)
+        _settings.ayah_font = key
+        _settings.save()
+        if _deck != null:
+                _deck.ayah_font = key
+                _deck.ayah_font_mod = _now()
+                _deck.save_progress()
+        if _settings.has_token() and _settings.auto_sync:
+                _run_sync(true)
 
 
 ## A session's answers are the one thing this app makes that another device
@@ -435,9 +454,10 @@ func _run_sync(quiet := false) -> void:
                 if int(result.get("pushed", 0)) + int(result.get("pulled", 0)) + int(result.get("merged", 0)) == 0:
                         line = I18nScript.t("Everything in step — synced just now")
                 else:
-                        line = I18nScript.t("Synced just now · %d sent, %d fetched, %d merged") % [
-                                result.get("pushed", 0), result.get("pulled", 0), result.get("merged", 0)
-                        ]
+                        line = I18nScript.f(
+                                "Synced just now · %d sent, %d fetched, %d merged",
+                                [result.get("pushed", 0), result.get("pulled", 0), result.get("merged", 0)]
+                        )
         elif _sync_retrying:
                 line = I18nScript.t("Connection trouble — the app will try again by itself")
         else:
@@ -507,16 +527,16 @@ func _sync_line() -> String:
         var waiting := _pending_answers()
         if waiting > 0:
                 if _answers_waiting > 0:
-                        var template := I18nScript.t(
+                        var template := (
                                 "%d answer waiting to sync" if waiting == 1 else "%d answers waiting to sync"
                         )
-                        return template % waiting
+                        return I18nScript.f(template, [waiting])
                 # Progress moved without a session -- the deck's own choices
                 # were changed here -- and the number of "answers" would be
                 # a lie.
                 return I18nScript.t("Changes waiting to sync")
         if _settings.last_sync > 0:
-                return I18nScript.t("Last synced %s") % _ago(_now() - _settings.last_sync)
+                return I18nScript.f("Last synced %s", [_ago(_now() - _settings.last_sync)])
         return I18nScript.t("Connected — not synced yet")
 
 
@@ -556,10 +576,10 @@ static func _ago(seconds: int) -> String:
         if seconds < 90:
                 return I18nScript.t("just now")
         if seconds < 3600:
-                return I18nScript.t("%d min ago") % (seconds / 60)
+                return I18nScript.f("%d min ago", [seconds / 60])
         if seconds < 86400:
-                return I18nScript.t("%dh ago") % (seconds / 3600)
-        return I18nScript.t("%dd ago") % (seconds / 86400)
+                return I18nScript.f("%dh ago", [seconds / 3600])
+        return I18nScript.f("%dd ago", [seconds / 86400])
 
 
 ## Screens change hands like pages: the outgoing one fades where it stands

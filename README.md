@@ -64,14 +64,16 @@ A few quiet extras:
   digits work) and filters for what is due, new, or resting.
 - **Set your own pace.** Settings → *New cards each day* (default 20, set
   it to 0 for review-only days).
-- **Choose the verse's typeface.** Settings → *Reading*: **Amiri Quran**
-  (the default), **Amiri**, or **Noto Naskh Arabic** — each shown by its own
+- **Choose the verse's typeface.** In Settings → *Reading*, or right in a
+  study session (the alif button beside the speaker): **Amiri Quran** (the
+  default), **Amiri**, or **Noto Naskh Arabic** — each shown by its own
   drawing of the Basmala, so you choose with your eyes. Your pick follows
   the deck to every device.
 - **The app speaks your language.** Menus and messages in English, فارسی or
   العربية — asked once the first time you open the app, changeable anytime
-  in Settings. The verses and their Persian translation always stay exactly
-  as they are.
+  in Settings. Numbers come in the language's own digits (۱ ۲ ۳, not 1 2 3),
+  and waits are spoken in words — ۱ روز, not 1d. The verses and their
+  Persian translation always stay exactly as they are.
 - **Copy any verse or translation** — drag or long-press, and paste it
   anywhere.
 

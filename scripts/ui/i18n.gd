@@ -1,6 +1,17 @@
 class_name I18n
 extends RefCounted
 
+## The digits each tongue reads its numbers in. English reads the Latin
+## digits the app already speaks; Persian and Arabic have their own --
+## and a number said in a reader's tongue is said in its own script too.
+## The decimal point and the percent sign travel with the digits: ٫ is
+## the separator both tongues write inside a number, ٪ the percent that
+## stands after one.
+const DIGITS := {
+        "fa": "۰۱۲۳۴۵۶۷۸۹",
+        "ar": "٠١٢٣٤٥٦٧٨٩",
+}
+
 ## The app's own words, in the reader's own tongue. The verses and their
 ## Persian translation are the deck's content and never change; this table
 ## dresses only the chrome -- menus, buttons, messages, the quiet lines a
@@ -26,6 +37,8 @@ const LANG_LABELS := {
         "ar": "العربية",
 }
 
+const Scheduler := preload("res://scripts/data/scheduler.gd")
+
 static var _lang := "en"
 
 
@@ -36,6 +49,53 @@ static func t(what: String) -> String:
         if entry.has(_lang):
                 return str(entry[_lang])
         return what
+
+
+## A line with numbers in it, said whole: the words in the current tongue
+## and the numbers in the tongue's own script. Every %d and %s a
+## translated line carries is fed through here, so a Persian page never
+## shows a Latin digit standing among Persian words. Care with marked-up
+## text: num() converts EVERY digit, including ones inside [color=#B4553F]
+## tags and URLs -- dress the number itself, not the line around it.
+static func f(what: String, args: Array) -> String:
+        return num(t(what) % args)
+
+
+## A number, said in the current tongue's own script: "100" reads as ۱۰۰
+## in Persian and ١٠٠ in Arabic, "1.5" keeps its half as ۱٫۵, "%" keeps
+## its place as ٪. English reads every number exactly as it was given.
+## Only the digits change, never the words around them.
+static func num(what) -> String:
+        var text := str(what)
+        var table: String = str(DIGITS.get(_lang, ""))
+        if table.is_empty():
+                return text
+        var out := PackedStringArray()
+        for i in text.length():
+                var ch := text[i]
+                if ch >= "0" and ch <= "9":
+                        out.append(table[ord(ch) - 48])
+                elif ch == ".":
+                        # A point between two digits belongs to the number; a
+                        # sentence's own full stop never stands between two.
+                        var before := i > 0 and text[i - 1] >= "0" and text[i - 1] <= "9"
+                        var after := i + 1 < text.length() and text[i + 1] >= "0" and text[i + 1] <= "9"
+                        out.append("٫" if before and after else ch)
+                elif ch == "%":
+                        out.append("٪")
+                else:
+                        out.append(ch)
+        return "".join(out)
+
+
+## A wait the reader is asked to consider, said in the reader's own tongue
+## and script. English keeps Anki's compact arithmetic ("10m", "1d",
+## "3.5mo"); every other tongue gets the words with its own digits --
+## "۱ دقیقه", "۱ روز" -- because a Persian reader meets a Latin "1d" as
+## a foreign word, not a number.
+static func wait(seconds: int) -> String:
+        var parts := Scheduler.humanize_parts(seconds)
+        return num(t(str(parts[0])) % parts[1])
 
 
 static func lang() -> String:
@@ -118,6 +178,16 @@ const STRINGS := {
         "%d min ago": {"fa": "%d دقیقه پیش", "ar": "قبل %d دقيقة"},
         "%dh ago": {"fa": "%d ساعت پیش", "ar": "قبل %d ساعة"},
         "%dd ago": {"fa": "%d روز پیش", "ar": "قبل %d يوم"},
+        # --- the words a wait is said in, wherever one is named ----------------------
+        "%ds": {"fa": "%d ثانیه", "ar": "%d ثانية"},
+        "%dm": {"fa": "%d دقیقه", "ar": "%d دقيقة"},
+        "%dh": {"fa": "%d ساعت", "ar": "%d ساعة"},
+        "%.1fh": {"fa": "%.1f ساعت", "ar": "%.1f ساعة"},
+        "%dd": {"fa": "%d روز", "ar": "%d يوم"},
+        "%.1fd": {"fa": "%.1f روز", "ar": "%.1f يوم"},
+        "%dmo": {"fa": "%d ماه", "ar": "%d شهر"},
+        "%.1fmo": {"fa": "%.1f ماه", "ar": "%.1f شهر"},
+        "%.1fy": {"fa": "%.1f سال", "ar": "%.1f سنة"},
         # --- study -----------------------------------------------------------------
         "%d of %d": {"fa": "%d از %d", "ar": "%d من %d"},
         "Show answer": {"fa": "نمایش پاسخ", "ar": "إظهار الجواب"},
@@ -213,11 +283,11 @@ const STRINGS := {
         "%d card": {"fa": "%d کارت", "ar": "بطاقة واحدة"},
         "%d cards": {"fa": "%d کارت", "ar": "%d بطاقة"},
         "%d in review": {"fa": "%d در مرور", "ar": "%d في المراجعة"},
+        "%s — %d cards": {"fa": "%s — %d کارت", "ar": "%s — %d بطاقة"},
         "Edit card": {"fa": "ویرایش کارت", "ar": "تعديل البطاقة"},
         "due now": {"fa": "الان", "ar": "الآن"},
         "due today": {"fa": "امروز", "ar": "اليوم"},
         "in %s": {"fa": "تا %s دیگر", "ar": "بعد %s"},
-        "in %dd": {"fa": "تا %d روز دیگر", "ar": "بعد %d يومًا"},
         # --- the editor ---------------------------------------------------------------
         "Back without saving": {"fa": "بازگشت بدون ذخیره", "ar": "العودة دون حفظ"},
         "Write": {"fa": "نوشتن", "ar": "كتابة"},

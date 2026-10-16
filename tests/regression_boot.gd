@@ -36,6 +36,7 @@ func _init() -> void:
         await _check_home_numbers(home)
         await _check_language_picker(main)
         await _check_study_session(main)
+        _check_own_digits()
         await _check_settings(main)
         await _check_browse(main)
         _check_settings_round_trip()
@@ -52,10 +53,47 @@ func _fresh_install() -> void:
         _remove_tree("user://decks")
         _remove_tree("user://settings.json")
 
+## The numbers a tongue says in its own script: Persian and Arabic readers
+## meet ۱۰۰ and ١٠٠, never a Latin digit standing among their own words, and
+## a wait is said in words -- ۱ روز, not 1d. English keeps the arithmetic
+## it has always read.
+func _check_own_digits() -> void:
+        var i18n := load("res://scripts/ui/i18n.gd")
+        i18n.set_lang("fa")
+        _is(i18n.num("100"), "۱۰۰", "a Persian page says a hundred in Persian")
+        _is(i18n.num("1.5"), "۱٫۵", "a half keeps its own separator")
+        _is(i18n.num("50%"), "۵۰٪", "a percent keeps its own sign")
+        _is(i18n.num("2:1"), "۲:۱", "a colon is never a separator")
+        _is(i18n.num("end. Then"), "end. Then", "a sentence's own full stop is never a separator")
+        _is(i18n.wait(86400), "۱ روز", "a day's wait is said in Persian words")
+        _is(i18n.wait(600), "۱۰ دقیقه", "ten minutes likewise")
+        _is(i18n.wait(30), "۳۰ ثانیه", "seconds likewise")
+        _is(i18n.wait(129600), "۱٫۵ روز", "a day and a half likewise")
+        _is(i18n.f("%d cards", [7]), "۷ کارت", "a whole line carries its own digits")
+        i18n.set_lang("ar")
+        _is(i18n.num(42), "٤٢", "an Arabic page says forty-two in Arabic")
+        _is(i18n.wait(86400), "١ يوم", "a day's wait is said in Arabic words")
+        i18n.set_lang("en")
+        _is(i18n.num("100"), "100", "English reads its numbers as it always has")
+        _is(i18n.wait(86400), "1d", "and its waits in Anki's own arithmetic")
+
 func _ok(condition: bool, what: String) -> void:
         if not condition:
                 _failures += 1
                 print("  FAIL: %s" % what)
+
+## A face row, found by the choice it carries rather than the words its
+## name was built from -- "amiri_quran" capitalizes with a space in it,
+## and a path built by hand would break on exactly that.
+func _face_row_by_choice(popup: Control, key: String) -> Button:
+        var rows: VBoxContainer = popup.get_node_or_null("Sheet/Pad/Column/Faces")
+        if rows == null:
+                return null
+        for child in rows.get_children():
+                var button := child as Button
+                if button != null and str(button.get_meta("choice", "")) == key:
+                        return button
+        return null
 
 func _is(got: Variant, expected: Variant, what: String) -> void:
         if got != expected:
@@ -181,27 +219,142 @@ func _check_study_session(main: Node) -> void:
                 volume_coin.pressed.emit()
                 await create_timer(0.1).timeout
                 _ok(volume_popup != null and volume_popup.visible, "pressing the coin opens the volume's page")
-                var slider: HSlider = volume_popup.get_node("Pad/Row/Slider")
+                # The page hangs from its coin: never past the window's edge,
+                # a breath below it, its roof pointing up at it -- the peak is
+                # the anchor, so a narrow window may slide the page sideways
+                # and the page still reads as the coin's own.
+                var coin_rect := volume_coin.get_global_rect()
+                var page_rect := volume_popup.get_global_rect()
+                var window_w := study.get_global_rect().size.x
+                _ok(
+                        absf(page_rect.position.y - (coin_rect.end.y + 8.0)) < 2.0,
+                        "the volume's page hangs a breath below its coin"
+                )
+                _ok(
+                        page_rect.position.x >= 11.0 and page_rect.end.x <= window_w - 11.0,
+                        "the page never runs past the window's edge"
+                )
+                var caret: Control = volume_popup.get_node_or_null("Caret")
+                _ok(
+                        caret != null
+                                and absf(
+                                        page_rect.position.x + caret.position.x + 8.0
+                                                - coin_rect.get_center().x
+                                ) < 3.0,
+                        "the page's roof points up at its coin"
+                )
+                _ok(
+                        volume_popup.get_node_or_null("Sheet/Pad/Column/Head/Title") != null,
+                        "the page says what it is for before it asks for a number"
+                )
+                var slider: HSlider = volume_popup.get_node("Sheet/Pad/Column/Row/Slider")
                 slider.value = 0.5
                 await create_timer(0.7).timeout
                 _is(study.volume, 0.5, "the rule sets the loudness it says")
                 _ok(absf(study._player.volume_db - linear_to_db(0.5)) < 0.01, "the player obeys the rule")
                 # The speaker in the page is the mute: one press for silence,
                 # one press back for the loudness silence replaced.
-                (volume_popup.get_node("Pad/Row/Mute") as Button).pressed.emit()
+                (volume_popup.get_node("Sheet/Pad/Column/Head/Mute") as Button).pressed.emit()
                 await create_timer(0.2).timeout
                 _is(study.volume, 0.0, "pressing the speaker mutes the recitation")
-                (volume_popup.get_node("Pad/Row/Mute") as Button).pressed.emit()
+                (volume_popup.get_node("Sheet/Pad/Column/Head/Mute") as Button).pressed.emit()
                 await create_timer(0.2).timeout
                 _is(study.volume, 0.5, "pressing it again unmutes to what was")
                 _is(
-                        (volume_popup.get_node("Pad/Row/Readout") as Label).text,
+                        (volume_popup.get_node("Sheet/Pad/Column/Row/Readout") as Label).text,
                         "50%",
                         "the number says the loudness inline"
                 )
                 volume_coin.pressed.emit()
                 await create_timer(0.1).timeout
                 _ok(not volume_popup.visible, "pressing the coin again closes the page")
+
+        # The verses' own hand can be chosen where they are read: a third coin
+        # in the corner opens the faces, a choice re-says the card in the new
+        # hand at once, and the deck carries the choice as it carries every
+        # travelling one.
+        var font_coin: Button = study.get_node_or_null("Margin/Column/TopBar/Right/Pair/Font")
+        _ok(font_coin != null, "the alif coin sits between the pencil and the speaker")
+        var font_popup: Control = study.get_node_or_null("FontPopup")
+        _ok(font_popup != null, "the faces' own page waits under the coin")
+        if font_coin != null and font_popup != null:
+                font_coin.pressed.emit()
+                await create_timer(0.1).timeout
+                _ok(font_popup.visible, "pressing the alif opens the faces")
+                _ok(volume_popup == null or not volume_popup.visible, "opening the faces closes the volume's page")
+                var face_rows := font_popup.get_node_or_null("Sheet/Pad/Column/Faces")
+                _ok(face_rows != null and face_rows.get_child_count() == 3, "each face is a row of its own")
+                var amiri_row := _face_row_by_choice(font_popup, "amiri")
+                if amiri_row != null:
+                        amiri_row.pressed.emit()
+                        await create_timer(0.3).timeout
+                        _ok(not font_popup.visible, "a choice folds the page away")
+                        _is(ThemeScript.ayah_face_key(), "amiri", "the chosen face is worn from this breath on")
+                        var carried_face: Variant = JSON.parse_string(
+                                FileAccess.get_file_as_string("user://decks/quran/progress.json")
+                        )
+                        _ok(
+                                typeof(carried_face) == TYPE_DICTIONARY
+                                        and str((carried_face as Dictionary).get("ayah_font", "")) == "amiri",
+                                "the choice is stamped into the deck's own file"
+                        )
+                        var resaid: RichTextLabel = null
+                        for found in view.find_children("Paragraph", "RichTextLabel", true, false):
+                                resaid = found
+                                break
+                        _ok(
+                                resaid != null
+                                        and str(resaid.get_theme_font("normal_font").resource_path).ends_with(
+                                                "Amiri-Regular.ttf"
+                                        ),
+                                "the standing card re-says its words in the new hand"
+                        )
+                # Back to the mushaf's own cut, the way the reader found it.
+                font_coin.pressed.emit()
+                await create_timer(0.1).timeout
+                var quran_row := _face_row_by_choice(font_popup, "amiri_quran")
+                if quran_row != null:
+                        quran_row.pressed.emit()
+                        await create_timer(0.2).timeout
+                        _is(ThemeScript.ayah_face_key(), "amiri_quran", "the mushaf's cut returns")
+
+        # A tongue says its numbers in its own script: the session's count
+        # in Persian reads ۱ از ۹۹, the answer buttons name their waits in
+        # Persian words, and the recitation's own address on its button
+        # wears the reader's digits -- never a Latin number standing among
+        # Persian words.
+        var i18n := load("res://scripts/ui/i18n.gd")
+        i18n.set_lang("fa")
+        study._show_front()
+        await create_timer(0.1).timeout
+        var fa_progress: Label = study.get_node("Margin/Column/TopBar/Progress")
+        _ok(
+                fa_progress.text.contains("از") and not fa_progress.text.contains("1"),
+                "the session's count is said in Persian words and digits"
+        )
+        study._reveal()
+        await create_timer(0.4).timeout
+        var fa_waits := []
+        for button in study.get_node("Margin/Column/Answers").get_children():
+                fa_waits.append(button.get_node("Center/Row/Stack/Wait").text)
+        _ok(
+                fa_waits.any(func(w: String) -> bool: return w.contains("دقیقه")),
+                "the answer buttons name their waits in Persian words"
+        )
+        var audio_meta := ""
+        for found in view.find_children("*", "Button", true, false):
+                # The engine sanitizes node names: "Audio:001003.mp3" is
+                # born as "Audio_001003_mp3".
+                if str(found.name).begins_with("Audio"):
+                        audio_meta = str(found.get_meta("idle_text", ""))
+                        break
+        _ok(
+                not audio_meta.is_empty() and audio_meta.contains("۱") and not audio_meta.contains("1:"),
+                "the recitation's address is written in the reader's own digits"
+        )
+        i18n.set_lang("en")
+        study._show_front()
+        await create_timer(0.1).timeout
 
         study._reveal()
         await create_timer(0.4).timeout
@@ -492,6 +645,19 @@ func _check_settings(main: Node) -> void:
         _ok(saved != null, "the save button stands beside it")
         var card_title: Label = settings.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/CardTitle")
         _ok(card_title != null and card_title.text.length() > 0, "the GitHub card carries its own title inside it")
+        # The deck's card speaks in words, not paths: user://decks/quran is
+        # the machine's own address for the deck, and no reader needs it.
+        var folder_line: Control = settings.get_node_or_null(
+                "Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/Folder"
+        )
+        _ok(folder_line == null, "the deck's card no longer shows its raw storage path")
+        var deck_line: RichTextLabel = settings.get_node_or_null(
+                "Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/Name"
+        )
+        _ok(
+                deck_line != null and deck_line.text.contains("cards"),
+                "the deck's card still says what it holds, in the reader's own words"
+        )
         # The quiet promise is a row of its own with a switch, not a caption
         # with a dot after it: a first-time reader sees the choice they have.
         var auto_row: Button = settings.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/AutoRow")

@@ -1,6 +1,6 @@
 {
   "name": "qurantathbit",
-  "version": "1.0.18",
+  "version": "1.0.19",
   "description": "A quiet companion for keeping the Qur'an close — one deck, one card at a time, with your own GitHub as the cloud. Web build served from any static host or `npx qurantathbit`.",
   "license": "MIT",
   "repository": {

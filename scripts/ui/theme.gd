@@ -323,12 +323,112 @@ class VolumeMark extends Control:
                 draw_arc(Vector2(11.0, 9.0), 8.5, -0.75, 0.75, 12, Color(color.r, color.g, color.b, 0.55), 1.8, true)
 
 
-## The volume's own small page: a speaker that mutes on press, a rule the
-## hand drags, and the number it stands at -- one quiet row, the size of the
-## thing it controls, with no title to read first. Both places that play a
-## recitation (a session and the browser) open the same page, so loudness is
-## one idea everywhere it can be changed.
-class VolumePopover extends PanelContainer:
+## The peak in a popover's roof: a triangle of the page's own paper
+## pointing up at the coin that opened it. A child drawn after the sheet,
+## so its base opens the sheet's border the way a page's own corner would;
+## its two slanted edges carry the page's own hairline, because a white
+## triangle on cream paper with no edge is a shape nobody can see.
+class CaretMark extends Control:
+        func _init() -> void:
+                custom_minimum_size = Vector2(16, 8)
+                mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+        func _draw() -> void:
+                draw_colored_polygon(
+                        PackedVector2Array([
+                                Vector2(0.0, 9.0), Vector2(16.0, 9.0), Vector2(8.0, 0.0),
+                        ]),
+                        CARD
+                )
+                draw_polyline(
+                        PackedVector2Array([
+                                Vector2(0.0, 9.0), Vector2(8.0, 0.0), Vector2(16.0, 9.0),
+                        ]),
+                        LINE,
+                        1.5,
+                        true
+                )
+
+
+## A page that hangs from a coin: the app's own card surface (the sheet),
+## and a peak in its roof that points up at the coin that opened it --
+## placed and aimed by place_popover(). The sheet is a child, not the page
+## itself, so the peak may stand above the page's edge without clipping
+## games, and the page's own children never have to know it is there.
+class Popover extends Control:
+        var sheet: PanelContainer
+        var _caret: CaretMark
+
+        func _init(width: float) -> void:
+                visible = false
+                mouse_filter = Control.MOUSE_FILTER_STOP
+                custom_minimum_size = Vector2(width, 0)
+                sheet = PanelContainer.new()
+                sheet.name = "Sheet"
+                sheet.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+                sheet.mouse_filter = Control.MOUSE_FILTER_STOP
+                sheet.add_theme_stylebox_override("panel", THEME.card_stylebox())
+                add_child(sheet)
+                _caret = CaretMark.new()
+                _caret.name = "Caret"
+                add_child(_caret)
+
+        ## The one padding every popover's content breathes, so all of them
+        ## share one rhythm.
+        func content(left: int, top: int, right: int, bottom: int) -> MarginContainer:
+                var pad := MarginContainer.new()
+                pad.name = "Pad"
+                pad.add_theme_constant_override("margin_left", left)
+                pad.add_theme_constant_override("margin_right", right)
+                pad.add_theme_constant_override("margin_top", top)
+                pad.add_theme_constant_override("margin_bottom", bottom)
+                sheet.add_child(pad)
+                return pad
+
+        ## The page sizes itself to what its content needs, never below the
+        ## measure it was born with: a Control's size will not go under its
+        ## own custom minimum, and a placement computed from the smaller
+        ## number hangs the page past the window's edge.
+        func fit() -> Vector2:
+                var want: Vector2 = sheet.get_combined_minimum_size()
+                want = Vector2(
+                        maxf(want.x, custom_minimum_size.x),
+                        maxf(want.y, custom_minimum_size.y)
+                )
+                size = want
+                return want
+
+        ## Where the roof points: the x, in the page's own coordinates,
+        ## that stands under the coin being answered.
+        func set_caret(x: float) -> void:
+                _caret.position = Vector2(x - 8.0, -7.0)
+
+
+## The typeface's own mark: an alif drawn in Amiri -- the first letter of
+## the app's own name, and the question a typeface answers is how a letter
+## is drawn. The letter is centred in the mark's own width, because a
+## single narrow stroke drawn from its own left edge reads as sitting
+## beside the coin's centre rather than in it.
+class TypeMark extends Control:
+        var color := GREEN_DEEP
+
+        func _init(p_color: Color = GREEN_DEEP) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(20, 20)
+
+        func _draw() -> void:
+                draw_string(
+                        THEME.amiri(22), Vector2(0.0, 17.0), "أ",
+                        HORIZONTAL_ALIGNMENT_CENTER, 20.0, 22, color
+                )
+
+
+## The volume's own small page: its name, the mute, a rule the hand drags,
+## and the number it stands at -- a page the size of the question it
+## answers, hung from the coin that opens it. Both places that play a
+## recitation (a session and the browser) open the same page, so loudness
+## is one idea everywhere it can be changed.
+class VolumePopover extends Popover:
         ## Every nudge of the rule, live -- the hand hears the change as it
         ## makes it.
         signal changed(value: float)
@@ -343,29 +443,34 @@ class VolumePopover extends PanelContainer:
         var _loud := 1.0  # the last loudness above silence, for unmuting
 
         func _init() -> void:
+                super(238.0)
                 name = "VolumePopup"
-                visible = false
-                mouse_filter = Control.MOUSE_FILTER_STOP
-                add_theme_stylebox_override("panel", THEME.card_stylebox())
 
-                var pad := MarginContainer.new()
-                pad.name = "Pad"
-                pad.add_theme_constant_override("margin_left", 16)
-                pad.add_theme_constant_override("margin_right", 16)
-                pad.add_theme_constant_override("margin_top", 12)
-                pad.add_theme_constant_override("margin_bottom", 12)
-                add_child(pad)
+                var pad := content(16, 14, 16, 14)
+                var column := VBoxContainer.new()
+                column.name = "Column"
+                column.add_theme_constant_override("separation", 12)
+                pad.add_child(column)
 
-                var row := HBoxContainer.new()
-                row.name = "Row"
-                row.add_theme_constant_override("separation", 12)
-                pad.add_child(row)
+                # The page says what it is for before it asks for a number:
+                # its name in the reader's own tongue, the mute beside it.
+                var head := HBoxContainer.new()
+                head.name = "Head"
+                head.add_theme_constant_override("separation", 10)
+                column.add_child(head)
+                var title := Label.new()
+                title.name = "Title"
+                title.text = I18N.t("Recitation volume")
+                title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+                title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+                THEME.dress(title, CAPTION, INK_SOFT)
+                head.add_child(title)
 
                 # The speaker is also the mute: one press for silence, one
                 # press for the loudness silence replaced.
                 var mute := Button.new()
                 mute.name = "Mute"
-                mute.custom_minimum_size = Vector2(38, 38)
+                mute.custom_minimum_size = Vector2(36, 36)
                 mute.tooltip_text = I18N.t("Mute or unmute")
                 THEME.apply_mark_styles(mute, THEME.mark_button_styles(GREEN, true))
                 _mark = VolumeMark.new(GREEN_DEEP)
@@ -378,40 +483,47 @@ class VolumePopover extends PanelContainer:
                 mute.add_child(mute_center)
                 THEME.pressable(mute)
                 mute.pressed.connect(_toggle_mute)
-                row.add_child(mute)
+                head.add_child(mute)
+
+                # The rule itself: wide enough to drag with a thumb, its
+                # number said beside it in the reader's own digits.
+                var row := HBoxContainer.new()
+                row.name = "Row"
+                row.add_theme_constant_override("separation", 12)
+                column.add_child(row)
 
                 _slider = HSlider.new()
                 _slider.name = "Slider"
                 _slider.min_value = 0.0
                 _slider.max_value = 1.0
                 _slider.step = 0.01
-                _slider.custom_minimum_size = Vector2(170, 36)
+                _slider.custom_minimum_size = Vector2(110, 40)
                 _slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
                 var track := StyleBoxFlat.new()
                 track.bg_color = Color("#E6DFCE")
-                track.set_corner_radius_all(4)
-                track.content_margin_top = 4
-                track.content_margin_bottom = 4
+                track.set_corner_radius_all(3)
+                track.content_margin_top = 3
+                track.content_margin_bottom = 3
                 var filled := StyleBoxFlat.new()
                 filled.bg_color = GREEN
-                filled.set_corner_radius_all(4)
-                filled.content_margin_top = 4
-                filled.content_margin_bottom = 4
+                filled.set_corner_radius_all(3)
+                filled.content_margin_top = 3
+                filled.content_margin_bottom = 3
                 _slider.add_theme_stylebox_override("slider", track)
                 _slider.add_theme_stylebox_override("grabber_area", filled)
                 _slider.add_theme_stylebox_override("grabber_area_highlight", filled)
                 _slider.add_theme_icon_override("grabber", THEME.knob_icon(18, GREEN_DEEP))
-                _slider.add_theme_icon_override("grabber_highlight", THEME.knob_icon(22, GREEN_DEEP))
+                _slider.add_theme_icon_override("grabber_highlight", THEME.knob_icon(21, GREEN_DEEP))
                 _slider.add_theme_icon_override("grabber_disabled", THEME.knob_icon(18, Color("#9AA79E")))
                 _slider.value_changed.connect(_on_dragged)
                 row.add_child(_slider)
 
                 _readout = Label.new()
                 _readout.name = "Readout"
-                _readout.custom_minimum_size = Vector2(46, 0)
+                _readout.custom_minimum_size = Vector2(58, 0)
                 _readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
                 _readout.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-                THEME.dress(_readout, CAPTION, INK)
+                THEME.dress(_readout, 17, GREEN_DEEP, true)
                 row.add_child(_readout)
                 _say(1.0)
 
@@ -437,13 +549,14 @@ class VolumePopover extends PanelContainer:
                 committed.emit(v)
 
         ## What the page says about a loudness: the mark goes quiet at
-        ## silence, the number keeps the number's own place.
+        ## silence, the number keeps the number's own place and its own
+        ## script -- 50% for an English reader, ۵۰٪ for a Persian one.
         func _say(v: float) -> void:
                 if v > 0.005:
                         _loud = v
                 _mark.muted = v <= 0.005
                 _mark.queue_redraw()
-                _readout.text = "%d%%" % int(round(v * 100.0))
+                _readout.text = I18N.num("%d%%" % int(round(v * 100.0)))
 
         ## A save waits for the hand to stop moving: only the latest nudge
         ## commits, so one drag is one word, not one per tick along it.
@@ -494,7 +607,25 @@ class VolumeRig extends RefCounted:
                 _popup.visible = not _popup.visible
                 if _popup.visible:
                         _popup.set_volume(float(_screen.get("volume")))
+                        THEME.place_popover(_popup, _coin())
                         THEME.settle_in(_popup, 0.0, 0.16)
+
+        ## The coin the page hangs from, wherever the screen's bar hid it --
+        ## one screen tucks its coin under a Pair, another leaves it bare.
+        func _coin() -> Button:
+                var bar := _screen.get_node_or_null("Margin/Column/TopBar")
+                if bar == null:
+                        return null
+                return _find_button(bar, "Volume")
+
+        func _find_button(node: Node, what: String) -> Button:
+                if node is Button and node.name == what:
+                        return node
+                for child in node.get_children():
+                        var found := _find_button(child, what)
+                        if found != null:
+                                return found
+                return null
 
         ## Loudness to the screen's own word, the player and the coin's face
         ## -- one place, so they can never disagree. linear_to_db(0) is
@@ -1067,6 +1198,31 @@ static func _centered_mark(mark: Control) -> CenterContainer:
         return center
 
 
+## Hang a popover under its coin: centred on the coin, a breath below it,
+## never past the window's edges, its roof pointing up at the coin -- so
+## every page that opens from a corner reads as belonging to that corner,
+## not as a box that drifted in from somewhere else. The window may move
+## under it; a screen's layout calls this again to keep it hung.
+static func place_popover(popup: Control, coin: Control, gap := 8.0) -> void:
+        if popup == null or coin == null:
+                return
+        if not popup.is_inside_tree() or not coin.is_inside_tree():
+                return
+        var parent := popup.get_parent() as Control
+        if parent == null:
+                return
+        var coin_rect := coin.get_global_rect()
+        var base := parent.get_global_rect().position
+        var w := popup.get_combined_minimum_size().x
+        if popup.has_method("fit"):
+                w = (popup.call("fit") as Vector2).x
+        var x := coin_rect.get_center().x - base.x - w / 2.0
+        x = clampf(x, 24.0, maxf(parent.size.x - w - 24.0, 24.0))
+        popup.position = Vector2(x, coin_rect.end.y - base.y + gap)
+        if popup.has_method("set_caret"):
+                popup.call("set_caret", coin_rect.get_center().x - base.x - x)
+
+
 ## A round grabber for a slider, drawn rather than typed: no icon font in
 ## this app, and the engine's default grabber is a grey plastic bead from
 ## another app. The circle is drawn at 4x and scaled down, so its edge
@@ -1121,21 +1277,21 @@ static func key_chip(label_text: String) -> PanelContainer:
 static func count_up(label: Label, to: int, duration := 0.55) -> void:
         var shown: Variant = label.get_meta("counted", -1) if label.has_meta("counted") else -1
         if int(shown) == to:
-                label.text = str(to)
+                label.text = I18N.num(to)
                 return
         label.set_meta("counted", to)
         if to <= 0:
-                label.text = str(to)
+                label.text = I18N.num(to)
                 return
-        label.text = "0"
+        label.text = I18N.num(0)
         var tween := label.create_tween()
         tween.tween_method(
-                func(v: float) -> void: label.text = str(int(round(v))),
+                func(v: float) -> void: label.text = I18N.num(int(round(v))),
                 0.0,
                 float(to),
                 duration
         ).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-        tween.tween_callback(func() -> void: label.text = str(to))
+        tween.tween_callback(func() -> void: label.text = I18N.num(to))
 
 
 ## Fade a control in, sliding it a breath. A positive distance arrives
