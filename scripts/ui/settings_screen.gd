@@ -391,7 +391,7 @@ func _about() -> Control:
         box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         box.alignment = BoxContainer.ALIGNMENT_CENTER
         box.add_theme_constant_override("separation", 4)
-        # The name in the script it was given, then the line it works by.
+        # The name in the script it was given, then the version it runs.
         var ornament := ThemeScript.OrnamentMark.new()
         ornament.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         box.add_child(ornament)
@@ -402,10 +402,7 @@ func _about() -> Control:
         arabic.add_theme_font_size_override("font_size", 16)
         arabic.add_theme_color_override("font_color", ThemeScript.GOLD)
         box.add_child(arabic)
-        var label := _text(
-                "QuranTathbit v%s\na quiet memorisation companion" % VersionScript.VERSION,
-                ThemeScript.INK_SOFT, ThemeScript.CAPTION, true
-        )
+        var label := _text("QuranTathbit v%s" % VersionScript.VERSION, ThemeScript.INK_SOFT, ThemeScript.CAPTION, true)
         label.name = "Line"
         box.add_child(label)
         return box

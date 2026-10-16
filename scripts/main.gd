@@ -26,6 +26,7 @@ var _http: HttpClientScript
 var _auth: GitHubAuthScript
 var _sync: GitHubSyncScript
 var _screen: Control
+var _update_waiting := false  # a newer web version was announced; Home owes the user the offer
 
 
 func _ready() -> void:
@@ -43,6 +44,7 @@ func _ready() -> void:
         _auth = GitHubAuthScript.new()
         _sync = GitHubSyncScript.new(_http, _auth)
 
+        _watch_updates()
         _go_home()
         # The one line the release workflow's smoke test looks for: the deck is
         # installed, loaded, and the first screen is standing.
@@ -98,6 +100,8 @@ func _go_home() -> void:
         home.study_pressed.connect(_start_session)
         home.sync_pressed.connect(_on_sync_pressed)
         home.settings_pressed.connect(_on_settings_pressed)
+        if _update_waiting:
+                home.offer_update(_apply_update)
 
 
 func _start_session() -> void:
@@ -240,6 +244,53 @@ func _swap(next: Control, from_above := false) -> void:
         _screen = next
         add_child(next)
         ThemeScript.appear(next, 0.0, -14.0 if from_above else 14.0)
+
+
+# --- web updates ----------------------------------------------------------------
+
+## The web build runs inside a page that can outlive the version it carries.
+## The page's head script asks the service worker to re-check itself -- every
+## fifteen minutes, and each time the tab is looked at again -- and the engine
+## turns a newer waiting worker into one signal, answered on Home as a quiet
+## Update offer. Taking it asks the worker to take the page over; a reload is
+## the hand-turned version of the same thing, held back until the ask has had
+## its chance.
+func _watch_updates() -> void:
+        var bridge := _bridge()
+        if bridge == null:
+                return
+        # Arming is the ask: from here the worker reports on its own, and a
+        # version already waiting outside the door is announced at once.
+        bridge.call("pwa_needs_update")
+        bridge.connect("pwa_update_available", _on_pwa_update_available)
+
+
+func _on_pwa_update_available() -> void:
+        _update_waiting = true
+        if _screen is HomeScript:
+                var home: HomeScript = _screen
+                home.offer_update(_apply_update)
+
+
+## The page's bridge to the engine, read at runtime rather than by name: on
+## every other platform there is none, and the same line then reads as "not
+## here" instead of refusing to load.
+func _bridge() -> Object:
+        if not OS.has_feature("web"):
+                return null
+        return Engine.get_singleton("JavaScriptBridge")
+
+
+func _apply_update() -> void:
+        var bridge := _bridge()
+        if bridge == null:
+                return
+        bridge.call("pwa_update")
+        # If the worker never answers, the page can still be turned by hand;
+        # a reload re-checks the worker either way.
+        get_tree().create_timer(6.0).timeout.connect(func() -> void:
+                bridge.call("eval", "location.reload()")
+        )
 
 
 func _now() -> int:

@@ -365,6 +365,34 @@ func _study_button() -> Control:
 func refresh(counts: Dictionary) -> void:
         _apply_counts(counts)
 
+## A browser session can outlive the version it is running. When the engine
+## reports a newer one waiting outside, Home offers it here -- under the day's
+## own button, never inside a study session -- as one quiet line and the way
+## to take it. The page does the swapping; the button only asks.
+func offer_update(on_update: Callable) -> void:
+        if get_node_or_null("Margin/Column/Update") != null:
+                return
+        var column: VBoxContainer = get_node("Margin/Column")
+        var row := VBoxContainer.new()
+        row.name = "Update"
+        row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        row.add_theme_constant_override("separation", 8)
+        var line := Label.new()
+        line.name = "Line"
+        line.text = "A new version is ready."
+        line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        ThemeScript.dress(line, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
+        row.add_child(line)
+        var take := ThemeScript.ghost_button("Update", ThemeScript.GREEN_DEEP, 44)
+        take.name = "Take"
+        take.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        take.pressed.connect(on_update)
+        row.add_child(take)
+        column.add_child(row)
+        # One arrival, one settle: the row fades in where it stands, the way
+        # a container's own children arrive, never fighting the layout.
+        ThemeScript.settle_in(row, 0.12)
+
 ## Enter begins the day's study, the way Space reveals an answer: the home
 ## screen's one button is the whole screen, so the keyboard may press it
 ## from anywhere.

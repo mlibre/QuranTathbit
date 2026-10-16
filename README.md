@@ -29,7 +29,9 @@ the app invites, it never pushes, and cards you miss simply wait.
 
 Nothing to install, nothing to sign up for. Each recitation streams on
 demand, and the app caches itself — after the first visit it opens instantly
-and works offline, on any modern browser: desktop, tablet, or phone.
+and works offline, on any modern browser: desktop, tablet, or phone. A tab
+or installed app left open hears about a new version on its own and quietly
+offers **Update** — no refresh needed.
 
 Want it on your home screen like any other app? Your browser's menu offers
 **Install app** (Chrome, Edge) or **Add to Home Screen** (Safari, any

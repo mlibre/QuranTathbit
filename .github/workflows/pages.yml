@@ -131,6 +131,17 @@ jobs:
           grep -q "qt-browser-keys" builds/web/index.html
           grep -q "stopImmediatePropagation" builds/web/index.html
           grep -q "addEventListener('keydown'" builds/web/index.html
+          # A session can outlive the version it runs: the head script asks the
+          # service worker to re-check itself every fifteen minutes and each
+          # time the tab is looked at again; a newer waiting worker becomes the
+          # engine's pwa_update_available, which Home answers with a quiet
+          # Update offer that swaps the page in place of a refresh. The marker
+          # alone would pass even if the watcher arrived truncated, so the
+          # check demands its working parts, not its name.
+          grep -q "qt-update-watch" builds/web/index.html
+          grep -q "getRegistration" builds/web/index.html
+          grep -q "visibilitychange" builds/web/index.html
+          grep -q "reg.update" builds/web/index.html
           python3 - <<'PY'
           import sys
           data = open("builds/web/index.pck", "rb").read()
