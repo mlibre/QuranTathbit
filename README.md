@@ -40,7 +40,7 @@ and works offline, on any modern browser: desktop, tablet, or phone.
 Grab a build from the [**Releases**](https://github.com/mlibre/QuranTathbit/releases) page:
 
 | Platform    | File                                             | How to run                                           |
-| --- | --- | --- |
+| ----------- | ------------------------------------------------ | ---------------------------------------------------- |
 | **Windows** | `QuranTathbit-Windows.zip` → `QuranTathbit.exe`  | unzip anywhere, double-click                         |
 | **Linux**   | `QuranTathbit-Linux.zip` → `QuranTathbit.x86_64` | `chmod +x`, then run                                 |
 | **Android** | `QuranTathbit-Android.apk`                       | sideload; allow installs from this source when asked |
@@ -77,7 +77,7 @@ first sync never looks frozen.
 ## Keyboard shortcuts
 
 | Key                   | What it does                                   |
-| --- | --- |
+| --------------------- | ---------------------------------------------- |
 | **Space** / **Enter** | show the answer, then answer **Good**          |
 | **1** – **4**         | answer **Again**, **Hard**, **Good**, **Easy** |
 | **Esc**               | close the session                              |
@@ -94,6 +94,14 @@ friends — keep working as on any other page.
 - **Typefaces** — Amiri for the Arabic verses, Vazirmatn for the Persian
   text, each under its SIL OFL license in `assets/fonts/`.
 
+## For developers
+
+[AGENTS.md](AGENTS.md) holds the design rules, [docs/TESTING.md](docs/TESTING.md)
+the test battery, [docs/OAUTH_SETUP.md](docs/OAUTH_SETUP.md) your own GitHub
+app, [docs/README.npm.md](docs/README.npm.md) the npm package. To run from
+source: `godot --headless --path . --import`, then open the project and
+press F5.
+
 ## 🇵🇸 In Support of Palestine
 
 This project supports Palestine. If you can, donate to [UNRWA](https://www.unrwa.org).
@@ -105,11 +113,3 @@ and our help. Even a small act can matter. Please do what you can. 🤲
 And if you ever doubt what is right and what is wrong, remember: when someone
 kills a baby to loot baby’s belongings, he is the devil — and he stands on the
 wrong side. ✊
-
-## For developers
-
-[AGENTS.md](AGENTS.md) holds the design rules, [docs/TESTING.md](docs/TESTING.md)
-the test battery, [docs/OAUTH_SETUP.md](docs/OAUTH_SETUP.md) your own GitHub
-app, [docs/README.npm.md](docs/README.npm.md) the npm package. To run from
-source: `godot --headless --path . --import`, then open the project and
-press F5.
