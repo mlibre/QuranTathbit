@@ -151,6 +151,63 @@ class CheckMark extends Control:
                 draw_circle(points[2], 2.75, GOLD)
 
 
+## A status dot for the sync caption: the coin's state, said small, beside
+## the words that explain it -- so the line reads at a glance even far from
+## the corner it belongs to.
+class StatusDot extends Control:
+        var color := INK_SOFT
+
+        func _init(p_color: Color = INK_SOFT) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(9, 9)
+                mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+        func _draw() -> void:
+                draw_circle(Vector2(4.5, 4.5), 4.0, color)
+                draw_circle(Vector2(4.5, 4.5), 4.0, Color(color.r, color.g, color.b, 0.22))
+
+
+## The way a new version arrives: an arrow coming down into a tray, the
+## shape every app's update wears. While a new version waits outside, a
+## ring around it breathes -- gold, slow, the one attention the corner
+## allows itself -- so the coin is found without shouting.
+class UpdateMark extends Control:
+        var color := GOLD_DEEP
+        var waiting := false
+        var _t := 0.0
+
+        func _init(p_color: Color = GOLD_DEEP) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(20, 20)
+
+        func _process(delta: float) -> void:
+                if waiting:
+                        _t += delta
+                        queue_redraw()
+
+        func _draw() -> void:
+                var c := Vector2(10, 10)
+                if waiting:
+                        var breath := 0.5 + 0.5 * sin(_t * 2.4)
+                        draw_arc(
+                                c, 9.0, 0.0, TAU, 40,
+                                Color(color.r, color.g, color.b, 0.12 + 0.30 * breath),
+                                1.6, true
+                        )
+                # The tray that receives what arrives.
+                draw_arc(Vector2(10, 15.0), 5.5, 0.0, PI, 18, color, 2.2, true)
+                draw_line(Vector2(4.5, 15.0), Vector2(4.5, 15.6), color, 2.2, true)
+                draw_line(Vector2(15.5, 15.0), Vector2(15.5, 15.6), color, 2.2, true)
+                # The arrow itself, on its way down.
+                draw_line(Vector2(10, 3.0), Vector2(10, 10.5), color, 2.2, true)
+                draw_line(Vector2(6.4, 7.4), Vector2(10, 11.0), color, 2.2, true)
+                draw_line(Vector2(13.6, 7.4), Vector2(10, 11.0), color, 2.2, true)
+
+        func set_waiting(on: bool) -> void:
+                waiting = on
+                queue_redraw()
+
+
 ## The tune mark: three rules and their knobs, for the place settings live.
 ## The rules sit 6 px apart with slim knobs -- a mark this small reads as
 ## one thing only when each rule keeps a clear breath of paper under it.
@@ -600,8 +657,15 @@ static func key_chip(label_text: String) -> PanelContainer:
 ## A number that arrives: 0 to its value over half a second, easing out,
 ## the way a page's own numbers do when they matter. One shot, then it
 ## rests. Numbers that are already 0 (nothing due, nothing learned) never
-## move -- rest is also an answer.
+## move -- rest is also an answer -- and a number that has not changed
+## since the last telling does not retell itself: a page that recounts its
+## own inventory every time it is glanced at reads as nervous, not alive.
 static func count_up(label: Label, to: int, duration := 0.55) -> void:
+        var shown: Variant = label.get_meta("counted", -1) if label.has_meta("counted") else -1
+        if int(shown) == to:
+                label.text = str(to)
+                return
+        label.set_meta("counted", to)
         if to <= 0:
                 label.text = str(to)
                 return
@@ -613,6 +677,7 @@ static func count_up(label: Label, to: int, duration := 0.55) -> void:
                 float(to),
                 duration
         ).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+        tween.tween_callback(func() -> void: label.text = str(to))
 
 
 ## Fade a control in, sliding it a breath. A positive distance arrives
@@ -783,10 +848,26 @@ static func soft_stylebox(color: Color, radius := RADIUS) -> StyleBoxFlat:
         return box
 
 
+## A pill of the stats row: its own soft ground with a hairline of its own
+## tone around it, so the number sits in a shape even on the palest fill.
+static func pill_stylebox(fill: Color, edge: Color) -> StyleBoxFlat:
+        var box := StyleBoxFlat.new()
+        box.bg_color = fill
+        box.border_color = Color(edge.r, edge.g, edge.b, 0.35)
+        box.set_border_width_all(1)
+        box.set_corner_radius_all(RADIUS)
+        return box
+
+
 static func button_stylebox(color: Color, radius := 22) -> StyleBoxFlat:
         var box := StyleBoxFlat.new()
         box.bg_color = color
         box.set_corner_radius_all(radius)
+        # The go-buttons sit a breath above the page: one soft shadow under
+        # each, the same light the cards already cast.
+        box.shadow_color = Color(0.30, 0.22, 0.10, 0.20)
+        box.shadow_size = 12
+        box.shadow_offset = Vector2(0, 5)
         return box
 
 

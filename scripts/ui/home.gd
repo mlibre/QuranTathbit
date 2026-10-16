@@ -14,6 +14,7 @@ const MarkdownScript := preload("res://scripts/ui/markdown.gd")
 signal study_pressed
 signal sync_pressed
 signal settings_pressed
+signal update_pressed
 
 var _counts := {"due": 0, "new": 0, "learned": 0}
 var _deck_of_last_setup: DeckScript
@@ -47,7 +48,7 @@ func _layout() -> void:
         var pad: MarginContainer = get_node("Margin/Column/DeckCard/Pad")
         pad.add_theme_constant_override("margin_left", 20 if narrow else 30)
         pad.add_theme_constant_override("margin_right", 20 if narrow else 30)
-        for coin_name in ["SyncCoin", "SettingsCorner"]:
+        for coin_name in ["SyncCoin", "SettingsCorner", "UpdateCoin"]:
                 var coin: Button = get_node(coin_name)
                 coin.offset_top = 22.0 + inset
                 coin.offset_bottom = 70.0 + inset
@@ -114,9 +115,12 @@ func _apply_counts(counts: Dictionary) -> void:
                 study.disabled = false
 
 ## The sync coin says the state before any words do: a green coin when the
-## deck and the repo last agreed, a gold coin while the promise is still
-## unkept, a quiet ink one when there is no connection at all. The words
-## ride in the tooltip, where the person who wants them will find them.
+## deck and the repo last agreed, a gold coin while answers still wait to
+## travel or the promise is unkept, a turning green one while the exchange
+## is actually happening, a red one when it could not finish, and a quiet
+## ink one when there is no connection at all. The words ride under the
+## day's button with a dot of the same tone, where a fingertip finds them
+## as surely as a cursor finds a tooltip.
 func _set_sync_state(text: String, state: String) -> void:
         var coin: Button = get_node("SyncCoin")
         var mark: ThemeScript.SyncMark = coin.get_node("Mark/SyncMark")
@@ -129,13 +133,28 @@ func _set_sync_state(text: String, state: String) -> void:
                 "pending":
                         tone = ThemeScript.GOLD
                         mark_tone = ThemeScript.GOLD_DEEP
+                "syncing":
+                        tone = ThemeScript.GREEN
+                        mark_tone = ThemeScript.GREEN_DEEP
+                "error":
+                        tone = ThemeScript.DANGER
+                        mark_tone = ThemeScript.DANGER
         ThemeScript.apply_mark_styles(coin, ThemeScript.mark_button_styles(tone, true))
         mark.color = mark_tone
+        mark.set_working(state == "syncing")
         mark.queue_redraw()
         coin.tooltip_text = text
-        var line: Label = get_node_or_null("Margin/Column/SyncLine")
-        if line != null:
-                line.text = text
+        var row: HBoxContainer = get_node_or_null("Margin/Column/SyncLine")
+        if row != null:
+                (row.get_node("Text") as Label).text = text
+                (row.get_node("Dot") as ThemeScript.StatusDot).color = mark_tone
+
+
+## The coin turns and the line says so, while a sync runs quietly under
+## the page: the one honest thing between "you answered" and "it is safe
+## on GitHub".
+func set_syncing() -> void:
+        _set_sync_state("Syncing…", "syncing")
 
 
 ## The next card's heading: the first line of its front, plain text. The
@@ -207,6 +226,18 @@ func _build() -> void:
                 "Settings",
                 func() -> void: settings_pressed.emit()
         ))
+        # The third coin sleeps until the page hears that a newer version
+        # waits outside; then it is the gold way to take it, beside its kin,
+        # where the eye already knows the app's corners live.
+        var update := _corner_coin(
+                "UpdateCoin",
+                Vector2(-196.0, -148.0),
+                ThemeScript.UpdateMark.new(),
+                "Install the new version",
+                func() -> void: update_pressed.emit()
+        )
+        update.visible = false
+        add_child(update)
 
 ## One corner coin: a roundel in its own tone, a drawn mark centred in it,
 ## the same press the whole app knows. Settings and sync differ only in
@@ -224,6 +255,8 @@ func _corner_coin(coin_name: String, x_range: Vector2, mark: Control, tooltip: S
         coin.offset_bottom = 70.0
         if coin_name == "SyncCoin":
                 mark.name = "SyncMark"
+        elif coin_name == "UpdateCoin":
+                mark.name = "UpdateMark"
         var center := CenterContainer.new()
         center.name = "Mark"
         center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -340,7 +373,7 @@ func _pill(title: String, key: String) -> Control:
         var pill := PanelContainer.new()
         pill.name = title
         pill.custom_minimum_size = Vector2(104, 74)
-        pill.add_theme_stylebox_override("panel", ThemeScript.soft_stylebox(_pill_bg(key)))
+        pill.add_theme_stylebox_override("panel", ThemeScript.pill_stylebox(_pill_bg(key), _pill_fg(key)))
         var box := VBoxContainer.new()
         box.name = "Box"
         box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -381,17 +414,27 @@ func _pill_fg(key: String) -> Color:
 
 ## The sync coin's state in words, under the day's button: a tooltip says
 ## it to a mouse, but a fingertip has no hover to carry one, so the line
-## stands on the page itself -- quiet, small, and there for whichever kind
-## of hand asks.
+## stands on the page itself -- a dot of the state's own tone, the words
+## beside it, quiet, small, and there for whichever kind of hand asks.
 func _sync_line() -> Control:
+        var row := HBoxContainer.new()
+        row.name = "SyncLine"
+        row.alignment = BoxContainer.ALIGNMENT_CENTER
+        row.add_theme_constant_override("separation", 8)
+        row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        var dot := ThemeScript.StatusDot.new(ThemeScript.INK_SOFT)
+        dot.name = "Dot"
+        dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+        row.add_child(dot)
         var line := Label.new()
-        line.name = "SyncLine"
+        line.name = "Text"
         line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         ThemeScript.dress(line, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
         line.text = ""
-        return line
+        row.add_child(line)
+        return row
 
 func _study_button() -> Control:
         var button := ThemeScript.primary_button("Study", 60)
@@ -405,32 +448,30 @@ func refresh(counts: Dictionary) -> void:
         _apply_counts(counts)
 
 ## A browser session can outlive the version it is running. When the engine
-## reports a newer one waiting outside, Home offers it here -- under the day's
-## own button, never inside a study session -- as one quiet line and the way
-## to take it. The page does the swapping; the button only asks.
-func offer_update(on_update: Callable) -> void:
+## reports a newer one waiting outside, Home offers it twice over: a gold
+## coin in the corner beside its kin, breathing until it is taken, and a
+## quiet line under the day's own button that says what the coin is for --
+## never inside a study session. The page does the swapping; the buttons
+## only ask.
+func offer_update() -> void:
+        var coin := get_node_or_null("UpdateCoin")
+        if coin != null:
+                coin.visible = true
+                (coin.get_node("Mark/UpdateMark") as ThemeScript.UpdateMark).set_waiting(true)
         if get_node_or_null("Margin/Column/Update") != null:
                 return
         var column: VBoxContainer = get_node("Margin/Column")
-        var row := VBoxContainer.new()
-        row.name = "Update"
-        row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-        row.add_theme_constant_override("separation", 8)
         var line := Label.new()
-        line.name = "Line"
-        line.text = "A new version is ready."
+        line.name = "Update"
+        line.text = "A new version is ready — the gold button up top installs it."
         line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        ThemeScript.dress(line, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
-        row.add_child(line)
-        var take := ThemeScript.ghost_button("Update", ThemeScript.GREEN_DEEP, 44)
-        take.name = "Take"
-        take.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-        take.pressed.connect(on_update)
-        row.add_child(take)
-        column.add_child(row)
-        # One arrival, one settle: the row fades in where it stands, the way
+        line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        ThemeScript.dress(line, ThemeScript.CAPTION, ThemeScript.GOLD_DEEP)
+        column.add_child(line)
+        # One arrival, one settle: the line fades in where it stands, the way
         # a container's own children arrive, never fighting the layout.
-        ThemeScript.settle_in(row, 0.12)
+        ThemeScript.settle_in(line, 0.12)
 
 ## Enter begins the day's study, the way Space reveals an answer: the home
 ## screen's one button is the whole screen, so the keyboard may press it

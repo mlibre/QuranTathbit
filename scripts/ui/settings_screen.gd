@@ -271,23 +271,42 @@ func _github_body() -> Control:
         buttons.add_child(disconnect)
 
         box.add_child(_field_label("Personal access token"))
-        var token_row := HBoxContainer.new()
-        token_row.name = "TokenRow"
-        token_row.add_theme_constant_override("separation", 8)
-        box.add_child(token_row)
+        # The field owns its whole row: a token is forty characters, and a
+        # thumb needs the field's full width to find its place in it. The
+        # things a hand does with the field stand under it, as three equal
+        # doors -- paste, check, keep -- because in a browser canvas there is
+        # no long-press menu and no Ctrl+V worth the name, and pasting a
+        # token by typing it is not pasting.
         var token := LineEdit.new()
         token.name = "Token"
         token.placeholder_text = ("Paste the token GitHub shows you" if OS.has_feature("web") else "…or paste a repo token")
         token.secret = true
         token.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        token.custom_minimum_size = Vector2(0, 44)
+        token.custom_minimum_size = Vector2(0, 48)
         token.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
         token.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
         _style_field(token)
-        token_row.add_child(token)
+        token.text_submitted.connect(func(_text: String) -> void: _save_token())
+        box.add_child(token)
+        var token_row := HBoxContainer.new()
+        token_row.name = "TokenRow"
+        token_row.add_theme_constant_override("separation", 8)
+        box.add_child(token_row)
+        var paste := ThemeScript.ghost_button("Paste", ThemeScript.GREEN, 44, 12)
+        paste.name = "PasteToken"
+        paste.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        paste.tooltip_text = "Paste from the clipboard"
+        paste.pressed.connect(_paste_token)
+        token_row.add_child(paste)
+        var show := ThemeScript.ghost_button("Show", ThemeScript.INK_SOFT, 44, 12)
+        show.name = "ShowToken"
+        show.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        show.tooltip_text = "Show or hide what was typed"
+        show.pressed.connect(_toggle_token_shown)
+        token_row.add_child(show)
         var save_token := ThemeScript.ghost_button("Save", ThemeScript.GREEN, 44, 12)
         save_token.name = "SaveToken"
-        save_token.custom_minimum_size = Vector2(88, 44)
+        save_token.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         save_token.pressed.connect(_save_token)
         token_row.add_child(save_token)
         var token_hint := _text(
@@ -316,6 +335,26 @@ func _github_body() -> Control:
         )
         repo_hint.name = "RepoHint"
         box.add_child(repo_hint)
+        repo.focus_exited.connect(func() -> void: _save_repo(repo.text))
+
+        # The quiet promise, said plainly and changeable: after each session
+        # the deck tells GitHub on its own. A hand that would rather ask
+        # every time can switch that off here.
+        var auto_row := HBoxContainer.new()
+        auto_row.name = "AutoRow"
+        auto_row.add_theme_constant_override("separation", 10)
+        var auto_label := _text("Sync quietly after each session", ThemeScript.INK, ThemeScript.CAPTION)
+        auto_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        auto_row.add_child(auto_label)
+        var auto := CheckButton.new()
+        auto.name = "AutoSync"
+        auto.tooltip_text = "Sync on its own after each session, and when the app opens"
+        auto.toggled.connect(func(on: bool) -> void:
+                _settings.auto_sync = on
+                _settings.save()
+        )
+        auto_row.add_child(auto)
+        box.add_child(auto_row)
 
         var sync := ThemeScript.primary_button("Sync now", 46)
         sync.name = "Sync"
@@ -426,7 +465,12 @@ func _refresh() -> void:
         var connect: Button = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Buttons/Connect")
         var disconnect: Button = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Buttons/Disconnect")
         var repo: LineEdit = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Repo")
+        var auto: CheckButton = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/AutoRow/AutoSync")
         repo.text = _settings.repo
+        # No signal: this is the settings being said, not the settings being
+        # changed -- a refresh that toggled its own switch would overwrite
+        # the file it is only reading.
+        auto.set_pressed_no_signal(_settings.auto_sync)
         if _settings.has_token() and not _settings.owner.is_empty():
                 state.text = "Connected as @%s" % _settings.owner
         elif _settings.has_token():
@@ -526,12 +570,12 @@ func _begin_web_connect() -> void:
         hint.text = (
                 "1. Press the button — GitHub opens with the form filled in: the name and the repo permission are already set.\n"
                 + "2. Generate the token, then copy the string it shows you.\n"
-                + "3. Paste it below and press Save."
+                + "3. Come back here, press Paste, then Save."
         )
         open.text = "Create a token on GitHub"
         _flow_uri = "https://github.com/settings/tokens/new?scopes=repo&description=QuranTathbit%20sync"
         flow.visible = true
-        get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/TokenRow/Token").grab_focus()
+        get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Token").grab_focus()
 
 func _finish(token: String) -> void:
         var who: Dictionary = await _auth.whoami(_http, token)
@@ -553,7 +597,7 @@ func _finish(token: String) -> void:
         account_changed.emit()
 
 func _save_token() -> void:
-        var token: LineEdit = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/TokenRow/Token")
+        var token: LineEdit = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Token")
         if token.text.strip_edges().is_empty():
                 return
         var value := token.text.strip_edges()
@@ -568,6 +612,88 @@ func _save_token() -> void:
         token.text = ""
         _refresh()
         account_changed.emit()
+
+
+# --- the clipboard, both of its worlds ------------------------------------------
+
+## One field, two worlds: on a desktop the clipboard is the engine's to read;
+## in a browser the page owns it, and only the page's own JavaScript can
+## ask. The button works in both because the hand that presses it should
+## not have to know which world it is in.
+func _paste_token() -> void:
+        var field := _token_field()
+        if OS.has_feature("web"):
+                await _paste_from_page(field)
+                return
+        var clip := DisplayServer.clipboard_get().strip_edges()
+        if clip.is_empty():
+                _token_note("Nothing on the clipboard. Copy the token first, then press Paste.")
+                return
+        field.text = clip
+        field.caret_column = clip.length()
+        field.grab_focus()
+
+
+## The browser's clipboard answers a promise, and eval cannot wait for one:
+## the page is asked to write the answer into a corner of the document
+## itself, and the field watches that corner until it changes -- the same
+## hand-off the page and the engine use for everything else.
+func _paste_from_page(field: LineEdit) -> void:
+        var bridge: Object = Engine.get_singleton("JavaScriptBridge")
+        if bridge == null:
+                _token_note("This build cannot read the clipboard — type the token instead.")
+                return
+        var ask := (
+                "(function(){var d=document.documentElement;"
+                + "d.setAttribute('data-qt-clipboard','asked');"
+                + "if(navigator.clipboard&&navigator.clipboard.readText){"
+                + "navigator.clipboard.readText().then(function(t){"
+                + "d.setAttribute('data-qt-clipboard','ok:'+(t||''))"
+                + "},function(){d.setAttribute('data-qt-clipboard','no')})"
+                + "}else{d.setAttribute('data-qt-clipboard','no')}})()"
+        )
+        bridge.call("eval", ask)
+        # Up to three seconds of watching: the browser may be waiting for the
+        # person to allow the read, and that is a conversation, not a lag.
+        for i in 30:
+                await get_tree().create_timer(0.1).timeout
+                var answer := str(bridge.call(
+                        "eval",
+                        "document.documentElement.getAttribute('data-qt-clipboard')||''"
+                ))
+                if answer == "asked":
+                        continue
+                if answer.begins_with("ok:"):
+                        var clip := answer.substr(3).strip_edges()
+                        if clip.is_empty():
+                                _token_note("The clipboard is empty. Copy the token on GitHub, then press Paste.")
+                                return
+                        field.text = clip
+                        field.caret_column = clip.length()
+                        field.grab_focus()
+                        return
+                _token_note("This browser would not share its clipboard. Copy the token, tap the field, and use your keyboard's paste.")
+                return
+        _token_note("The clipboard did not answer. Press Paste again.")
+
+
+## A secret field keeps neither typos nor pastes visible; a hand that wants
+## to see what arrived before it commits may, and the button says which way
+## it stands.
+func _toggle_token_shown() -> void:
+        var field := _token_field()
+        field.secret = not field.secret
+        var show: Button = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/TokenRow/ShowToken")
+        show.text = "Hide" if not field.secret else "Show"
+
+
+func _token_field() -> LineEdit:
+        return get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Token")
+
+
+func _token_note(what: String) -> void:
+        var state: RichTextLabel = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State")
+        state.text = what
 
 func _save_repo(text: String) -> void:
         var value := text.strip_edges()

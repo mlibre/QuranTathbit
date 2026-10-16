@@ -27,6 +27,9 @@ var _auth: GitHubAuthScript
 var _sync: GitHubSyncScript
 var _screen: Control
 var _update_waiting := false  # a newer web version was announced; Home owes the user the offer
+var _syncing := false  # one sync at a time; a second press is a question, not a demand
+var _answers_waiting := 0  # answers given since the repo last heard from this deck
+var _sync_failed := false  # the last sync could not finish; the deck is honest about it
 
 
 func _ready() -> void:
@@ -46,6 +49,12 @@ func _ready() -> void:
 
         _watch_updates()
         _go_home()
+        # A deck that is already connected says hello on its own, quietly: a
+        # sync that finds nothing to do is three small questions and a green
+        # line, and the user never again opens the app to a status that
+        # pretends nothing has happened since yesterday.
+        if _settings.has_token() and _settings.auto_sync:
+                get_tree().create_timer(1.2).timeout.connect(func() -> void: _run_sync(true))
         # The one line the release workflow's smoke test looks for: the deck is
         # installed, loaded, and the first screen is standing.
         print("QURAN_TATHBIT_BOOT_OK")
@@ -100,8 +109,9 @@ func _go_home() -> void:
         home.study_pressed.connect(_start_session)
         home.sync_pressed.connect(_on_sync_pressed)
         home.settings_pressed.connect(_on_settings_pressed)
+        home.update_pressed.connect(_apply_update)
         if _update_waiting:
-                home.offer_update(_apply_update)
+                home.offer_update()
 
 
 func _start_session() -> void:
@@ -115,12 +125,23 @@ func _start_session() -> void:
         _swap(study)
         study.start(cards)
         study.answered.connect(_on_answered)
-        study.closed.connect(_go_home)
+        study.closed.connect(_on_session_closed)
+
+
+## A session's answers are the one thing this app makes that another device
+## wants; when the session closes, the deck says so to GitHub on its own --
+## quietly, under the page it returns to -- so "synced" is never a thing
+## the user has to remember to ask for.
+func _on_session_closed() -> void:
+        _go_home()
+        if _settings.has_token() and _settings.auto_sync and _answers_waiting > 0:
+                _run_sync(true)
 
 
 func _on_answered(card: CardScript, button: String) -> void:
         _deck.answer(card, button, _now())
         _deck.save_progress()
+        _answers_waiting += 1
 
 
 func _on_settings_pressed() -> void:
@@ -149,26 +170,43 @@ func _on_sync_pressed() -> void:
         if not _settings.has_token():
                 _on_settings_pressed()
                 return
-        await _run_sync()
+        _run_sync()
 
 
-## Sync, with its own quiet screen while it works: a phase in plain words, a
-## bar that knows how far along it is, and the promise that the deck is safe
-## on this machine whatever the network does. The app stays usable when it
-## fails -- the deck is local first, always.
-func _run_sync() -> void:
-        var overlay := SyncOverlayScript.new()
-        overlay.name = "SyncOverlay"
-        add_child(overlay)
-        var result: Dictionary = await _sync.sync(USER_DECK, overlay.report)
-        overlay.finish(bool(result.get("ok", false)))
-        await get_tree().create_timer(0.6).timeout
-        overlay.queue_free()
+## Sync, with its own quiet screen while it works when the hand asked for
+## it, and with only the turning coin when the app asked for itself: a
+## phase in plain words, a bar that knows how far along it is, and the
+## promise that the deck is safe on this machine whatever the network
+## does. The app stays usable when it fails -- the deck is local first,
+## always.
+func _run_sync(quiet := false) -> void:
+        if _syncing:
+                return
+        _syncing = true
+        if _screen is HomeScript:
+                (_screen as HomeScript).set_syncing()
+        var overlay: Control = null
+        if not quiet:
+                overlay = SyncOverlayScript.new()
+                overlay.name = "SyncOverlay"
+                add_child(overlay)
+        var result: Dictionary = await _sync.sync(
+                USER_DECK, overlay.report if overlay != null else Callable()
+        )
+        if overlay != null:
+                overlay.finish(bool(result.get("ok", false)))
+                await get_tree().create_timer(0.6).timeout
+                overlay.queue_free()
+        _syncing = false
         # Only a finished sync may move the "last synced" clock: a failed run
         # must leave the app honest about when it last heard from the repo.
         if bool(result.get("ok", false)):
                 _settings.last_sync = _now()
                 _settings.save()
+                _answers_waiting = 0
+                _sync_failed = false
+        else:
+                _sync_failed = true
 
         # Progress may have merged in from another device; read the deck back.
         var reloaded: DeckScript = DeckScript.load(USER_DECK)
@@ -179,19 +217,20 @@ func _run_sync() -> void:
         var line := ""
         if bool(result.get("ok", false)):
                 if int(result.get("pushed", 0)) + int(result.get("pulled", 0)) + int(result.get("merged", 0)) == 0:
-                        line = "Everything already in step — synced just now"
+                        line = "Everything in step — synced just now"
                 else:
-                        line = "Synced just now · %d pushed, %d pulled, %d merged" % [
+                        line = "Synced just now · %d sent, %d fetched, %d merged" % [
                                 result.get("pushed", 0), result.get("pulled", 0), result.get("merged", 0)
                         ]
         else:
-                line = "Sync could not finish (%s). Your cards are safe here." % str(result.get("error", "?"))
+                line = "Sync could not finish — your cards are safe here. Try again."
         if _screen is HomeScript:
-                var home: HomeScript = _screen
-                home.setup(_deck, SchedulerScript.counts(_deck, _now()), line, _sync_state())
+                _refresh_home()
         elif _screen is SettingsScreenScript:
                 var screen: SettingsScreenScript = _screen
                 screen.note_sync_result(line)
+                # The settings screen keeps its own account of the moment; the
+                # home line recomputes when the user goes back to it.
 
 
 ## Home is told the same five things every time it is refreshed -- from its
@@ -207,19 +246,41 @@ func _refresh_home() -> void:
 func _sync_line() -> String:
         if not _settings.has_token():
                 return "Not connected — your deck lives on this device only"
+        if _syncing:
+                return "Syncing…"
+        var waiting := _pending_answers()
+        if waiting > 0:
+                return "%d %s waiting to sync" % [waiting, "answer" if waiting == 1 else "answers"]
         if _settings.last_sync > 0:
                 return "Last synced %s" % _ago(_now() - _settings.last_sync)
         return "Connected — not synced yet"
 
 
-## Which of the three states the home dot is in: agreed with the repo at
-## least once, connected but never yet taken there, or not connected at all.
+## Which of the coin's states the page is in: not connected at all; agreed
+## with the repo at least once; connected but never yet taken there;
+## holding work the repo has not seen; or the last attempt could not
+## finish.
 func _sync_state() -> String:
         if not _settings.has_token():
                 return "off"
+        if _syncing:
+                return "syncing"
+        if _pending_answers() > 0:
+                return "pending"
+        if _sync_failed:
+                return "error"
         if _settings.last_sync > 0:
                 return "synced"
         return "pending"
+
+
+## Answers the repo has not seen: the ones this session gave, or the ones a
+## previous session left behind when its sync could not finish -- read from
+## the same baseline the sync engine keeps, without touching the network.
+func _pending_answers() -> int:
+        if _answers_waiting > 0:
+                return _answers_waiting
+        return 1 if GitHubSyncScript.progress_dirty(USER_DECK) else 0
 
 
 static func _ago(seconds: int) -> String:
@@ -269,7 +330,7 @@ func _on_pwa_update_available() -> void:
         _update_waiting = true
         if _screen is HomeScript:
                 var home: HomeScript = _screen
-                home.offer_update(_apply_update)
+                home.offer_update()
 
 
 ## The page's bridge to the engine, read at runtime rather than by name: on

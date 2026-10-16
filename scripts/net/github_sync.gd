@@ -112,18 +112,24 @@ func sync(deck_path: String, on_progress: Callable = Callable()) -> Dictionary:
         var plan := _plan(local, remote, manifest, carry_media)
 
         # Pulls are rare and small: each is one file this deck has never changed.
+        # They fly six at a time, the way uploads do -- a first sync onto a new
+        # device is a hundred files, and one round trip apiece is a hundred
+        # waits for the same network.
         var pulls: Array = plan.filter(func(step: Dictionary) -> bool: return str(step.action) == "pull")
         var pulled := 0
         var failed: Array = []
-        var index := 0
         _report(on_progress, "downloading", 0, pulls.size())
-        for step in pulls:
-                index += 1
-                if await _pull_file(deck_path, str(step.path)):
-                        pulled += 1
-                else:
-                        failed.append(str(step.path))
-                _report(on_progress, "downloading", index, pulls.size())
+        for start in range(0, pulls.size(), BLOB_WIDTH):
+                var flight: Array = []
+                for step in pulls.slice(start, start + BLOB_WIDTH):
+                        flight.append(str(step.path))
+                var responses: Array = await _fetch_files(flight)
+                for i in flight.size():
+                        if _write_pulled(deck_path, str(flight[i]), responses[i]):
+                                pulled += 1
+                        else:
+                                failed.append(str(flight[i]))
+                _report(on_progress, "downloading", minf(start + BLOB_WIDTH, pulls.size()), pulls.size())
 
         # progress.json is merged card by card, never bulk-overwritten, and the
         # merged file rides the same commit as everything else being sent.
@@ -295,14 +301,27 @@ func _head_sha() -> String:
                 return ""
         return str(((head.body_json as Dictionary).get("object", {}) as Dictionary).get("sha", ""))
 
-func _pull_file(deck_path: String, path: String) -> bool:
+## Fetch many files at once: one batch, as many answers, in the same order.
+func _fetch_files(paths: Array) -> Array:
+        var batch: Array = []
+        for path in paths:
+                var headers := _auth_headers()
+                headers["Accept"] = RAW
+                batch.append({
+                        "method": "GET",
+                        "url": API + "/repos/%s/%s/contents/%s" % [owner, repo, _encode_path(str(path))],
+                        "headers": headers,
+                        "body": PackedByteArray(),
+                })
+        return await _request_many(batch)
+
+## One fetched file, written home: inside the deck, nowhere else, with its
+## folders made if the file is new to this machine.
+func _write_pulled(deck_path: String, path: String, response: Dictionary) -> bool:
         var target := deck_path.path_join(path)
         if not _is_safe_target(deck_path, target):
                 push_error("GitHubSync: refusing to write outside the deck: %s" % path)
                 return false
-        var response: Dictionary = await _get_raw(
-                "/repos/%s/%s/contents/%s" % [owner, repo, _encode_path(path)]
-        )
         if int(response.get("code", 0)) != 200:
                 push_error("GitHubSync: pull %s failed (%d)" % [path, int(response.get("code", 0))])
                 return false
@@ -420,8 +439,14 @@ static func _commit_message(sends: Array, deletes: Array) -> String:
 ## bytes the repo last saw.
 func _merge_progress(deck_path: String, remote: Dictionary, manifest: Dictionary) -> Dictionary:
         var local_path := deck_path.path_join("progress.json")
-        var mine := _read_progress(local_path)
         var remote_sha := str(remote.get("progress.json", ""))
+        var baseline := str(manifest.get("progress.json", ""))
+        # Both sides exactly as the last sync left them: there is nothing to
+        # merge and nothing to send, and no reason to fetch the file at all.
+        # Downloading it anyway made every sync look like a full round trip.
+        if not remote_sha.is_empty() and remote_sha == baseline and not _progress_needs_push(local_path, manifest):
+                return {"merged": 0, "changed": false}
+        var mine := _read_progress(local_path)
         var theirs: Dictionary = {}
         if not remote_sha.is_empty():
                 var fetched: Dictionary = await _get_raw(
@@ -445,7 +470,10 @@ func _merge_progress(deck_path: String, remote: Dictionary, manifest: Dictionary
                 var file := FileAccess.open(local_path, FileAccess.WRITE)
                 if file == null:
                         return {"merged": 0, "changed": false, "error": "progress_write_failed"}
-                file.store_string(JSON.stringify({"format": DeckScript.FORMAT, "cards": mine}, "\t") + "\n")
+                var clean := {}
+                for card_id in mine.keys():
+                        clean[card_id] = DeckScript.canonical_state(mine[card_id])
+                file.store_string(JSON.stringify({"format": DeckScript.FORMAT, "cards": clean}, "\t") + "\n")
                 file.close()
         return {"merged": merged, "changed": true}
 
@@ -534,6 +562,12 @@ func _tree_shas(tree_json: Variant) -> Dictionary:
         return out
 
 func _load_manifest() -> Dictionary:
+        return manifest_for(_deck_path)
+
+## The last-synced checksums of one deck, read without running a sync: Home
+## asks "does anything wait?" and the answer is the record the last sync
+## left behind -- one small file, no network.
+static func manifest_for(deck_path: String) -> Dictionary:
         if not FileAccess.file_exists(MANIFEST):
                 return {}
         var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(MANIFEST))
@@ -542,10 +576,22 @@ func _load_manifest() -> Dictionary:
         # One manifest per deck folder: two folders syncing one repo must not
         # mistake each other's files for already-synced ones.
         var decks: Dictionary = (data as Dictionary).get("decks", {})
-        var mine: Variant = decks.get(_deck_key(), {})
+        var mine: Variant = decks.get(deck_path.simplify_path(), {})
         if typeof(mine) == TYPE_DICTIONARY:
                 return mine as Dictionary
         return {}
+
+## Does this deck hold study the repo has not seen? The progress file
+## differs from the bytes the last sync left behind. A deck that has never
+## synced is not waiting -- it has not begun.
+static func progress_dirty(deck_path: String) -> bool:
+        var path := deck_path.path_join("progress.json")
+        if not FileAccess.file_exists(path):
+                return false
+        var baseline := str(manifest_for(deck_path).get("progress.json", ""))
+        if baseline.is_empty():
+                return false
+        return _blob_sha(FileAccess.get_file_as_bytes(path)) != baseline
 
 func _save_manifest(files: Dictionary) -> void:
         var data := {}

@@ -17,6 +17,7 @@ func _init() -> void:
         _write_deck()
         _test_load()
         _test_progress_round_trip()
+        _test_progress_bytes_are_stable()
         _test_broken_progress()
         _test_script_classification()
         _teardown()
@@ -89,6 +90,25 @@ func _test_progress_round_trip() -> void:
         # Untouched cards stay out of the file entirely.
         var raw := FileAccess.get_file_as_string(ROOT.path_join("progress.json"))
         _ok(not raw.contains("\"002\""), "untouched cards are not written to progress.json")
+
+## A progress file that changes its own bytes between one save and the
+## next -- with no study in between -- is a file that cannot be compared,
+## and sync compares bytes: JSON reads every int back as a float, so a
+## reload-and-save used to rewrite "reps": 1 as "reps": 1.0 and announce
+## a change that was only formatting. The deck writes whole floats back
+## as the ints they were; save, load, save again: identical bytes.
+func _test_progress_bytes_are_stable() -> void:
+        var deck: DeckScript = DeckScript.load(ROOT)
+        deck.answer(deck.cards[0], "good", 1792000100)
+        _ok(deck.save_progress(), "progress saves")
+        var first := FileAccess.get_file_as_bytes(ROOT.path_join("progress.json"))
+        var reloaded: DeckScript = DeckScript.load(ROOT)
+        _ok(reloaded.save_progress(), "progress saves again after a reload")
+        var second := FileAccess.get_file_as_bytes(ROOT.path_join("progress.json"))
+        _is(second, first, "progress bytes do not change on a reload without study")
+        var raw := FileAccess.get_file_as_string(ROOT.path_join("progress.json"))
+        _ok(not raw.contains(".0"), "whole numbers are written as ints, never as floats")
+        _ok(raw.contains("\"ease\": 2.5"), "a true fraction keeps its decimals")
 
 func _test_broken_progress() -> void:
         _write(ROOT.path_join("progress.json"), "{ not json at all")

@@ -30,8 +30,9 @@ the app invites, it never pushes, and cards you miss simply wait.
 Nothing to install, nothing to sign up for. Each recitation streams on
 demand, and the app caches itself — after the first visit it opens instantly
 and works offline, on any modern browser: desktop, tablet, or phone. A tab
-or installed app left open hears about a new version on its own and quietly
-offers **Update** — no refresh needed.
+or installed app left open hears about a new version on its own: a gold
+button appears beside the others in the corner, and taking it swaps the page
+in place — no refresh needed.
 
 Want it on your home screen like any other app? Your browser's menu offers
 **Install app** (Chrome, Edge) or **Add to Home Screen** (Safari, any
@@ -39,8 +40,10 @@ phone): it then opens full-screen and offline, with its own icon — no store,
 no tab, no browser bars.
 
 > In a browser you sign in with a one-minute token: press **Connect GitHub**
-> and the app walks you through it. On desktop and Android the full
-> device-code sign-in works.
+> and the app walks you through it — and when it comes time to paste the
+> token, the **Paste** button reads the clipboard for you, because a canvas
+> has no long-press menu. On desktop and Android the full device-code
+> sign-in works.
 
 ## ⬇️ Download it for your computer
 
@@ -87,9 +90,13 @@ On **Settings → Connect GitHub** the app shows a short code; you type it at
 private repository named `quran-tathbit` (renameable) and pushes the deck
 there. After that, every sync is a three-way merge: what changed only here is
 pushed, what changed only there is pulled, and what changed on both sides
-keeps your local edit (for cards) or merges card by card (for progress). A
-small overlay with a progress bar covers the screen while it runs — a slow
-first sync never looks frozen.
+keeps your local edit (for cards) or merges card by card (for progress).
+
+Sync is quiet and it is cheap. It runs on its own after each session — the
+status line under the day's button says what it is doing, and it can be
+switched off in Settings — and a sync with nothing to say moves nothing at
+all: no file is re-sent, none is re-fetched, and a run that finds everything
+already in step is a handful of lookups, never a round trip.
 
 ## Keyboard shortcuts
 

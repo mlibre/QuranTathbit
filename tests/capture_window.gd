@@ -114,13 +114,18 @@ func _check_touch_reach(home: Control) -> void:
         var study: Control = home.get_node("Margin/Column/Study")
         _ok(window.grow(1.0).encloses(study.get_global_rect()),
                 "the study button is inside the window (%s in %s)" % [study.get_global_rect(), window])
-        for coin_name in ["SyncCoin", "SettingsCorner"]:
+        for coin_name in ["SyncCoin", "SettingsCorner", "UpdateCoin"]:
                 var coin: Button = home.get_node(coin_name)
                 _ok(window.encloses(coin.get_global_rect()),
                         "the %s coin is inside the window (%s)" % [coin_name, coin.get_global_rect()])
+                if not coin.visible:
+                        continue  # the update coin sleeps until a version waits
                 var at := coin.get_global_rect().get_center()
                 _ok(_top_at(home, at) == coin,
                         "the %s coin is on top of everything at its own centre" % coin_name)
+        var sync_text: Label = home.get_node_or_null("Margin/Column/SyncLine/Text")
+        _ok(sync_text != null and sync_text.text.length() > 0,
+                "the sync state says itself on the page, not only in a tooltip")
 
 ## The card never asks a window for more room than it has.
 func _check_card_fits() -> void:

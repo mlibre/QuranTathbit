@@ -15,10 +15,10 @@ godot --headless --path . --script tests/regression_<name>.gd   # one suite
 | suite                  | what it holds the app to                                              |
 | --- | --- |
 | `regression_scheduler` | Anki's SM-2 with Anki's numbers: interval bands, fuzz bounds, step delays, lapse/relearn round trips, ease moves, queue caps |
-| `regression_deck`      | the deck as folders and files: load, card discovery, media resolution, progress round-trip, repair of a hand-corrupted `progress.json` |
-| `regression_sync`      | sync against a fake GitHub: first push, second device, local-edit-wins, progress merge by card, single-commit batches, ref-conflict retry, foreign files untouched, editor metadata never travelling, web builds skipping media |
+| `regression_deck`      | the deck as folders and files: load, card discovery, media resolution, progress round-trip, byte-stable saves (an int never re-saves as a float), repair of a hand-corrupted `progress.json` |
+| `regression_sync`      | sync against a fake GitHub: first push, second device, local-edit-wins, progress merge by card, single-commit batches, ref-conflict retry, foreign files untouched, editor metadata never travelling, web builds skipping media — and a quiet sync that asks for nothing: no upload, no tree, no commit, not even a file download, while both sides match the last sync's record |
 | `regression_markdown`  | the card markdown subset, and the Arabic/Persian/Latin script detection that dresses each block |
-| `regression_boot`      | a cold first run: the bundled deck installs itself, home shows the real numbers, a session renders a real card, settings opens and returns |
+| `regression_boot`      | a cold first run: the bundled deck installs itself, home shows the real numbers, a session renders a real card, settings opens (token field, Paste/Show/Save all standing) and returns — and the settings file survives its own handwriting: JSON's floats read back as the ints they were saved as |
 
 ## Why the battery runs twice
 
@@ -54,6 +54,22 @@ reads the tree back — no editor metadata riding along — then runs a quiet
 second sync that moves nothing; `QURAN_TATHBIT_LIVE_CLEANUP=1` deletes the
 scratch repo at the end. Tokens are read from the environment and never
 written anywhere.
+
+The browser's own clipboard is not reachable headlessly, so the token
+Paste button is proven on a served web build instead:
+
+```bash
+bash tools/test_web_paste.sh       # boot, open settings, paste, show, save
+```
+
+It serves `builds/web`, boots the app at a phone viewport, opens Settings
+with a canvas click, overrides the page clipboard with a known token, and
+presses Paste — the button's whole hand-off with the page (eval cannot
+await a promise, so the page writes the answer into a document attribute
+the app polls) is confirmed by the attribute ending in exactly the token
+that was set. Show then reveals the field for a screenshot, and Save with
+the fake token is confirmed to answer honestly ("that token did not work")
+against GitHub's real servers.
 
 ## Adding a suite
 

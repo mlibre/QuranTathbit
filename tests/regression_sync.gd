@@ -24,6 +24,7 @@ func _init() -> void:
         await _test_progress_merges()
         await _test_local_progress_pushes()
         await _test_quiet_sync_transfers_nothing()
+        await _test_quiet_sync_asks_for_nothing()
         await _test_failed_push_retries()
         await _test_ref_conflict_retries()
         await _test_foreign_files_are_left_alone()
@@ -58,6 +59,10 @@ class FakeGitHub:
         var commits := 0
         var fail_blobs := false  # every blob POST answers 500
         var ref_conflicts := 0  # the first ref updates answer 409
+        var blob_posts := 0  # uploads, even the ones that fail
+        var tree_posts := 0
+        var commit_posts := 0
+        var content_gets := 0  # file downloads, progress included
 
         func _init() -> void:
                 files["README.md"] = {"sha": _content_sha("hello".to_utf8_buffer()), "content": "hello".to_utf8_buffer()}
@@ -72,6 +77,7 @@ class FakeGitHub:
                 if method == "GET" and url.contains("/git/ref/heads/"):
                         return _json(200, {"object": {"sha": "head-%d" % commits}})
                 if method == "POST" and url.ends_with("/git/blobs"):
+                        blob_posts += 1
                         if fail_blobs:
                                 return _json(500, {})
                         var payload: Variant = JSON.parse_string(body.get_string_from_utf8())
@@ -82,8 +88,10 @@ class FakeGitHub:
                         blobs[sha] = content
                         return _json(201, {"sha": sha})
                 if method == "POST" and url.ends_with("/git/trees"):
+                        tree_posts += 1
                         return _make_tree(body)
                 if method == "POST" and url.ends_with("/git/commits"):
+                        commit_posts += 1
                         commits += 1
                         return _json(201, {"sha": "commit-%d" % commits})
                 if method == "PATCH" and url.contains("/git/refs/heads/"):
@@ -99,6 +107,7 @@ class FakeGitHub:
                 if method == "GET" and url.contains("/repos/") and path.is_empty():
                         return _json(200, {"default_branch": "main"})
                 if method == "GET" and not path.is_empty():
+                        content_gets += 1
                         if not files.has(path):
                                 return _json(404, {})
                         return _raw(200, files[path].content)
@@ -152,6 +161,16 @@ class FakeHttp:
 
         var request: Callable
         var request_json: Callable
+
+        ## The engine batches its downloads; the fake answers a batch as a
+        ## run of asks, in order, exactly what the batch promises.
+        func request_many(batch: Array) -> Array:
+                var out: Array = []
+                out.resize(batch.size())
+                for i in batch.size():
+                        var spec: Dictionary = batch[i]
+                        out[i] = request.call(str(spec["method"]), str(spec["url"]), spec["headers"], spec["body"])
+                return out
 
 # --- fixtures -------------------------------------------------------------------
 
@@ -311,6 +330,38 @@ func _test_quiet_sync_transfers_nothing() -> void:
         _is(quiet.pushed, 0, "a quiet sync pushes nothing (got %d)" % quiet.pushed)
         _is(quiet.pulled, 0, "a quiet sync pulls nothing (got %d)" % quiet.pulled)
         _is(fake.commits, commits_before, "a quiet sync commits nothing")
+
+## A quiet sync must not merely move nothing -- it must not even ask. The
+## remote progress file used to be fetched on every run even when both
+## sides matched the last sync's record of them, so every sync carried the
+## shape of a full round trip: a status check should cost a handful of
+## lookups, never a file.
+func _test_quiet_sync_asks_for_nothing() -> void:
+        _write_deck({"001": ["Q1", "A1"]})
+        var fake := FakeGitHub.new()
+        var sync := _make_sync(fake)
+        await sync.sync(DECK)
+        _write_progress({
+                "001": {"status": "review", "ivl": 4, "ease": 2.5, "reps": 3, "lapses": 0, "mod": 1000, "due_day": 100, "step": 0, "relearning": false, "due_ts": 0},
+        })
+        await sync.sync(DECK)  # the progress reaches the repo once
+        fake.blob_posts = 0
+        fake.tree_posts = 0
+        fake.commit_posts = 0
+        fake.content_gets = 0
+        var quiet: Dictionary = await sync.sync(DECK)
+        _ok(bool(quiet.get("ok", false)), "a quiet sync succeeds")
+        _is(fake.content_gets, 0, "a quiet sync fetches no file (got %d)" % fake.content_gets)
+        _is(fake.blob_posts, 0, "a quiet sync uploads no blob (got %d)" % fake.blob_posts)
+        _is(fake.tree_posts, 0, "a quiet sync posts no tree (got %d)" % fake.tree_posts)
+        _is(fake.commit_posts, 0, "a quiet sync commits nothing (got %d)" % fake.commit_posts)
+        # And the deck itself can answer the same question without the
+        # network at all: this is the line Home shows between syncs.
+        _ok(not SyncScript.progress_dirty(DECK), "a synced deck reports nothing waiting")
+        _write_progress({
+                "001": {"status": "review", "ivl": 8, "ease": 2.5, "reps": 4, "lapses": 0, "mod": 2000, "due_day": 100, "step": 0, "relearning": false, "due_ts": 0},
+        })
+        _ok(SyncScript.progress_dirty(DECK), "a studied deck reports answers waiting")
 
 func _test_failed_push_retries() -> void:
         _write_deck({"001": ["Q1", "A1"]})

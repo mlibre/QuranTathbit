@@ -125,7 +125,7 @@ func save_progress() -> bool:
                 var state: Dictionary = card.state
                 if state["status"] == "new" and int(state.get("reps", 0)) == 0:
                         continue  # untouched cards stay out of the file
-                entries[card.id] = state
+                entries[card.id] = canonical_state(state)
         var file := FileAccess.open(progress_path, FileAccess.WRITE)
         if file == null:
                 push_error("Deck.save_progress: cannot write %s (%s)" % [progress_path, error_string(FileAccess.get_open_error())])
@@ -134,6 +134,26 @@ func save_progress() -> bool:
         file.close()
         dirty = false
         return true
+
+
+## JSON reads every number back as a float, so a file saved, loaded and
+## saved again would rewrite "reps": 3 as "reps": 3.0 -- the same learning,
+## different bytes. Sync compares bytes, so the deck would announce a change
+## that is only formatting, again and again. Whole floats go back to ints
+## before anything is written; an ease of 2.5 stays exactly what it is.
+static func canonical_state(state: Dictionary) -> Dictionary:
+        var out := {}
+        for key in state.keys():
+                var value: Variant = state[key]
+                if (
+                        typeof(value) == TYPE_FLOAT
+                        and float(value) == roundf(float(value))
+                        and absf(float(value)) < 9007199254740992.0
+                ):
+                        out[key] = int(float(value))
+                else:
+                        out[key] = value
+        return out
 
 func answer(card: CardScript, button: String, now: int) -> void:
         card.state = SchedulerScript.apply(SchedulerScript.id_seed(card.id), card.state, button, now)

@@ -29,6 +29,7 @@ func _init() -> void:
         await _check_home_numbers(home)
         await _check_study_session(main)
         await _check_settings(main)
+        _check_settings_round_trip()
 
         if _failures > 0:
                 print("boot: %d FAILURE(S)" % _failures)
@@ -156,11 +157,49 @@ func _check_settings(main: Node) -> void:
         _ok(settings != null, "settings opens")
         if settings == null:
                 return
-        var state: RichTextLabel = settings.get_node("Margin/Scroll/Column/GitHub/Padding/Box/State")
-        _ok(state.text.length() > 0, "the GitHub section says where things stand")
+        # The path is walked with a guard, not a bare get_node: a stale path
+        # once errored silently here and the suite called the broken check a
+        # pass, because a runtime error aborts the function, not the run.
+        var state: RichTextLabel = settings.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State")
+        _ok(state != null, "the GitHub section stands where it is built")
+        if state != null:
+                _ok(state.text.length() > 0, "the GitHub section says where things stand")
+        var token: LineEdit = settings.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Token")
+        _ok(token != null, "the token field stands in its own row")
+        var paste: Button = settings.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/TokenRow/PasteToken")
+        _ok(paste != null, "the paste button stands under the token field")
+        var shown: Button = settings.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/TokenRow/ShowToken")
+        _ok(shown != null, "the show button stands beside it")
+        var saved: Button = settings.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/TokenRow/SaveToken")
+        _ok(saved != null, "the save button stands beside them")
         settings.closed.emit()
         await create_timer(0.4).timeout
         _ok(main.get_node_or_null("Home") != null, "closing settings returns home")
+
+## The app's own memory must survive its own handwriting: JSON writes
+## every number as a float, and a loader that compared types strictly
+## forgot the last sync forever -- the app said "not synced yet" on every
+## open, and said it again after every sync, forever, on every platform.
+func _check_settings_round_trip() -> void:
+        var script: GDScript = load("res://scripts/data/settings.gd")
+        var settings = script.new()
+        settings.token = "round-trip"
+        settings.last_sync = 1792000123
+        settings.setup_done = true
+        settings.auto_sync = false
+        _ok(settings.save(), "settings save")
+        var back = script.load_settings()
+        _is(back.token, "round-trip", "the token loads back")
+        _is(back.last_sync, 1792000123, "the last sync time survives its own reload")
+        _is(back.setup_done, true, "setup_done survives its own reload")
+        _is(back.auto_sync, false, "a switched-off auto sync stays off")
+        # A file written by any older version of the app carries its ints as
+        # floats; those must heal into the ints they were meant as.
+        var file := FileAccess.open("user://settings.json", FileAccess.WRITE)
+        file.store_string("{\"last_sync\": 1792000456.0, \"token\": \"x\", \"repo\": \"r\"}\n")
+        file.close()
+        var healed = script.load_settings()
+        _is(healed.last_sync, 1792000456, "a whole float reads back as the int it was saved as")
 
 func _remove_tree(path: String) -> void:
         if FileAccess.file_exists(path):
