@@ -170,13 +170,21 @@ class CheckMark extends Control:
 ## the corner it belongs to.
 class StatusDot extends Control:
         var color := INK_SOFT
+        var hollow := false
 
-        func _init(p_color: Color = INK_SOFT) -> void:
+        func _init(p_color: Color = INK_SOFT, p_hollow := false) -> void:
                 color = p_color
+                hollow = p_hollow
                 custom_minimum_size = Vector2(9, 9)
                 mouse_filter = Control.MOUSE_FILTER_IGNORE
 
         func _draw() -> void:
+                # A hollow ring is a thing not yet begun -- the shelf's "new"
+                # says itself as an empty circle, the way a reader's own
+                # margin notes are ringed, not filled.
+                if hollow:
+                        draw_arc(Vector2(4.5, 4.5), 3.4, 0.0, TAU, 24, color, 1.6, true)
+                        return
                 draw_circle(Vector2(4.5, 4.5), 4.0, color)
                 draw_circle(Vector2(4.5, 4.5), 4.0, Color(color.r, color.g, color.b, 0.22))
 
@@ -625,20 +633,27 @@ class OrnamentMark extends Control:
                         draw_polyline(points, GOLD_DEEP, 1.5, true)
 
 
-## A magnifier: the one mark every searching field in the world wears, drawn
-## here the way every other mark is -- a ring and its handle, at the weight
-## of the type beside it. No font in this app carries a lens.
-class SearchMark extends Control:
-        var color := INK_SOFT
+## A chapter's own mark: the eight-pointed star of the paper's lattice,
+## drawn small beside a surah's name -- the rosette a mushaf sets before
+## its surahs' titles, in miniature, gold and quiet.
+class StarMark extends Control:
+        var color := GOLD
 
-        func _init(p_color: Color = INK_SOFT) -> void:
+        func _init(p_color: Color = GOLD) -> void:
                 color = p_color
-                custom_minimum_size = Vector2(17, 17)
+                custom_minimum_size = Vector2(14, 14)
                 mouse_filter = Control.MOUSE_FILTER_IGNORE
 
         func _draw() -> void:
-                draw_arc(Vector2(7, 7), 5.0, 0.0, TAU, 28, color, 1.8, true)
-                draw_line(Vector2(10.8, 10.8), Vector2(15.2, 15.2), color, 2.0, true)
+                var c := size / 2.0
+                for turn in [0.0, PI / 8.0]:
+                        var points := PackedVector2Array()
+                        for i in 4:
+                                var ang: float = float(turn) + TAU * i / 4.0
+                                points.append(c + Vector2(cos(ang), sin(ang)) * 6.0)
+                        points.append(points[0])
+                        draw_polyline(points, color, 1.4, true)
+                draw_circle(c, 1.5, color)
 
 
 ## A still lattice of eight-pointed stars behind the page: the margin

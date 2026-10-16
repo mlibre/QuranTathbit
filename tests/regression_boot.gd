@@ -355,6 +355,21 @@ func _check_study_session(main: Node) -> void:
                                                         original + "\n",
                                                         "discarding writes nothing"
                                                 )
+                                # A page only opened and only closed is not an
+                                # edit: the card's files end with the newline
+                                # every text file carries, and the guard that
+                                # compares them must read both sides the same
+                                # way -- nothing was asked, nothing was kept.
+                                edit_coin.pressed.emit()
+                                await create_timer(0.3).timeout
+                                editor = study.get_node_or_null("Editor")
+                                if editor != null:
+                                        (editor.get_node("Margin/Column/TopBar/Back") as Button).pressed.emit()
+                                        await create_timer(0.25).timeout
+                                        _ok(
+                                                study.get_node_or_null("Editor") == null,
+                                                "closing an untouched page asks nothing"
+                                        )
                                 # The page's other way of standing: the card as its reader
                                 # will see it, both sides laid out whole.
                                 edit_coin.pressed.emit()
@@ -534,18 +549,23 @@ func _check_browse(main: Node) -> void:
                 await create_timer(0.3).timeout
                 return
         # The shelf's own scripture: the row's preview is the verse itself in
-        # the mushaf cut, at a size its vowels survive -- the one place the
-        # app drew Amiri's harakat small enough to misread.
+        # the mushaf cut, flush right the way the verse is read, at a size
+        # its vowels survive -- the one place the app drew Amiri's harakat
+        # small enough to misread.
         var preview: Label = first_entry.get_node_or_null("Row/Line/Words/Preview")
         if preview != null:
                 _is(
                         preview.get_theme_font_size("font_size"),
-                        22,
+                        26,
                         "the shelf's verse preview reads at the mushaf's size"
                 )
                 _ok(
                         str(preview.get_theme_font("font").resource_path).ends_with("AmiriQuran-Regular.ttf"),
                         "the shelf's preview wears the mushaf cut"
+                )
+                _ok(
+                        preview.horizontal_alignment == HORIZONTAL_ALIGNMENT_RIGHT,
+                        "the verse stands flush right, the edge it is read from"
                 )
         (first_entry.get_node("Row") as Button).pressed.emit()
         await create_timer(0.4).timeout

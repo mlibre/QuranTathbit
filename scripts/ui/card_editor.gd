@@ -379,9 +379,14 @@ func _follow_caret() -> void:
 # --- leaving, saving -------------------------------------------------------------------
 
 func _dirty() -> bool:
+        # The card's files carry the trailing newline every text file carries
+        # on disk; the field's words do not. Both sides are read the same way
+        # before they are compared, so a page that was only opened and only
+        # closed is not "edited" -- the guard is asked only when words truly
+        # moved.
         return (
-                _front.get_text().strip_edges() != _card.front
-                or _back.get_text().strip_edges() != _card.back
+                _front.get_text().strip_edges() != _card.front.strip_edges()
+                or _back.get_text().strip_edges() != _card.back.strip_edges()
         )
 
 func _request_close() -> void:
@@ -407,7 +412,7 @@ func _save() -> void:
         if front.is_empty() or back.is_empty():
                 _warn.text = "A card needs both a question and an answer."
                 return
-        if front == _card.front and back == _card.back:
+        if front == _card.front.strip_edges() and back == _card.back.strip_edges():
                 _close()
                 return
         if not _write(_card.folder.path_join("front.md"), front + "\n"):

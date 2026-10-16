@@ -82,14 +82,17 @@ width, two answer buttons to a row, every target a thumb tall:
 Every verse, translation and explanation is selectable — drag, or long-press
 on a touch screen — so you can paste any of it into your notes: the
 selection rests in the page's own gold, never a browser-blue slab. The deck
-is also a book: **Browse** under the day's button opens the whole library —
-every card as a page of scripture in miniature, the verse itself large in
-the mushaf typeface with its address above it, gathered under its surah's
-own running head with a quiet green rule of how far through it you are.
-The shelf answers its search field (the surah, the verse's own words, or
+is also a book: **Browse** under the day's button opens the whole library
+as an illuminated index — every verse set as ink directly on the paper,
+flush right in the mushaf typeface the way the verse itself is read, its
+address in gold and its standing sharing one quiet line beneath, a hairline
+between verses, and each surah opening with a small gold star, its name at
+a chapter's size, and a thin green thread of how far through it you are.
+The shelf answers its search line (the surah, the verse's own words, or
 its address — `2:93`, `۲:۹۳`, the hand's own digits both) and its filter
 pills (due today, not yet started, resting between reviews); a row opens in
-place to read and listen, and the ↑/↓ keys walk the shelf like a list.
+place to read and listen — the card laid out as a white page set on the
+shelf's paper — and the ↑/↓ keys walk the shelf like a list.
 
 The day's pace is yours, not the algorithm's. Anki's deck default offers 20
 new cards a day; **Settings → New cards each day** turns that number to your
