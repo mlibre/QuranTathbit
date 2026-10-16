@@ -73,7 +73,7 @@ func _init() -> void:
         await _shot("home_again")
         # The library: the deck as a book, a row opening its own page.
         main._on_browse_pressed()
-        await create_timer(0.9).timeout
+        await create_timer(1.4).timeout
         await _shot("browse")
         var browse: Control = main.get_node("Browse")
         var list: VBoxContainer = browse.get_node("Margin/Column/Scroll/Wrap/Column")

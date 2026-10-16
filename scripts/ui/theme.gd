@@ -625,6 +625,22 @@ class OrnamentMark extends Control:
                         draw_polyline(points, GOLD_DEEP, 1.5, true)
 
 
+## A magnifier: the one mark every searching field in the world wears, drawn
+## here the way every other mark is -- a ring and its handle, at the weight
+## of the type beside it. No font in this app carries a lens.
+class SearchMark extends Control:
+        var color := INK_SOFT
+
+        func _init(p_color: Color = INK_SOFT) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(17, 17)
+                mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+        func _draw() -> void:
+                draw_arc(Vector2(7, 7), 5.0, 0.0, TAU, 28, color, 1.8, true)
+                draw_line(Vector2(10.8, 10.8), Vector2(15.2, 15.2), color, 2.0, true)
+
+
 ## A still lattice of eight-pointed stars behind the page: the margin
 ## decoration of a reverent book, drawn once in gold at a whisper. It never
 ## moves and never competes -- cards and words sit on top of it.

@@ -70,8 +70,12 @@ width, two answer buttons to a row, every target a thumb tall:
    it went — **Again**, **Hard**, **Good**, **Easy** — each carrying its
    next interval as its biggest word, so the cost of each choice is
    visible up front. A typo noticed mid-study is fixed mid-study: the
-   pencil in the corner opens the card itself, saves to the very files the
-   deck is, and the next sync carries the edit to GitHub like any other.
+   pencil in the corner opens the card's own page: the words written the way
+   Arabic and Persian are read — every line flush right, the caret and the
+   chosen words following the hand — with a **Read** switch beside the
+   saving that lays the card out exactly as its reader will see it, both
+   sides. It saves to the very files the deck is, and the next sync carries
+   the edit to GitHub like any other.
 4. **Rest** — when the queue is empty, the app says so and tells you to come
    back tomorrow. Progress is saved automatically.
 
@@ -79,9 +83,13 @@ Every verse, translation and explanation is selectable — drag, or long-press
 on a touch screen — so you can paste any of it into your notes: the
 selection rests in the page's own gold, never a browser-blue slab. The deck
 is also a book: **Browse** under the day's button opens the whole library —
-every card under its surah's name, searchable by the surah, the verse's own
-words, or its address (`2:93`, `۲:۹۳` — the hand's own digits both), each
-card opening in place to read and listen.
+every card as a page of scripture in miniature, the verse itself large in
+the mushaf typeface with its address above it, gathered under its surah's
+own running head with a quiet green rule of how far through it you are.
+The shelf answers its search field (the surah, the verse's own words, or
+its address — `2:93`, `۲:۹۳`, the hand's own digits both) and its filter
+pills (due today, not yet started, resting between reviews); a row opens in
+place to read and listen, and the ↑/↓ keys walk the shelf like a list.
 
 The day's pace is yours, not the algorithm's. Anki's deck default offers 20
 new cards a day; **Settings → New cards each day** turns that number to your

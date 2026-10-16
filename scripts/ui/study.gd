@@ -688,7 +688,7 @@ func _open_editor() -> void:
                 return
         if get_node_or_null("Editor") != null:
                 return
-        var editor := CardEditorScript.new(_cards[_index])
+        var editor := CardEditorScript.new(_cards[_index], volume)
         editor.name = "Editor"
         add_child(editor)
         editor.saved.connect(_on_editor_saved)

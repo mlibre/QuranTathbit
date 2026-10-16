@@ -235,6 +235,8 @@ Before claiming a release is working, verify:
 - Release export launches on a clean target device.
 - No secrets, credentials, test-only data, or debug logging are shipped unintentionally.
 
+- `DisplayServer.get_display_safe_area()` reports the *screen* the window sits on. Under Xvfb a screen smaller than the project's window (a leftover `-screen 0 1200x320` probe display, say) turns into hundreds of pixels of phantom "system inset" for an app that honestly reads the safe area -- layouts that correctly ride above a phone's gesture bar get squeezed to a third of their height, and every screenshot taken on that display lies. Run capture Xvfb servers at exactly the window's size (`-screen 0 1280x800x24` for a 1280x800 window), and when a layout inexplicably collapses to its content minimum, print `top_inset()`/`bottom_inset()` and the safe area before blaming the containers: a MarginContainer fitting a child to (size - margins - insets) is doing exactly what it was told.
+
 ## Official sources
 
 - Performance: <https://docs.godotengine.org/en/4.7/tutorials/performance/index.html>

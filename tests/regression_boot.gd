@@ -286,20 +286,35 @@ func _check_study_session(main: Node) -> void:
                 var editor: Control = study.get_node_or_null("Editor")
                 _ok(editor != null, "the pencil opens the card's own page")
                 if editor != null:
-                        var fields: Array = []
-                        for child in editor.get_node("Centre/Panel/Pad/Column").get_children():
-                                if child is TextEdit:
-                                        fields.append(child)
-                        _is(fields.size(), 2, "the editor carries the question and the answer (got %d)" % fields.size())
-                        if fields.size() == 2:
-                                var front_field: TextEdit = fields[0]
-                                var back_field: TextEdit = fields[1]
+                        var front_field: Control = editor.get_node_or_null(
+                                "Margin/Column/Scroll/Wrap/Content/Write/Front"
+                        )
+                        var back_field: Control = editor.get_node_or_null(
+                                "Margin/Column/Scroll/Wrap/Content/Write/Back"
+                        )
+                        _ok(front_field != null and back_field != null, "the page carries the question and the answer")
+                        if front_field != null and back_field != null:
                                 var original: String = study._cards[0].front
-                                _is(front_field.text, original, "the editor opens with the card's own words")
-                                front_field.text = original + "\nedited on the spot"
-                                back_field.text = study._cards[0].back
-                                (editor.get_node("Centre/Panel/Pad/Column/Actions/Save") as Button).pressed.emit()
-                                await create_timer(0.3).timeout
+                                _is(front_field.get_text(), original, "the editor opens with the card's own words")
+                                # The page writes the way its words are read: the mirror's
+                                # lines stand flush right, and the input engine beneath them
+                                # resolves each line's own direction.
+                                var lines: VBoxContainer = front_field.get_node_or_null("Lines")
+                                _ok(lines != null and lines.get_child_count() >= 1, "the field lays its words out in lines")
+                                if lines != null and lines.get_child_count() > 0:
+                                        var mirror_line: RichTextLabel = lines.get_child(0)
+                                        _ok(
+                                                mirror_line.horizontal_alignment == HORIZONTAL_ALIGNMENT_RIGHT,
+                                                "the writing runs flush right, the way Arabic is read"
+                                        )
+                                var source: TextEdit = front_field.get_node_or_null("Source")
+                                _ok(
+                                        source != null and source.text_direction == Control.TEXT_DIRECTION_AUTO,
+                                        "the input engine reads each line's own direction"
+                                )
+                                front_field.set_text(original + "\nedited on the spot")
+                                (editor.get_node("Margin/Column/Footer/Actions/Save") as Button).pressed.emit()
+                                await create_timer(0.4).timeout
                                 _ok(study.get_node_or_null("Editor") == null, "saving closes the editor")
                                 _is(
                                         FileAccess.get_file_as_string("user://decks/quran/001/front.md"),
@@ -314,6 +329,48 @@ func _check_study_session(main: Node) -> void:
                                 restore.close()
                                 study._cards[0].front = original
                                 main._deck_edited = false
+                                # The page asks before it lets the work go: a dirty page
+                                # shows its guard, and discarding leaves the file untouched.
+                                edit_coin.pressed.emit()
+                                await create_timer(0.3).timeout
+                                editor = study.get_node_or_null("Editor")
+                                if editor != null:
+                                        front_field = editor.get_node_or_null(
+                                                "Margin/Column/Scroll/Wrap/Content/Write/Front"
+                                        )
+                                        if front_field != null:
+                                                front_field.set_text(original + "\nthrown away")
+                                                (editor.get_node("Margin/Column/TopBar/Back") as Button).pressed.emit()
+                                                await create_timer(0.2).timeout
+                                                _ok(
+                                                        editor.get_node_or_null("Margin/Column/Footer/Guard") != null
+                                                                and editor.get_node("Margin/Column/Footer/Guard").visible,
+                                                        "leaving with unwritten words asks first"
+                                                )
+                                                (editor.get_node("Margin/Column/Footer/Guard/Discard") as Button).pressed.emit()
+                                                await create_timer(0.4).timeout
+                                                _ok(study.get_node_or_null("Editor") == null, "discarding closes the page")
+                                                _is(
+                                                        FileAccess.get_file_as_string("user://decks/quran/001/front.md"),
+                                                        original + "\n",
+                                                        "discarding writes nothing"
+                                                )
+                                # The page's other way of standing: the card as its reader
+                                # will see it, both sides laid out whole.
+                                edit_coin.pressed.emit()
+                                await create_timer(0.3).timeout
+                                editor = study.get_node_or_null("Editor")
+                                if editor != null:
+                                        (editor.get_node("Margin/Column/Footer/Actions/Mode/Row/Read") as Button).pressed.emit()
+                                        await create_timer(0.3).timeout
+                                        var read_col: VBoxContainer = editor.get_node_or_null(
+                                                "Margin/Column/Scroll/Wrap/Content/Read"
+                                        )
+                                        _ok(
+                                                read_col != null and read_col.get_child_count() == 2,
+                                                "the read mode lays out both sides of the card"
+                                        )
+                                        editor.queue_free()
 
         # Answer the card and check the state moves.
         study._answer("good")
@@ -483,7 +540,7 @@ func _check_browse(main: Node) -> void:
         if preview != null:
                 _is(
                         preview.get_theme_font_size("font_size"),
-                        20,
+                        22,
                         "the shelf's verse preview reads at the mushaf's size"
                 )
                 _ok(
@@ -512,6 +569,44 @@ func _check_browse(main: Node) -> void:
                 (second_entry.get_node("Row") as Button).pressed.emit()
                 await create_timer(0.3).timeout
                 _ok(not detail.visible, "opening one row folds the last one away")
+        # The shelf's other question: the pills that keep one thread of the
+        # story -- what is due, what has never been started, what rests.
+        var filters: HFlowContainer = browse.get_node_or_null("Margin/Column/Filters")
+        _ok(filters != null and filters.get_child_count() == 4, "the shelf carries its four pills")
+        if filters != null and filters.get_child_count() == 4:
+                var due_pill: Button = filters.get_node_or_null("PillDue")
+                _ok(due_pill != null, "the due pill stands with its count")
+                if due_pill != null:
+                        due_pill.pressed.emit()
+                        await create_timer(0.4).timeout
+                        var due_rows := 0
+                        for child in column.get_children():
+                                if child.name.begins_with("Entry"):
+                                        due_rows += 1
+                        _is(due_rows, 0, "a fresh deck has nothing due today (got %d)" % due_rows)
+                        _ok(
+                                browse.get_node_or_null("Margin/Column/Scroll/Wrap/Column/Empty") != null,
+                                "an empty due list says so, warmly"
+                        )
+                        due_pill.pressed.emit()
+                        await create_timer(0.4).timeout
+                        var back_rows := 0
+                        for child in column.get_children():
+                                if child.name.begins_with("Entry"):
+                                        back_rows += 1
+                        _is(back_rows, deck.cards.size(), "a pressed-again pill brings the whole shelf back")
+        # The running head: a surah's title that stays while its cards scroll.
+        _ok(browse.get_node_or_null("Sticky") != null, "the running head rides above the shelf")
+        var sticky: PanelContainer = browse.get_node_or_null("Sticky")
+        if sticky != null:
+                _ok(not sticky.visible, "the running head rests while the shelf is at its top")
+                (browse.get_node("Margin/Column/Scroll") as ScrollContainer).scroll_vertical = 900
+                await create_timer(0.3).timeout
+                _ok(sticky.visible, "scrolling into a surah's cards raises its running head")
+                _ok(
+                        sticky.get_node("Row/Name").text.length() > 0,
+                        "the running head names the chapter it stands over"
+                )
         browse.closed.emit()
         await create_timer(0.4).timeout
         _ok(main.get_node_or_null("Home") != null, "leaving the library returns home")

@@ -2,157 +2,237 @@ class_name CardEditor
 extends Control
 const ThemeScript := preload("res://scripts/ui/theme.gd")
 const CardScript := preload("res://scripts/data/card.gd")
+const CardViewScript := preload("res://scripts/ui/card_view.gd")
 const MarkdownScript := preload("res://scripts/ui/markdown.gd")
+const RtlFieldScript := preload("res://scripts/ui/rtl_field.gd")
 
-## The card's own page, opened over whatever screen was reading it: the
-## question and the answer as the markdown their author wrote, editable on
-## the spot and saved to the very files the deck is. A typo or a better
-## wording is noticed while studying, and the fix belongs there -- not in
-## another app on another machine, waiting for a sync to carry it.
+## The card's own page, opened over whatever screen was reading it: not a
+## small window over a dimmed room but a whole page of the app, arriving the
+## way deeper pages arrive, because a fix to scripture is not an aside -- it
+## is the work of the moment.
 ##
-## The editor owns the page while it is open: the screen beneath does not
-## answer the keyboard (its Space and 1-4 would reach into the fields), and
-## Esc and Ctrl+Enter are answered here first. Saving writes front.md and
-## back.md beside the card's media, updates the card in memory, and leaves
-## the rest to the deck's own life: the next sync carries the edit to the
-## repo as part of its one commit, exactly as a hand-edited file would.
+## The page has two ways of standing. In WRITE, the question and the answer
+## are written in the app's own right-to-left fields: every line flush
+## against the right edge the way Arabic and Persian are read, the caret and
+## the chosen words following the hand, markup lines wearing the gold of the
+## app's citations so a file's name never masquerades as a sentence. In
+## READ, the very card the deck will show is laid out whole -- the verses in
+## the mushaf cut, the translations, the recitations, the citation at the
+## foot -- so a wording is judged as it will be read, not as it is typed.
+##
+## Leaving with words unwritten is answered, not assumed: the footer asks
+## once, quietly, and either keeps the page or closes it. Saving writes
+## front.md and back.md beside the card's media, updates the card in memory,
+## and leaves the rest to the deck's own life: the next sync carries the
+## edit to the repo as part of its one commit, exactly as a hand-edited
+## file would.
 
 signal saved(card: CardScript)
 signal cancelled
 
 var _card: CardScript
-var _front: TextEdit
-var _back: TextEdit
+var _volume := 1.0
+var _player: AudioStreamPlayer
+var _front: RtlFieldScript
+var _back: RtlFieldScript
+var _reference: Label
+var _write_column: VBoxContainer
+var _read_column: VBoxContainer
+var _scroll: ScrollContainer
+var _footer: VBoxContainer
+var _actions: HBoxContainer
+var _guard: HBoxContainer
 var _warn: Label
+var _mode := "write"  # the page's two ways of standing
+var _closing := false
 
-func _init(p_card: CardScript) -> void:
+func _init(p_card: CardScript, p_volume := 1.0) -> void:
         _card = p_card
+        _volume = p_volume
 
 func _ready() -> void:
         set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-        # The page beneath dims and stops taking input: the editor is the
-        # whole world until it is closed.
         mouse_filter = Control.MOUSE_FILTER_STOP
-        var dim := ColorRect.new()
-        dim.name = "Dim"
-        dim.color = Color(ThemeScript.INK.r, ThemeScript.INK.g, ThemeScript.INK.b, 0.34)
-        dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-        dim.mouse_filter = Control.MOUSE_FILTER_STOP
-        add_child(dim)
 
-        var center := CenterContainer.new()
-        center.name = "Centre"
-        center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-        add_child(center)
+        _player = AudioStreamPlayer.new()
+        _player.name = "Player"
+        _player.volume_db = linear_to_db(maxf(clampf(_volume, 0.0, 1.0), 0.0001))
+        add_child(_player)
 
-        var panel := PanelContainer.new()
-        panel.name = "Panel"
-        panel.add_theme_stylebox_override("panel", ThemeScript.card_stylebox())
-        panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-        center.add_child(panel)
+        add_child(ThemeScript.paper_backdrop())
+        add_child(ThemeScript.paper_pattern())
 
-        var pad := MarginContainer.new()
-        pad.name = "Pad"
-        pad.add_theme_constant_override("margin_left", 30)
-        pad.add_theme_constant_override("margin_right", 30)
-        pad.add_theme_constant_override("margin_top", 26)
-        pad.add_theme_constant_override("margin_bottom", 26)
-        panel.add_child(pad)
+        var margin := MarginContainer.new()
+        margin.name = "Margin"
+        margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        margin.add_theme_constant_override("margin_left", 24)
+        margin.add_theme_constant_override("margin_right", 24)
+        margin.add_theme_constant_override("margin_top", 22)
+        margin.add_theme_constant_override("margin_bottom", 24)
+        add_child(margin)
 
         var column := VBoxContainer.new()
         column.name = "Column"
+        column.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
         column.add_theme_constant_override("separation", 12)
-        pad.add_child(column)
+        margin.add_child(column)
 
-        # The page's own heading: the pencil beside the words, the card's
-        # reference under them, so the card being edited is never in doubt.
-        var heading := HBoxContainer.new()
-        heading.name = "Heading"
-        heading.add_theme_constant_override("separation", 10)
-        var mark := ThemeScript.PencilMark.new(ThemeScript.GOLD_DEEP)
-        mark.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-        heading.add_child(mark)
-        var title := Label.new()
-        title.name = "Title"
-        title.text = "Edit card"
-        title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-        ThemeScript.dress(title, ThemeScript.TITLE, ThemeScript.GREEN_DEEP, true)
-        heading.add_child(title)
-        column.add_child(heading)
-
-        var reference := Label.new()
-        reference.name = "Reference"
-        reference.text = _reference_of(_card)
-        reference.text_direction = TextDirection.TEXT_DIRECTION_AUTO
-        reference.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-        var script := ThemeScript.reference_script(reference.text)
-        reference.add_theme_font_override("font", ThemeScript.font_for(script, 14))
-        reference.add_theme_font_size_override("font_size", 14)
-        reference.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP)
-        column.add_child(reference)
-        column.add_child(ThemeScript.hairline())
-
-        column.add_child(_caption("QUESTION"))
-        _front = _field(_card.front, 78)
-        column.add_child(_front)
-        column.add_child(_caption("ANSWER"))
-        _back = _field(_card.back, 210)
-        column.add_child(_back)
-
-        _warn = Label.new()
-        _warn.name = "Warn"
-        _warn.text = " "
-        _warn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        ThemeScript.dress(_warn, ThemeScript.CAPTION, ThemeScript.DANGER)
-        column.add_child(_warn)
-
-        var actions := HBoxContainer.new()
-        actions.name = "Actions"
-        actions.alignment = BoxContainer.ALIGNMENT_END
-        actions.add_theme_constant_override("separation", 10)
-        var quit := ThemeScript.ghost_button("Cancel", ThemeScript.INK_SOFT, 46)
-        quit.name = "Cancel"
-        quit.custom_minimum_size = Vector2(120, 46)
-        quit.pressed.connect(_close)
-        actions.add_child(quit)
-        var keep := ThemeScript.primary_button("Save", 46)
-        keep.name = "Save"
-        keep.custom_minimum_size = Vector2(140, 46)
-        keep.pressed.connect(_save)
-        actions.add_child(keep)
-        column.add_child(actions)
+        column.add_child(_build_top_bar())
+        column.add_child(_build_reference())
+        column.add_child(_build_scroll())
+        column.add_child(_build_footer())
 
         resized.connect(_layout)
         call_deferred("_layout")
-        _front.grab_focus()
+        ThemeScript.appear(self, 0.0, 26.0)
+        _front.take_focus()
+        _front.set_caret_at_end()
 
-## The page answers the window: the panel keeps a reader's measure on a
-## desk and a phone's whole width in a hand, and the answer's field grows
-## with the room -- capped, so a small window scrolls inside the field
-## instead of the panel running past the screen.
-func _layout() -> void:
-        if size.x <= 0.0:
+func _build_top_bar() -> Control:
+        var bar: Dictionary = ThemeScript.top_bar("Edit card")
+        var row: HBoxContainer = bar["row"]
+        var back: Button = bar["back"]
+        back.tooltip_text = "Back without saving"
+        back.pressed.connect(_request_close)
+        return row
+
+## The page's two ways of standing, said in one quiet pill: Write, the words
+## as their author wrote them; Read, the card as its reader will see it. It
+## lives at the foot beside the saving, where a hand resting from the
+## keyboard already is.
+func _build_mode_switch() -> Control:
+        var track := PanelContainer.new()
+        track.name = "Mode"
+        track.add_theme_stylebox_override("panel", ThemeScript.soft_stylebox(
+                Color(ThemeScript.INK.r, ThemeScript.INK.g, ThemeScript.INK.b, 0.06), 21
+        ))
+        var row := HBoxContainer.new()
+        row.name = "Row"
+        row.add_theme_constant_override("separation", 2)
+        track.add_child(row)
+        for mode in ["write", "read"]:
+                var button := Button.new()
+                button.name = mode.capitalize()
+                button.custom_minimum_size = Vector2(78, 42)
+                button.text = mode.capitalize()
+                button.tooltip_text = (
+                        "The words as their author wrote them" if mode == "write"
+                        else "The card as its reader will see it"
+                )
+                ThemeScript.pressable(button)
+                button.pressed.connect(_set_mode.bind(mode))
+                row.add_child(button)
+        return track
+
+func _dress_mode_buttons() -> void:
+        var row: HBoxContainer = get_node_or_null("Margin/Column/Footer/Actions/Mode/Row")
+        if row == null:
                 return
-        var panel: PanelContainer = get_node("Centre/Panel")
-        var width: float = minf(size.x - 36.0, 560.0)
-        panel.custom_minimum_size = Vector2(maxf(width, 280.0), 0.0)
-        if _back != null:
-                var room: float = size.y - 320.0
-                _back.custom_minimum_size.y = clampf(room, 150.0, 330.0)
+        for mode in ["write", "read"]:
+                var button := row.get_node(str(mode).capitalize()) as Button
+                var on: bool = str(mode) == _mode
+                var rest := ThemeScript.soft_stylebox(ThemeScript.GOLD_SOFT if on else Color(0, 0, 0, 0), 18)
+                button.add_theme_stylebox_override("normal", rest)
+                button.add_theme_stylebox_override("hover", rest)
+                button.add_theme_stylebox_override("pressed", rest)
+                button.add_theme_stylebox_override("focus", rest)
+                button.add_theme_stylebox_override("disabled", rest)
+                button.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION, on))
+                button.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+                button.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP if on else ThemeScript.INK_SOFT)
+                button.add_theme_color_override("font_hover_color", ThemeScript.GOLD_DEEP if on else ThemeScript.INK)
+                button.add_theme_color_override("font_pressed_color", ThemeScript.GOLD_DEEP if on else ThemeScript.INK)
+                button.add_theme_color_override("font_focus_color", ThemeScript.GOLD_DEEP if on else ThemeScript.INK_SOFT)
 
-## The editor answers the keyboard before the page beneath it can: Esc
-## leaves without touching anything, and Ctrl+Enter saves without leaving
-## the fields for the mouse.
-func _input(event: InputEvent) -> void:
-        if event is InputEventKey and event.pressed and not event.echo:
-                if event.keycode == KEY_ESCAPE:
-                        _close()
-                        get_viewport().set_input_as_handled()
-                elif (event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER) and (
-                        event.ctrl_pressed or event.meta_pressed
-                ):
-                        _save()
-                        get_viewport().set_input_as_handled()
+func _set_mode(mode: String) -> void:
+        if mode == _mode:
+                return
+        _mode = mode
+        _dress_mode_buttons()
+        var writing := mode == "write"
+        _write_column.visible = writing
+        _read_column.visible = not writing
+        _scroll.scroll_vertical = 0
+        if writing:
+                _front.take_focus()
+        if not writing:
+                _fill_read_column()
+        ThemeScript.settle_in(_write_column if writing else _read_column, 0.0, 0.2)
+
+## The thread that ties the page to its card: the question's first line, in
+## the gold of every eyebrow, following the words as they are written.
+func _build_reference() -> Control:
+        _reference = Label.new()
+        _reference.name = "Reference"
+        _reference.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        _reference.text = _reference_of(_card)
+        _reference.text_direction = TextDirection.TEXT_DIRECTION_AUTO
+        var script := ThemeScript.reference_script(_reference.text)
+        _reference.add_theme_font_override("font", ThemeScript.font_for(script, 14))
+        _reference.add_theme_font_size_override("font_size", 14)
+        _reference.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP)
+        return _reference
+
+func _build_scroll() -> Control:
+        _scroll = ScrollContainer.new()
+        _scroll.name = "Scroll"
+        _scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        _scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+        ThemeScript.style_scroll(_scroll)
+        var wrap := CenterContainer.new()
+        wrap.name = "Wrap"
+        wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        _scroll.add_child(wrap)
+        var content := VBoxContainer.new()
+        content.name = "Content"
+        content.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        content.add_theme_constant_override("separation", 14)
+        wrap.add_child(content)
+
+        _write_column = VBoxContainer.new()
+        _write_column.name = "Write"
+        _write_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        _write_column.add_theme_constant_override("separation", 6)
+        content.add_child(_write_column)
+
+        _write_column.add_child(_caption("QUESTION"))
+        _front = RtlFieldScript.new()
+        _front.name = "Front"
+        _front.one_line = true
+        _front.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        _front.text_changed.connect(_on_front_changed)
+        _front.advance_requested.connect(func() -> void: _back.take_focus())
+        _write_column.add_child(_front)
+        _front.set_text(_card.front)
+
+        _write_column.add_child(_spacer(8))
+        _write_column.add_child(_caption("ANSWER"))
+        _back = RtlFieldScript.new()
+        _back.name = "Back"
+        _back.custom_minimum_size = Vector2(0, 180)
+        _back.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        _back.text_changed.connect(func() -> void: _clear_warning())
+        _back.caret_moved.connect(_follow_caret)
+        _front.caret_moved.connect(_follow_caret)
+        _write_column.add_child(_back)
+        _back.set_text(_card.back)
+
+        _write_column.add_child(_spacer(10))
+        _write_column.add_child(_hint_row())
+
+        _read_column = VBoxContainer.new()
+        _read_column.name = "Read"
+        _read_column.visible = false
+        _read_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        _read_column.add_theme_constant_override("separation", 16)
+        content.add_child(_read_column)
+        return _scroll
+
+func _spacer(height: int) -> Control:
+        var room := Control.new()
+        room.custom_minimum_size = Vector2(0, height)
+        room.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        return room
 
 func _caption(text: String) -> Label:
         var label := Label.new()
@@ -161,45 +241,174 @@ func _caption(text: String) -> Label:
         ThemeScript.dress(label, 12, ThemeScript.INK_SOFT, true)
         return label
 
-## A field dressed like the app, not like a source editor: the page's own
-## white, the page's own type, the verse's own direction left to the text.
-func _field(text: String, min_height: int) -> TextEdit:
-        var field := TextEdit.new()
-        field.text = text
-        field.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
-        field.custom_minimum_size = Vector2(0, min_height)
-        field.size_flags_vertical = Control.SIZE_EXPAND_FILL
-        field.text_direction = TextDirection.TEXT_DIRECTION_AUTO
-        field.add_theme_font_override("font", ThemeScript.vazir(15))
-        field.add_theme_font_size_override("font_size", 15)
-        field.add_theme_color_override("font_color", ThemeScript.INK)
-        field.add_theme_color_override("caret_color", ThemeScript.GREEN_DEEP)
-        # The words a hand picks out of a field wear the page's gold, the
-        # same wash every selection in the app wears -- not the engine's grey.
-        field.add_theme_color_override("selection_color", ThemeScript.SELECT)
-        var page := ThemeScript.soft_stylebox(ThemeScript.CARD, 12)
-        page.border_color = ThemeScript.LINE
-        page.set_border_width_all(1)
-        page.content_margin_left = 12
-        page.content_margin_right = 12
-        page.content_margin_top = 10
-        page.content_margin_bottom = 10
-        field.add_theme_stylebox_override("normal", page)
-        var focus := page.duplicate() as StyleBoxFlat
-        focus.border_color = ThemeScript.GOLD
-        focus.set_border_width_all(2)
-        field.add_theme_stylebox_override("focus", focus)
-        return field
+## What the keyboard already knows, said once for the eye: leaving, saving,
+## and the one mark of the deck's own markdown.
+func _hint_row() -> Control:
+        var row := HBoxContainer.new()
+        row.name = "Hints"
+        row.alignment = BoxContainer.ALIGNMENT_CENTER
+        row.add_theme_constant_override("separation", 8)
+        row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        row.add_child(ThemeScript.key_chip("Esc"))
+        row.add_child(_hint_word("leave"))
+        row.add_child(ThemeScript.key_chip("Ctrl + Enter"))
+        row.add_child(_hint_word("save"))
+        row.add_child(_hint_word("·  *stars* lean a word"))
+        return row
+
+func _hint_word(text: String) -> Label:
+        var label := Label.new()
+        label.text = text
+        ThemeScript.dress(label, 12, ThemeScript.INK_SOFT)
+        label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+        return label
+
+func _build_footer() -> Control:
+        _footer = VBoxContainer.new()
+        _footer.name = "Footer"
+        _footer.add_theme_constant_override("separation", 8)
+
+        _warn = Label.new()
+        _warn.name = "Warn"
+        _warn.text = " "
+        _warn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        ThemeScript.dress(_warn, ThemeScript.CAPTION, ThemeScript.DANGER)
+        _footer.add_child(_warn)
+
+        _actions = HBoxContainer.new()
+        _actions.name = "Actions"
+        _actions.alignment = BoxContainer.ALIGNMENT_END
+        _actions.add_theme_constant_override("separation", 10)
+        _actions.add_child(_build_mode_switch())
+        var stretch := Control.new()
+        stretch.name = "Stretch"
+        stretch.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        stretch.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        _actions.add_child(stretch)
+        var quit := ThemeScript.ghost_button("Cancel", ThemeScript.INK_SOFT, 46)
+        quit.name = "Cancel"
+        quit.custom_minimum_size = Vector2(110, 46)
+        quit.pressed.connect(_request_close)
+        _actions.add_child(quit)
+        var keep := ThemeScript.primary_button("Save", 46)
+        keep.name = "Save"
+        keep.custom_minimum_size = Vector2(130, 46)
+        keep.pressed.connect(_save)
+        _actions.add_child(keep)
+        _footer.add_child(_actions)
+        call_deferred("_dress_mode_buttons")
+
+        # The question the page asks before it lets the work go: nothing is
+        # discarded on a stray press, and nothing is kept by accident either.
+        _guard = HBoxContainer.new()
+        _guard.name = "Guard"
+        _guard.visible = false
+        _guard.alignment = BoxContainer.ALIGNMENT_END
+        _guard.add_theme_constant_override("separation", 10)
+        var asking := Label.new()
+        asking.name = "Asking"
+        asking.text = "The edits are not saved."
+        asking.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        asking.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+        asking.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+        ThemeScript.dress(asking, ThemeScript.CAPTION, ThemeScript.DANGER)
+        _guard.add_child(asking)
+        var stay := ThemeScript.ghost_button("Keep editing", ThemeScript.GREEN_DEEP, 46, 21)
+        stay.name = "Stay"
+        stay.pressed.connect(_dismiss_guard)
+        _guard.add_child(stay)
+        var discard := ThemeScript.ghost_button("Discard", ThemeScript.DANGER, 46, 21)
+        discard.name = "Discard"
+        discard.pressed.connect(_close)
+        _guard.add_child(discard)
+        _footer.add_child(_guard)
+        return _footer
+
+func _dismiss_guard() -> void:
+        _guard.visible = false
+        _actions.visible = true
+
+# --- the page's two ways of standing --------------------------------------------------
+
+## The card as its reader will see it: both sides, dressed exactly as the
+## session dresses them, so a wording is judged where it will be read.
+func _fill_read_column() -> void:
+        for child in _read_column.get_children():
+                _read_column.remove_child(child)
+                child.queue_free()
+        _read_column.add_child(_preview_card(
+                _front.get_text(), "", true
+        ))
+        _read_column.add_child(_preview_card(
+                _back.get_text(), _reference_of_front(), false
+        ))
+
+func _preview_card(text: String, ref_line: String, lead: bool) -> Control:
+        var panel := PanelContainer.new()
+        panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        panel.add_theme_stylebox_override("panel", ThemeScript.card_stylebox())
+        var pad := MarginContainer.new()
+        pad.add_theme_constant_override("margin_left", 24)
+        pad.add_theme_constant_override("margin_right", 24)
+        pad.add_theme_constant_override("margin_top", 22)
+        pad.add_theme_constant_override("margin_bottom", 22)
+        panel.add_child(pad)
+        var view := CardViewScript.new(_player)
+        view.show_text(text, _card.folder, lead, ref_line, true)
+        pad.add_child(view)
+        return panel
+
+func _on_front_changed() -> void:
+        _reference.text = _reference_of_front()
+        _clear_warning()
+
+func _reference_of_front() -> String:
+        return _reference_of_text(_front.get_text())
+
+func _clear_warning() -> void:
+        _warn.text = " "
+
+## The caret never leaves the page's sight: wherever it stands, the page
+## scrolls to keep it, the way every editor a hand already knows behaves.
+func _follow_caret() -> void:
+        var field := _back if _back.holds_focus() else _front
+        if field == null or not field.holds_focus():
+                return
+        _scroll.ensure_control_visible(field.caret_control())
+
+# --- leaving, saving -------------------------------------------------------------------
+
+func _dirty() -> bool:
+        return (
+                _front.get_text().strip_edges() != _card.front
+                or _back.get_text().strip_edges() != _card.back
+        )
+
+func _request_close() -> void:
+        if _dirty():
+                _guard.visible = true
+                _actions.visible = false
+                ThemeScript.settle_in(_guard, 0.0, 0.16)
+                return
+        _close()
 
 func _close() -> void:
+        if _closing:
+                return
+        _closing = true
         cancelled.emit()
-        queue_free()
+        ThemeScript.vanish(self)
 
 func _save() -> void:
-        var front := _front.text.strip_edges()
-        var back := _back.text.strip_edges()
+        if _closing:
+                return
+        var front := _front.get_text().strip_edges()
+        var back := _back.get_text().strip_edges()
         if front.is_empty() or back.is_empty():
                 _warn.text = "A card needs both a question and an answer."
+                return
+        if front == _card.front and back == _card.back:
+                _close()
                 return
         if not _write(_card.folder.path_join("front.md"), front + "\n"):
                 _warn.text = "The question could not be saved."
@@ -209,8 +418,9 @@ func _save() -> void:
                 return
         _card.front = front
         _card.back = back
+        _closing = true
         saved.emit(_card)
-        queue_free()
+        ThemeScript.vanish(self)
 
 static func _write(path: String, text: String) -> bool:
         var file := FileAccess.open(path, FileAccess.WRITE)
@@ -221,11 +431,48 @@ static func _write(path: String, text: String) -> bool:
         file.close()
         return true
 
+## The editor answers the keyboard before the page beneath it can: Esc
+## leaves without touching anything (once the guard is satisfied), and
+## Ctrl+Enter saves without leaving the fields for the mouse.
+func _input(event: InputEvent) -> void:
+        if event is InputEventKey and event.pressed and not event.echo:
+                if event.keycode == KEY_ESCAPE:
+                        if _guard.visible:
+                                _dismiss_guard()
+                        else:
+                                _request_close()
+                        get_viewport().set_input_as_handled()
+                elif (event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER) and (
+                        event.ctrl_pressed or event.meta_pressed
+                ):
+                        if _guard.visible:
+                                _dismiss_guard()
+                        else:
+                                _save()
+                        get_viewport().set_input_as_handled()
+
 ## The first plain line of the card's question: the name of what is being
 ## edited, said the way the study page says it.
 static func _reference_of(card: CardScript) -> String:
-        for line in card.front.split("\n"):
+        return _reference_of_text(card.front)
+
+static func _reference_of_text(source: String) -> String:
+        for line in source.split("\n"):
                 var plain := MarkdownScript.plain(line).strip_edges()
                 if not plain.is_empty():
                         return plain
-        return card.id
+        return ""
+
+# --- the page answers the window -------------------------------------------------------
+
+func _layout() -> void:
+        if size.x <= 0.0:
+                return
+        var margin: MarginContainer = get_node("Margin")
+        margin.add_theme_constant_override("margin_top", int(22.0 + ThemeScript.top_inset()))
+        margin.add_theme_constant_override("margin_bottom", int(24.0 + ThemeScript.bottom_inset()))
+        var narrow := size.x < ThemeScript.NARROW
+        margin.add_theme_constant_override("margin_left", 16 if narrow else 24)
+        margin.add_theme_constant_override("margin_right", 16 if narrow else 24)
+        var content: VBoxContainer = get_node("Margin/Column/Scroll/Wrap/Content")
+        content.custom_minimum_size = Vector2(minf(ThemeScript.MEASURE, size.x - 32.0), 0.0)
