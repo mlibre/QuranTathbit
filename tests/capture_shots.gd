@@ -14,7 +14,7 @@ extends SceneTree
 
 const MainScript := preload("res://scripts/main.gd")
 
-const SHOTS := 7
+const SHOTS := 8
 
 var _out := "/tmp/shots"
 var _saved := 0
@@ -48,6 +48,13 @@ func _init() -> void:
         study._answer("easy")
         await create_timer(0.7).timeout
         await _shot("study_two")
+        # The recitation's own control, open under its coin: the popover is
+        # part of the page a person sees, so the film keeps a frame of it.
+        study._toggle_volume_popup()
+        await create_timer(0.5).timeout
+        await _shot("volume")
+        study._toggle_volume_popup()
+        await create_timer(0.3).timeout
         study.closed.emit()
         await create_timer(0.7).timeout
         main._on_settings_pressed()

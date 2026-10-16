@@ -227,6 +227,37 @@ class SlidersMark extends Control:
                         draw_circle(Vector2(xs[i], ys[i]), 2.9, color)
 
 
+## A speaker with its own breath of sound: the volume mark, for the one
+## corner of a study session that says how loud the recitation is. A silent
+## app wears the speaker alone -- no breath, nothing to hear -- so the eye
+## reads the number before the hand reaches for it.
+class VolumeMark extends Control:
+        var color := GREEN_DEEP
+        var muted := false
+
+        func _init(p_color: Color = GREEN_DEEP) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(20, 18)
+
+        func _draw() -> void:
+                # The speaker itself: a small box opening into a horn.
+                draw_colored_polygon(
+                        PackedVector2Array([
+                                Vector2(2.5, 6.5), Vector2(6.5, 6.5),
+                                Vector2(11.5, 2.5), Vector2(11.5, 15.5),
+                                Vector2(6.5, 11.5), Vector2(2.5, 11.5),
+                        ]),
+                        color
+                )
+                if muted:
+                        # A straight line through the horn: the sound is off.
+                        draw_line(Vector2(13.5, 4.0), Vector2(18.5, 14.0), color, 2.0, true)
+                        return
+                # The breath: two arcs, the second quieter than the first.
+                draw_arc(Vector2(11.0, 9.0), 5.0, -0.85, 0.85, 12, color, 1.8, true)
+                draw_arc(Vector2(11.0, 9.0), 8.5, -0.75, 0.75, 12, Color(color.r, color.g, color.b, 0.55), 1.8, true)
+
+
 ## A chevron pointing back the way the user came: the universal way out.
 class BackMark extends Control:
         var color := INK
@@ -632,6 +663,31 @@ static func _centered_mark(mark: Control) -> CenterContainer:
         mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
         center.add_child(mark)
         return center
+
+
+## A round grabber for a slider, drawn rather than typed: no icon font in
+## this app, and the engine's default grabber is a grey plastic bead from
+## another app. The circle is drawn at 4x and scaled down, so its edge
+## lands soft instead of stair-stepped.
+static func circle_icon(diameter: int, color: Color, ring := false) -> ImageTexture:
+        var scale := 4
+        var side := diameter * scale
+        var image := Image.create(side, side, false, Image.FORMAT_RGBA8)
+        var c := Vector2(side, side) / 2.0
+        var r_fill := float(side) / 2.0 - float(scale)
+        var r_ring := r_fill - 2.0 * float(scale)
+        for y in side:
+                for x in side:
+                        var d := Vector2(x + 0.5, y + 0.5).distance_to(c)
+                        var alpha := 0.0
+                        if d <= r_fill:
+                                alpha = 1.0
+                                if ring and d < r_ring:
+                                        alpha = 0.0
+                        if alpha > 0.0:
+                                image.set_pixel(x, y, Color(color.r, color.g, color.b, alpha))
+        var texture := ImageTexture.create_from_image(image)
+        return texture
 
 
 ## A small key cap, the way a key looks on the keyboard it names.

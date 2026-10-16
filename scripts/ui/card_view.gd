@@ -34,6 +34,12 @@ var _playing_button: Button = null
 
 func _init(p_player: AudioStreamPlayer) -> void:
         _player = p_player
+        # The recitation's own last word: when the audio runs out by itself
+        # the button must hear about it, or it says "Listening…" forever at
+        # a verse that has already gone quiet. stop() never emits this -- only
+        # a natural finish does -- so a hand that stops the sound still has
+        # its own say through _stop_audio().
+        _player.finished.connect(_on_audio_finished)
         add_theme_constant_override("separation", ThemeScript.GAP)
 
 ## Show one side of a card. `lead` is the question's own heading, set large;
@@ -124,7 +130,7 @@ func _add_text(markdown: String, link: String, lead := false) -> void:
         label.add_theme_color_override("default_color", ThemeScript.INK if script != "plain" else ThemeScript.INK_SOFT)
         # Scripture breathes between its lines; the lead, most of all.
         if script == "arabic":
-                label.add_theme_constant_override("line_separation", 14 if lead else 10)
+                label.add_theme_constant_override("line_separation", 14 if lead else 12)
         elif script == "persian":
                 label.add_theme_constant_override("line_separation", 6)
         label.meta_clicked.connect(_open_link)
@@ -280,6 +286,15 @@ func _stop_audio() -> void:
         _playing_path = ""
         _playing_button = null
 
+## The sound ran to its own end: the button that spoke for it goes back to
+## rest, if the card it lived on still exists to hear it.
+func _on_audio_finished() -> void:
+        _playing_path = ""
+        var button := _playing_button
+        _playing_button = null
+        if button != null and is_instance_valid(button):
+                _set_button_state(button, "idle")
+
 ## What a button says while it works, speaks, or cannot: one place, so every
 ## state dresses the same on every button.
 func _set_button_state(button: Button, state: String) -> void:
@@ -365,14 +380,14 @@ func _size_for(script: String, lead := false) -> int:
         if lead:
                 match script:
                         "arabic":
-                                return 54
+                                return 56
                         "persian":
                                 return 30
                         _:
                                 return 24
         match script:
                 "arabic":
-                        return 38
+                        return 40
                 "persian":
                         return 20
                 _:

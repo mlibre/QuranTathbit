@@ -40,10 +40,9 @@ phone): it then opens full-screen and offline, with its own icon — no store,
 no tab, no browser bars.
 
 > In a browser you sign in with a one-minute token: press **Connect GitHub**
-> and the app walks you through it — and when it comes time to paste the
-> token, the **Paste** button reads the clipboard for you, because a canvas
-> has no long-press menu. On desktop and Android the full device-code
-> sign-in works.
+> and the app walks you through it — and pasting the token works the way it
+> does everywhere else: **Ctrl+V** in the box, or hold the box on a phone.
+> On desktop and Android the full device-code sign-in works.
 
 ## ⬇️ Download it for your computer
 

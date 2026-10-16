@@ -18,6 +18,7 @@ const MarkdownScript := preload("res://scripts/ui/markdown.gd")
 
 signal closed
 signal answered(card: CardScript, button: String)
+signal volume_changed(value: float)
 
 const PANEL := "Margin/Column/Surface/Fill/CardPanel"
 const AGAIN_COLOR := Color("#B4553F")
@@ -36,12 +37,15 @@ var _player: AudioStreamPlayer
 var _view: CardViewScript
 var _options: Array = []
 var _bar_tween: Tween
+var volume := 1.0  # the recitation's own loudness, 0..1, set before the session starts
+var _volume_ticket := 0  # only the latest nudge of the slider commits a save
 
 func _ready() -> void:
         _player = AudioStreamPlayer.new()
         _player.name = "Player"
         add_child(_player)
         _build()
+        _apply_volume(volume)
         resized.connect(_layout)
         call_deferred("_layout")
 
@@ -88,6 +92,9 @@ func _build() -> void:
         if not DisplayServer.is_touchscreen_available():
                 column.add_child(_key_hints())
         column.add_child(_footer())
+        # The volume's own small page floats above everything, last so it
+        # draws last, waiting in its corner until the hand asks for it.
+        add_child(_volume_popup())
 
 ## The session's own quiet progress: a thin bar under the top row that fills
 ## as cards are answered. The count label above it stays for the exact number;
@@ -139,6 +146,27 @@ func _top_bar() -> Control:
         progress.size_flags_vertical = Control.SIZE_SHRINK_CENTER
         progress.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
         ThemeScript.dress(progress, 15, ThemeScript.INK_SOFT, true)
+        # The corner every screen leaves empty gets this screen's own second
+        # question: how loud the recitation speaks. One quiet coin, beside
+        # the way back, where a thumb already knows the corner lives.
+        var right: Control = bar["right"]
+        var coin := Button.new()
+        coin.name = "Volume"
+        coin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        ThemeScript.apply_mark_styles(coin, ThemeScript.mark_button_styles(ThemeScript.GREEN, true))
+        var mark := ThemeScript.VolumeMark.new(ThemeScript.GREEN_DEEP)
+        mark.name = "VolumeMark"
+        var center := CenterContainer.new()
+        center.name = "Mark"
+        center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        center.add_child(mark)
+        coin.add_child(center)
+        coin.tooltip_text = "Recitation volume"
+        ThemeScript.pressable(coin)
+        coin.pressed.connect(_toggle_volume_popup)
+        right.add_child(coin)
         return row
 
 func _surface() -> Control:
@@ -213,6 +241,112 @@ func _footer() -> Control:
         row.add_child(done)
         return row
 
+# --- the recitation's volume -------------------------------------------------------
+
+## The volume's small page: a caption, a rule the hand can drag, and the
+## number it stands at. It opens under the coin that asked for it and closes
+## on any press outside itself, the way a popover behaves everywhere else.
+func _volume_popup() -> Control:
+        var panel := PanelContainer.new()
+        panel.name = "VolumePopup"
+        panel.visible = false
+        panel.mouse_filter = Control.MOUSE_FILTER_STOP
+        panel.add_theme_stylebox_override("panel", ThemeScript.card_stylebox())
+
+        var pad := MarginContainer.new()
+        pad.name = "Pad"
+        pad.add_theme_constant_override("margin_left", 18)
+        pad.add_theme_constant_override("margin_right", 18)
+        pad.add_theme_constant_override("margin_top", 14)
+        pad.add_theme_constant_override("margin_bottom", 14)
+        panel.add_child(pad)
+
+        var box := VBoxContainer.new()
+        box.name = "Box"
+        box.add_theme_constant_override("separation", 10)
+        pad.add_child(box)
+
+        var title := Label.new()
+        title.name = "Title"
+        title.text = "Recitation volume"
+        ThemeScript.dress(title, 12, ThemeScript.GOLD_DEEP, true)
+        box.add_child(title)
+
+        var slider := HSlider.new()
+        slider.name = "Slider"
+        slider.min_value = 0.0
+        slider.max_value = 1.0
+        slider.step = 0.01
+        slider.custom_minimum_size = Vector2(190, 30)
+        var track := StyleBoxFlat.new()
+        track.bg_color = Color("#E6DFCE")
+        track.set_corner_radius_all(5)
+        track.content_margin_top = 5
+        track.content_margin_bottom = 5
+        var filled := StyleBoxFlat.new()
+        filled.bg_color = ThemeScript.GREEN
+        filled.set_corner_radius_all(5)
+        filled.content_margin_top = 5
+        filled.content_margin_bottom = 5
+        slider.add_theme_stylebox_override("slider", track)
+        slider.add_theme_stylebox_override("grabber_area", filled)
+        slider.add_theme_stylebox_override("grabber_area_highlight", filled)
+        slider.add_theme_icon_override("grabber", ThemeScript.circle_icon(18, ThemeScript.GREEN_DEEP))
+        slider.add_theme_icon_override("grabber_highlight", ThemeScript.circle_icon(22, ThemeScript.GREEN_DEEP))
+        slider.add_theme_icon_override("grabber_disabled", ThemeScript.circle_icon(18, Color("#9AA79E")))
+        slider.value_changed.connect(func(v: float) -> void:
+                _apply_volume(v)
+                _schedule_volume_commit()
+        )
+        box.add_child(slider)
+
+        var readout := Label.new()
+        readout.name = "Readout"
+        readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        readout.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        ThemeScript.dress(readout, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
+        box.add_child(readout)
+        return panel
+
+
+func _toggle_volume_popup() -> void:
+        var popup: PanelContainer = get_node_or_null("VolumePopup")
+        if popup == null:
+                return
+        popup.visible = not popup.visible
+        if popup.visible:
+                (popup.get_node("Pad/Box/Slider") as HSlider).value = volume
+                ThemeScript.settle_in(popup, 0.0, 0.16)
+
+
+## Loudness to the player, the coin's own face, and the number the slider
+## says -- one place, so they can never disagree.
+func _apply_volume(v: float) -> void:
+        volume = clampf(v, 0.0, 1.0)
+        # linear_to_db(0) is negative infinity; a true zero is its own quiet
+        # floor instead, silence for the ear and a number for the maths.
+        _player.volume_db = linear_to_db(maxf(volume, 0.0001))
+        var mark: ThemeScript.VolumeMark = get_node_or_null(
+                "Margin/Column/TopBar/Right/Volume/Mark/VolumeMark"
+        )
+        if mark != null:
+                mark.muted = volume <= 0.005
+                mark.queue_redraw()
+        var readout: Label = get_node_or_null("VolumePopup/Pad/Box/Readout")
+        if readout != null:
+                readout.text = "Muted" if volume <= 0.005 else "%d%%" % int(round(volume * 100.0))
+
+
+## A save waits for the hand to stop moving: only the latest nudge of the
+## rule commits, so one drag is one write, not one per tick along it.
+func _schedule_volume_commit() -> void:
+        _volume_ticket += 1
+        var ticket := _volume_ticket
+        get_tree().create_timer(0.45).timeout.connect(func() -> void:
+                if ticket == _volume_ticket:
+                        volume_changed.emit(volume)
+        )
+
 func _layout() -> void:
         if size.x <= 0.0:
                 return
@@ -250,6 +384,17 @@ func _layout() -> void:
         var avail := minf(320.0, size.x - 48.0)
         (get_node("Margin/Column/Footer/ShowAnswer") as Button).custom_minimum_size = Vector2(avail, 58.0)
         (get_node("Margin/Column/Footer/Done") as Button).custom_minimum_size = Vector2(avail, 58.0)
+        # The volume's page hangs from its own corner, under the coin, never
+        # past the window's edge on a phone.
+        var popup: PanelContainer = get_node_or_null("VolumePopup")
+        if popup != null:
+                var popup_w := popup.get_combined_minimum_size().x
+                var inset := ThemeScript.top_inset()
+                popup.anchor_left = 0.0
+                popup.anchor_right = 0.0
+                popup.anchor_top = 0.0
+                popup.offset_left = maxf(size.x - popup_w - 24.0, 16.0)
+                popup.offset_top = 24.0 + inset + 48.0 + 10.0
 
 func _layout_answers() -> void:
         var grid: GridContainer = get_node("Margin/Column/Answers")
@@ -559,6 +704,17 @@ func _show_done() -> void:
 func _input(event: InputEvent) -> void:
         if not visible:
                 return
+        # A popover closes the way popovers do: any press outside it. The
+        # coin that opened it is outside it too -- its own press will close
+        # it, so the press is left alone here rather than closed and reopened
+        # in the same breath.
+        var popup: PanelContainer = get_node_or_null("VolumePopup")
+        if popup != null and popup.visible and event is InputEventMouseButton and event.pressed:
+                var press := event as InputEventMouseButton
+                var coin: Button = get_node_or_null("Margin/Column/TopBar/Right/Volume")
+                var inside_coin := coin != null and coin.get_global_rect().has_point(press.position)
+                if not inside_coin and not popup.get_global_rect().has_point(press.position):
+                        popup.visible = false
         if event is InputEventKey and event.pressed and not event.echo:
                 match event.keycode:
                         KEY_ESCAPE:

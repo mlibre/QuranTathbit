@@ -15,6 +15,7 @@ var deck_folder := ""  # absolute path of the synced deck (user://decks/quran)
 var last_sync := 0  # unix seconds
 var setup_done := false
 var auto_sync := true  # quiet sync after each session, and when the app opens
+var volume := 1.0  # recitation loudness, 0 (silent) to 1 (full); remembered between visits
 
 
 static func load_settings():
@@ -25,7 +26,7 @@ static func load_settings():
         if typeof(data) != TYPE_DICTIONARY:
                 push_warning("Settings: %s unreadable; using defaults" % PATH)
                 return s
-        for key in ["token", "owner", "repo", "deck_folder", "last_sync", "setup_done", "auto_sync"]:
+        for key in ["token", "owner", "repo", "deck_folder", "last_sync", "setup_done", "auto_sync", "volume"]:
                 if not data.has(key):
                         continue
                 # JSON reads every number back as a float, and every saved int
@@ -38,6 +39,8 @@ static func load_settings():
                         s.set(key, value)
                 elif want == TYPE_INT and typeof(value) == TYPE_FLOAT:
                         s.set(key, int(round(float(value))))
+                elif want == TYPE_FLOAT and typeof(value) == TYPE_INT:
+                        s.set(key, float(value))
                 elif want == TYPE_BOOL and typeof(value) == TYPE_INT:
                         s.set(key, bool(value))
         return s
@@ -58,6 +61,7 @@ func save() -> bool:
                                 "last_sync": last_sync,
                                 "setup_done": setup_done,
                                 "auto_sync": auto_sync,
+                                "volume": volume,
                         },
                         "\t"
                 )

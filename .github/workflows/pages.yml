@@ -120,7 +120,11 @@ jobs:
       # focus. The head_include ships a capture-phase gate on window that
       # stops propagation for the browser-reserved combos (and only those:
       # Space, 1-4 and Esc still belong to the app), so the default action
-      # survives and the tab behaves like a tab again.
+      # survives and the tab behaves like a tab again. The same gate takes
+      # Ctrl+V/Cmd+V away from the engine -- whose paste reads a cache a
+      # keystroke behind and asks the browser for a permission sheet -- and
+      # the qt-paste-bridge script hands the page's own paste events to the
+      # app instead: fresh text, no prompt, first press.
       - name: Check the web build carries the deck
         run: |
           test -f builds/web/index.pck
@@ -145,6 +149,12 @@ jobs:
           grep -q "getRegistration" builds/web/index.html
           grep -q "visibilitychange" builds/web/index.html
           grep -q "reg.update" builds/web/index.html
+          # Paste reaches the app through the page's own event, not a
+          # permission sheet: the marker alone would pass even if the bridge
+          # arrived truncated, so the check demands its working parts too.
+          grep -q "qt-paste-bridge" builds/web/index.html
+          grep -q "addEventListener('paste'" builds/web/index.html
+          grep -q "__qtPasteBridge" builds/web/index.html
           python3 - <<'PY'
           import sys
           data = open("builds/web/index.pck", "rb").read()

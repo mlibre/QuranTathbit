@@ -84,11 +84,15 @@ func _build() -> void:
         column.add_child(bar["row"])
 
         column.add_child(_deck_body())
-        column.add_child(_section("GitHub"))
         column.add_child(_github_body())
-        column.add_child(_section("Data source"))
         column.add_child(_source_body())
         column.add_child(_about())
+        # The last card gets the same breath under it the page gives above:
+        # a scroll that ends hard against its content reads as cut off.
+        var tail := Control.new()
+        tail.name = "Tail"
+        tail.custom_minimum_size = Vector2(0, 14)
+        column.add_child(tail)
 
 ## The page answers the window: the cards keep a reader's measure on a
 ## desktop -- never a stripe the width of a whole window -- and fill a phone
@@ -106,20 +110,17 @@ func _layout() -> void:
                 return
         column.custom_minimum_size = Vector2(minf(620.0, size.x - 52.0), 0.0)
 
-## A section header is a small gold word and a rule that runs to the edge of
-## the page: the word names what follows, the rule says where it ends.
-func _section(title: String) -> Control:
-        var row := HBoxContainer.new()
-        row.name = "Section_" + title
-        row.add_theme_constant_override("separation", 10)
+## A card's own name, said inside the card: a small gold word over a rule,
+## so each card reads as its own page with a running title -- not a label
+## floating between cards, where the margin swallows it.
+func _card_header(box: VBoxContainer, title: String) -> void:
         var label := Label.new()
+        label.name = "CardTitle"
         label.text = title
-        ThemeScript.dress(label, ThemeScript.CAPTION, ThemeScript.GOLD_DEEP, true)
-        row.add_child(label)
-        var rule := ThemeScript.hairline(ThemeScript.LINE)
-        rule.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-        row.add_child(rule)
-        return row
+        label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+        ThemeScript.dress(label, 12, ThemeScript.GOLD_DEEP, true)
+        box.add_child(label)
+        box.add_child(ThemeScript.hairline(ThemeScript.LINE))
 
 ## Every line of explanation on this screen is a selectable RichTextLabel:
 ## a person reads with their eyes and copies with their mouse, and neither
@@ -191,6 +192,7 @@ func _github_body() -> Control:
         var parts := _card("GitHub")
         var card: PanelContainer = parts[0]
         var box: VBoxContainer = parts[1]
+        _card_header(box, "GitHub sync")
 
         var state := _text("", ThemeScript.INK, ThemeScript.BODY)
         state.name = "State"
@@ -272,11 +274,11 @@ func _github_body() -> Control:
 
         box.add_child(_field_label("Personal access token"))
         # The field owns its whole row: a token is forty characters, and a
-        # thumb needs the field's full width to find its place in it. The
-        # things a hand does with the field stand under it, as three equal
-        # doors -- paste, check, keep -- because in a browser canvas there is
-        # no long-press menu and no Ctrl+V worth the name, and pasting a
-        # token by typing it is not pasting.
+        # thumb needs the field's full width to find its place in it. Paste
+        # is not a button any more -- in a browser the page hands the app its
+        # own paste events, so Ctrl+V simply works, and a finger pastes by
+        # holding the field. What is left under it are the two things that
+        # were always wanted: to see what arrived, and to keep it.
         var token := LineEdit.new()
         token.name = "Token"
         token.placeholder_text = ("Paste the token GitHub shows you" if OS.has_feature("web") else "…or paste a repo token")
@@ -286,25 +288,20 @@ func _github_body() -> Control:
         token.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
         token.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
         _style_field(token)
+        _paste_on_hold(token)
         token.text_submitted.connect(func(_text: String) -> void: _save_token())
         box.add_child(token)
         var token_row := HBoxContainer.new()
         token_row.name = "TokenRow"
         token_row.add_theme_constant_override("separation", 8)
         box.add_child(token_row)
-        var paste := ThemeScript.ghost_button("Paste", ThemeScript.GREEN, 44, 12)
-        paste.name = "PasteToken"
-        paste.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        paste.tooltip_text = "Paste from the clipboard"
-        paste.pressed.connect(_paste_token)
-        token_row.add_child(paste)
         var show := ThemeScript.ghost_button("Show", ThemeScript.INK_SOFT, 44, 12)
         show.name = "ShowToken"
         show.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         show.tooltip_text = "Show or hide what was typed"
         show.pressed.connect(_toggle_token_shown)
         token_row.add_child(show)
-        var save_token := ThemeScript.ghost_button("Save", ThemeScript.GREEN, 44, 12)
+        var save_token := ThemeScript.ghost_button("Save token", ThemeScript.GREEN, 44, 12)
         save_token.name = "SaveToken"
         save_token.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         save_token.pressed.connect(_save_token)
@@ -329,6 +326,7 @@ func _github_body() -> Control:
         _style_field(repo)
         repo.text_submitted.connect(_save_repo)
         box.add_child(repo)
+        _paste_on_hold(repo)
         var repo_hint := _text(
                 "Where your deck lives on GitHub — created on first sync if it does not exist.",
                 ThemeScript.INK_SOFT, ThemeScript.CAPTION
@@ -390,6 +388,7 @@ func _source_body() -> Control:
         var parts := _card("DataSource")
         var card: PanelContainer = parts[0]
         var box: VBoxContainer = parts[1]
+        _card_header(box, "Data source")
         box.add_theme_constant_override("separation", 8)
 
         var what := RichTextLabel.new()
@@ -570,7 +569,7 @@ func _begin_web_connect() -> void:
         hint.text = (
                 "1. Press the button — GitHub opens with the form filled in: the name and the repo permission are already set.\n"
                 + "2. Generate the token, then copy the string it shows you.\n"
-                + "3. Come back here, press Paste, then Save."
+                + "3. Come back here, paste it into the box below (Ctrl+V, or hold the box on a phone), then press Save."
         )
         open.text = "Create a token on GitHub"
         _flow_uri = "https://github.com/settings/tokens/new?scopes=repo&description=QuranTathbit%20sync"
@@ -616,10 +615,36 @@ func _save_token() -> void:
 
 # --- the clipboard, both of its worlds ------------------------------------------
 
+## In a browser the field itself is the paste button: a finger held on the
+## field for half a second pastes the clipboard into it. The engine's own
+## touch menu is switched off for this -- its Paste reads a cache a
+## keystroke behind -- and the hold takes its place; on a keyboard Ctrl+V
+## works too, carried by the page's own paste event.
+func _paste_on_hold(field: LineEdit) -> void:
+        if not OS.has_feature("web"):
+                return
+        field.context_menu_enabled = false
+        var hold := {"armed": null, "held": false}
+        field.gui_input.connect(func(event: InputEvent) -> void:
+                if not event is InputEventScreenTouch:
+                        return
+                if event.pressed:
+                        hold["held"] = true
+                        var timer := get_tree().create_timer(0.55)
+                        hold["armed"] = timer
+                        timer.timeout.connect(func() -> void:
+                                if hold["held"] and hold["armed"] == timer:
+                                        hold["held"] = false
+                                        _paste_token()
+                        )
+                else:
+                        hold["held"] = false
+        )
+
+
 ## One field, two worlds: on a desktop the clipboard is the engine's to read;
 ## in a browser the page owns it, and only the page's own JavaScript can
-## ask. The button works in both because the hand that presses it should
-## not have to know which world it is in.
+## ask. The hand that pastes should not have to know which world it is in.
 func _paste_token() -> void:
         var field := _token_field()
         if OS.has_feature("web"):
@@ -627,7 +652,7 @@ func _paste_token() -> void:
                 return
         var clip := DisplayServer.clipboard_get().strip_edges()
         if clip.is_empty():
-                _token_note("Nothing on the clipboard. Copy the token first, then press Paste.")
+                _token_note("Nothing on the clipboard. Copy the token first, then hold the field to paste.")
                 return
         field.text = clip
         field.caret_column = clip.length()
@@ -666,15 +691,16 @@ func _paste_from_page(field: LineEdit) -> void:
                 if answer.begins_with("ok:"):
                         var clip := answer.substr(3).strip_edges()
                         if clip.is_empty():
-                                _token_note("The clipboard is empty. Copy the token on GitHub, then press Paste.")
+                                _token_note("The clipboard is empty. Copy the token on GitHub, then hold the field to paste.")
                                 return
                         field.text = clip
                         field.caret_column = clip.length()
                         field.grab_focus()
+                        _token_note("Pasted — press Save token when it looks right.")
                         return
                 _token_note("This browser would not share its clipboard. Copy the token, tap the field, and use your keyboard's paste.")
                 return
-        _token_note("The clipboard did not answer. Press Paste again.")
+        _token_note("The clipboard did not answer. Hold the field again to paste.")
 
 
 ## A secret field keeps neither typos nor pastes visible; a hand that wants

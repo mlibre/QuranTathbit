@@ -109,6 +109,24 @@ func _check_study_session(main: Node) -> void:
 
         var view = study.get_node("Margin/Column/Surface/Fill/CardPanel/Padding/View")
         _ok(view.get_child_count() >= 1, "the card's question is on screen")
+        # The recitation's loudness lives in the header's free corner: a coin
+        # beside the way back, and under it a rule the hand can drag.
+        var volume_coin: Button = study.get_node_or_null("Margin/Column/TopBar/Right/Volume")
+        _ok(volume_coin != null, "the volume coin sits in the header's corner")
+        var volume_popup: Control = study.get_node_or_null("VolumePopup")
+        _ok(volume_popup != null, "the volume's own page waits under the coin")
+        if volume_coin != null:
+                volume_coin.pressed.emit()
+                await create_timer(0.1).timeout
+                _ok(volume_popup != null and volume_popup.visible, "pressing the coin opens the volume's page")
+                var slider: HSlider = volume_popup.get_node("Pad/Box/Slider")
+                slider.value = 0.5
+                await create_timer(0.7).timeout
+                _is(study.volume, 0.5, "the rule sets the loudness it says")
+                _ok(absf(study._player.volume_db - linear_to_db(0.5)) < 0.01, "the player obeys the rule")
+                volume_coin.pressed.emit()
+                await create_timer(0.1).timeout
+                _ok(not volume_popup.visible, "pressing the coin again closes the page")
 
         study._reveal()
         await create_timer(0.4).timeout
@@ -136,6 +154,27 @@ func _check_study_session(main: Node) -> void:
         _ok(view.get_children().any(func(c: Node) -> bool:
                 return c is Button and c.has_node("Center/Row/Icon") and "Listen" in c.get_node("Center/Row/Label").text
         ), "audio is offered as a button")
+        # The recitation's button must hear the sound end: a verse that runs
+        # out takes its button back to rest instead of saying "Listening…"
+        # forever -- the very thing a finished signal is for.
+        var listen_button: Button = null
+        for child in view.get_children():
+                if child is Button and child.has_node("Center/Row/Icon"):
+                        listen_button = child
+        if listen_button != null:
+                listen_button.pressed.emit()
+                await create_timer(0.3).timeout
+                _is(
+                        listen_button.get_node("Center/Row/Label").text,
+                        "Listening…",
+                        "pressing Listen starts the recitation"
+                )
+                study._view._on_audio_finished()
+                _is(
+                        listen_button.get_node("Center/Row/Label").text,
+                        listen_button.get_meta("idle_text", ""),
+                        "the button rests the moment the sound runs out"
+                )
 
         # Answer the card and check the state moves.
         study._answer("good")
@@ -166,12 +205,18 @@ func _check_settings(main: Node) -> void:
                 _ok(state.text.length() > 0, "the GitHub section says where things stand")
         var token: LineEdit = settings.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Token")
         _ok(token != null, "the token field stands in its own row")
+        # Paste is no longer a button: in a browser the page hands the app its
+        # own paste events, so Ctrl+V works in the field itself and a finger
+        # pastes by holding it. The two doors that remain are seeing and
+        # saving -- and the old button must not come back by accident.
         var paste: Button = settings.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/TokenRow/PasteToken")
-        _ok(paste != null, "the paste button stands under the token field")
+        _ok(paste == null, "no paste button: paste happens in the field itself")
         var shown: Button = settings.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/TokenRow/ShowToken")
-        _ok(shown != null, "the show button stands beside it")
+        _ok(shown != null, "the show button stands under the token field")
         var saved: Button = settings.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/TokenRow/SaveToken")
-        _ok(saved != null, "the save button stands beside them")
+        _ok(saved != null, "the save button stands beside it")
+        var card_title: Label = settings.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/CardTitle")
+        _ok(card_title != null and card_title.text.length() > 0, "the GitHub card carries its own title inside it")
         settings.closed.emit()
         await create_timer(0.4).timeout
         _ok(main.get_node_or_null("Home") != null, "closing settings returns home")
@@ -187,12 +232,14 @@ func _check_settings_round_trip() -> void:
         settings.last_sync = 1792000123
         settings.setup_done = true
         settings.auto_sync = false
+        settings.volume = 0.35
         _ok(settings.save(), "settings save")
         var back = script.load_settings()
         _is(back.token, "round-trip", "the token loads back")
         _is(back.last_sync, 1792000123, "the last sync time survives its own reload")
         _is(back.setup_done, true, "setup_done survives its own reload")
         _is(back.auto_sync, false, "a switched-off auto sync stays off")
+        _is(back.volume, 0.35, "a chosen loudness survives its own reload")
         # A file written by any older version of the app carries its ints as
         # floats; those must heal into the ints they were meant as.
         var file := FileAccess.open("user://settings.json", FileAccess.WRITE)

@@ -30,6 +30,7 @@ var _update_waiting := false  # a newer web version was announced; Home owes the
 var _syncing := false  # one sync at a time; a second press is a question, not a demand
 var _answers_waiting := 0  # answers given since the repo last heard from this deck
 var _sync_failed := false  # the last sync could not finish; the deck is honest about it
+var _paste_callback: Variant = null  # the page's paste hook, kept alive for the app's whole life
 
 
 func _ready() -> void:
@@ -47,6 +48,7 @@ func _ready() -> void:
         _auth = GitHubAuthScript.new()
         _sync = GitHubSyncScript.new(_http, _auth)
 
+        _install_paste_bridge()
         _watch_updates()
         _go_home()
         # A deck that is already connected says hello on its own, quietly: a
@@ -122,10 +124,22 @@ func _start_session() -> void:
                 return
         var study := StudyScript.new()
         study.name = "Study"
+        # The recitation speaks as loudly as the last session left it: the
+        # setting is set before the screen enters the tree, so its first
+        # breath already carries the remembered loudness.
+        study.volume = _settings.volume
         _swap(study)
         study.start(cards)
         study.answered.connect(_on_answered)
         study.closed.connect(_on_session_closed)
+        study.volume_changed.connect(_on_volume_changed)
+
+
+## A moved volume rule is remembered the moment the hand stops moving it, so
+## the next session opens as quiet as this one ended.
+func _on_volume_changed(value: float) -> void:
+        _settings.volume = value
+        _settings.save()
 
 
 ## A session's answers are the one thing this app makes that another device
@@ -305,6 +319,65 @@ func _swap(next: Control, from_above := false) -> void:
         _screen = next
         add_child(next)
         ThemeScript.appear(next, 0.0, -14.0 if from_above else 14.0)
+
+
+# --- the web's clipboard ------------------------------------------------------------
+
+## In a browser the engine's own paste is a keystroke behind: its Ctrl+V
+## reads a clipboard cache that only the PREVIOUS paste filled, so the first
+## press pastes nothing and the second pastes what may since have been
+## replaced -- and reading the clipboard directly (the engine's fallback)
+## is a permission sheet, a whole conversation for a paste. The page's own
+## paste event carries the text itself, no prompt, so the head script hides
+## Ctrl+V from the engine and forwards the event here instead. What arrives
+## lands in whichever field the user is typing in, the way paste has always
+## worked everywhere else.
+func _install_paste_bridge() -> void:
+        var bridge := _bridge()
+        if bridge == null:
+                return
+        # The callback object is reference-counted: a local would die with
+        # the function, and the page would be left calling a hook nobody
+        # answers. It is held for the app's whole life instead.
+        _paste_callback = bridge.call("create_callback", _on_web_paste)
+        var installer: Variant = bridge.call("get_interface", "__qtPasteInstall")
+        if installer == null:
+                return
+        installer.install(_paste_callback)
+
+
+## The page handed us its paste. One line is all a field takes; a
+## multi-line clipboard pastes its first line, the way every single-line
+## field everywhere treats it. A selection is replaced, not prepended to.
+func _on_web_paste(args: Array) -> void:
+        if args.is_empty():
+                return
+        var raw := str(args[0]).replace("\r\n", "\n").replace("\r", "\n")
+        var text := raw.split("\n")[0].strip_edges()
+        if text.is_empty():
+                return
+        var focus := get_viewport().gui_get_focus_owner()
+        if not focus is LineEdit:
+                return
+        var field := focus as LineEdit
+        if not field.editable:
+                return
+        if field.has_selection():
+                var from := field.get_selection_from_column()
+                var to := field.get_selection_to_column()
+                field.text = field.text.substr(0, from) + text + field.text.substr(to)
+                field.caret_column = from + text.length()
+                field.deselect()
+        else:
+                field.insert_text_at_caret(text)
+        field.grab_focus()
+        # The page is told what its paste became -- length and a first look,
+        # never the whole secret -- so the live web test can prove the hand
+        # arrived, the same corner-of-the-document pattern as always.
+        var note := ("ok:%d:%s" % [field.text.length(), field.text.substr(0, 8)]).uri_encode()
+        var bridge := _bridge()
+        if bridge != null:
+                bridge.call("eval", "document.documentElement.setAttribute('data-qt-pasted','" + note + "')")
 
 
 # --- web updates ----------------------------------------------------------------

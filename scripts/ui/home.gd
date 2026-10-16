@@ -60,6 +60,7 @@ func _layout() -> void:
                 pill.custom_minimum_size = Vector2(pill_w, 74)
         var study: Button = get_node("Margin/Column/Study")
         study.custom_minimum_size = Vector2(minf(340.0, avail), 60.0)
+        _fit_sync_line()
 
 func setup(deck: DeckScript, counts: Dictionary, sync_line: String, sync_state := "off") -> void:
         if not is_node_ready():
@@ -110,6 +111,14 @@ func _apply_counts(counts: Dictionary) -> void:
         if counts["due"] + counts["new"] == 0:
                 study.text = "All caught up"
                 study.disabled = true
+                # A day with nothing waiting is an answer, not an absence: the
+                # button rests in the day's own green, warm and settled,
+                # instead of the engine's grey that reads as broken.
+                var rest := ThemeScript.button_stylebox(ThemeScript.GREEN_SOFT)
+                rest.border_color = Color(ThemeScript.GREEN.r, ThemeScript.GREEN.g, ThemeScript.GREEN.b, 0.35)
+                rest.set_border_width_all(2)
+                study.add_theme_stylebox_override("disabled", rest)
+                study.add_theme_color_override("font_disabled_color", ThemeScript.GREEN_DEEP)
         else:
                 study.text = "Study" if counts["due"] > 0 else "Learn new cards"
                 study.disabled = false
@@ -144,10 +153,11 @@ func _set_sync_state(text: String, state: String) -> void:
         mark.set_working(state == "syncing")
         mark.queue_redraw()
         coin.tooltip_text = text
-        var row: HBoxContainer = get_node_or_null("Margin/Column/SyncLine")
+        var row: HBoxContainer = get_node_or_null("Margin/Column/SyncLine/Row")
         if row != null:
                 (row.get_node("Text") as Label).text = text
                 (row.get_node("Dot") as ThemeScript.StatusDot).color = mark_tone
+                _fit_sync_line()
 
 
 ## The coin turns and the line says so, while a sync runs quietly under
@@ -416,12 +426,17 @@ func _pill_fg(key: String) -> Color:
 ## it to a mouse, but a fingertip has no hover to carry one, so the line
 ## stands on the page itself -- a dot of the state's own tone, the words
 ## beside it, quiet, small, and there for whichever kind of hand asks.
+## The dot and the words are one centered figure: the row they share
+## shrinks to what it holds and the page centers the pair, so the dot
+## stands beside its own sentence instead of stranded at the margin.
 func _sync_line() -> Control:
+        var wrap := VBoxContainer.new()
+        wrap.name = "SyncLine"
         var row := HBoxContainer.new()
-        row.name = "SyncLine"
+        row.name = "Row"
         row.alignment = BoxContainer.ALIGNMENT_CENTER
         row.add_theme_constant_override("separation", 8)
-        row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         var dot := ThemeScript.StatusDot.new(ThemeScript.INK_SOFT)
         dot.name = "Dot"
         dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -430,11 +445,31 @@ func _sync_line() -> Control:
         line.name = "Text"
         line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         ThemeScript.dress(line, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
         line.text = ""
         row.add_child(line)
-        return row
+        wrap.add_child(row)
+        return wrap
+
+
+## The sentence takes the width its words need, and no more than the page
+## can hold: a long line wraps at the measure of the window rather than
+## pushing its dot off the edge, and a short one keeps the pair centred.
+func _fit_sync_line() -> void:
+        var label: Label = get_node_or_null("Margin/Column/SyncLine/Row/Text")
+        if label == null:
+                return
+        var font := ThemeScript.vazir(ThemeScript.CAPTION)
+        var widest := 0.0
+        for text_line in label.text.split("\n"):
+                widest = maxf(
+                        widest,
+                        font.get_string_size(
+                                text_line, HORIZONTAL_ALIGNMENT_LEFT, -1, ThemeScript.CAPTION
+                        ).x
+                )
+        var avail := maxf(size.x - 120.0, 140.0)
+        label.custom_minimum_size = Vector2(minf(widest, avail), 0.0)
 
 func _study_button() -> Control:
         var button := ThemeScript.primary_button("Study", 60)

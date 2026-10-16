@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
-# End-to-end test of the token Paste button in the web build, in one
-# invocation (background processes do not survive between tool calls here).
-# The browser's clipboard is a promise eval cannot await, so the button asks
-# the page to write the answer into a document attribute and polls for it.
-# This test proves that whole hand-off on a live page:
+# End-to-end test of pasting a token in the web build, in one invocation
+# (background processes do not survive between tool calls here).
+# Paste is no longer a button and no permission sheet stands between the
+# clipboard and the field: the head script hands the page's own paste
+# event to the app, which lands the text in whatever field is focused.
+# This test proves that whole path on a live page:
 #   1. serve builds/web, boot the app at a phone viewport, require BOOT_OK
 #   2. open Settings with a canvas click on the corner coin
-#   3. override the browser clipboard with a known token
-#   4. click Paste (sweeping a small y-range until the attribute flips),
-#      require the attribute to end in our token -- the exact bytes the
-#      GDScript field would receive
-#   5. click Show, screenshot the field for visual confirmation
-#   6. click Save with the fake token, require the honest failure note
-#      (a fake token cannot reach GitHub's /user), proving Save is wired
+#   3. sweep-click where the token field lives; after each click, dispatch
+#      a real paste event carrying a known token -- the app answers by
+#      stamping what its field now holds into the document (data-qt-pasted),
+#      so every try is checked and only a true paste into a true focused
+#      field answers
+#   4. require the stamp to carry the token's length and first eight
+#      characters -- the exact bytes the field received
+#   5. press Show, screenshot the field for visual confirmation
 set -uo pipefail
 SRV="$(dirname "$0")/serve_web.py"
 python3 "$SRV" 8123 >/tmp/serve_web.log 2>&1 &
@@ -23,7 +25,11 @@ sleep 1
 pass() { echo "PASS  $1"; }
 fail() { echo "FAIL  $1"; echo "FINAL: FAIL"; exit 1; }
 
-TOKEN="ghp_webtestTOKEN1234567890abcdef"
+TOKEN="ghp_testpaste_0123456789abcdef"
+LEN=${#TOKEN}
+HEAD="${TOKEN:0:8}"
+# "ok:LEN:HEAD" as the app writes it, URI-encoded the way the page carries it.
+WANT="ok%3A${LEN}%3A${HEAD}"
 
 echo "== 1. boot =="
 agent-browser set viewport 390 844 >/dev/null || fail "viewport"
@@ -44,46 +50,33 @@ agent-browser wait 2000 >/dev/null
 agent-browser screenshot /tmp/web_1_settings.png >/dev/null
 pass "settings opened by canvas click (verified by shot)"
 
-echo "== 3. clipboard override =="
-agent-browser eval "Object.defineProperty(navigator,'clipboard',{value:{readText:()=>Promise.resolve('$TOKEN')}})" >/dev/null || fail "clipboard override"
-pass "clipboard says the test token"
-
-echo "== 4. press Paste =="
-# The Paste button's page position is found by sweeping a grid: pressing it
-# makes the page stamp the clipboard handshake attribute on <html>, so
-# every try is checked and only the true press answers.
+echo "== 3. paste into the field =="
+# The paste lands only in a focused field: every try clicks a candidate
+# spot, dispatches a real paste event carrying the token, and looks for
+# the app's answer stamped into the document.
+PASTE_JS="var dt=new DataTransfer();dt.setData('text/plain','${TOKEN}');window.dispatchEvent(new ClipboardEvent('paste',{clipboardData:dt}));'sent'"
 FOUND=""
-FOUND_Y=""
-for y in 577 585 570 592 560 565; do
-  for x in 94 100 88; do
+for y in 530 520 540 510 550 500 560 490; do
+  for x in 160 100 220 280 60; do
+        agent-browser eval "document.documentElement.setAttribute('data-qt-pasted','')" >/dev/null
         agent-browser mouse move $x $y >/dev/null
         agent-browser mouse down >/dev/null; agent-browser mouse up >/dev/null
-        agent-browser wait 500 >/dev/null
-        A=$(agent-browser eval "document.documentElement.getAttribute('data-qt-clipboard') || 'none'" 2>/dev/null | tr -d '"\n')
-        if [ "$A" != "none" ] && [ "$A" != "asked" ]; then FOUND="$A"; FOUND_Y=$y; break 2; fi
+        agent-browser eval "$PASTE_JS" >/dev/null
+        agent-browser wait 300 >/dev/null
+        A=$(agent-browser eval "document.documentElement.getAttribute('data-qt-pasted') || 'none'" 2>/dev/null | tr -d '"\n')
+        if [ "$A" != "none" ] && [ "$A" != "" ]; then FOUND="$A"; break 2; fi
   done
 done
-[ -n "$FOUND" ] || fail "Paste never asked the page for the clipboard"
-echo "      paste button found at y=$FOUND_Y"
-echo "$FOUND" | grep -q "ok:$TOKEN" && pass "the page handed the clipboard to the app ($FOUND)" || fail "clipboard hand-off wrong: $FOUND"
+[ -n "$FOUND" ] || fail "pasting never reached a focused field"
+echo "      the app answered: $FOUND"
+[ "$FOUND" = "$WANT" ] && pass "the paste landed in the field ($FOUND)" || fail "the field holds something else: $FOUND (wanted $WANT)"
 
-# The three buttons share one row: Paste found, Show and Save stand at the
-# same height, a button's width apart.
-SHOW_X=$(( 94 + 100 ))
-SAVE_X=$(( 94 + 201 ))
-
-echo "== 5. show what arrived =="
-agent-browser mouse move $SHOW_X $FOUND_Y >/dev/null
+echo "== 4. show what arrived =="
+# Show and Save share the row under the field: halves of the card's width.
+agent-browser mouse move 121 585 >/dev/null
 agent-browser mouse down >/dev/null; agent-browser mouse up >/dev/null
 agent-browser wait 800 >/dev/null
 agent-browser screenshot /tmp/web_2_pasted.png >/dev/null
-pass "field screenshotted for visual check"
-
-echo "== 6. save the fake token =="
-agent-browser mouse move $SAVE_X $FOUND_Y >/dev/null
-agent-browser mouse down >/dev/null; agent-browser mouse up >/dev/null
-agent-browser wait 3500 >/dev/null
-agent-browser screenshot /tmp/web_3_saved.png >/dev/null
-pass "save pressed (outcome read from the shot)"
+pass "field screenshotted for visual check (token visible if Show was hit)"
 
 echo "FINAL: PASS"
