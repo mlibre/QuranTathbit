@@ -12,6 +12,8 @@ const HomeScript := preload("res://scripts/ui/home.gd")
 const StudyScript := preload("res://scripts/ui/study.gd")
 const SettingsScreenScript := preload("res://scripts/ui/settings_screen.gd")
 const BrowseScript := preload("res://scripts/ui/browse.gd")
+const I18nScript := preload("res://scripts/ui/i18n.gd")
+const LanguagePickerScript := preload("res://scripts/ui/language_picker.gd")
 
 ## QuranTathbit: one deck, kept in folders and files, studied one card at
 ## a time. This root owns the small amount of state the app has -- settings,
@@ -57,7 +59,9 @@ func _ready() -> void:
                 push_error("QuranTathbit: the deck could not be read from %s" % USER_DECK)
                 get_tree().quit(1)
                 return
-        _adopt_deck_pace()
+        _adopt_deck_choices()
+        I18nScript.set_lang(_settings.ui_lang)
+        ThemeScript.set_ayah_face(_settings.ayah_font)
 
         _http = HttpClientScript.new()
         _http.name = "HttpClient"
@@ -68,6 +72,11 @@ func _ready() -> void:
         _install_paste_bridge()
         _watch_updates()
         _go_home()
+        # The app's very first question, over the page it asks on: which
+        # tongue do its own words speak? Only a reader who has never
+        # answered -- here or on any device the deck reached -- is asked.
+        if _settings.ui_lang.is_empty():
+                _show_language_picker()
         # A deck that is already connected says hello on its own, quietly: a
         # sync that finds nothing to do is three small questions and a green
         # line, and the user never again opens the app to a status that
@@ -234,35 +243,98 @@ func _on_settings_pressed() -> void:
         screen.setup(_http, _auth, _settings, _deck)
         screen.closed.connect(_go_home)
         screen.sync_requested.connect(_on_sync_pressed)
-        screen.pace_push_requested.connect(_on_pace_push_requested)
+        screen.choice_push_requested.connect(_on_choice_push_requested)
         screen.account_changed.connect(_on_account_changed)
 
 
-## The reader's own pace travels with the deck, so a choice made on another
-## device arrives with the deck's own sync: the number this device wakes with
-## is the number the deck last heard. It is asked for quietly, under whatever
-## screen stands -- the same door every quiet sync uses.
-func _on_pace_push_requested() -> void:
+## A travelling choice has settled -- the day's pace, the verses' face, the
+## app's tongue -- and the repo should hear it without the user having to
+## ask, under whatever screen stands: the same door every quiet sync uses.
+func _on_choice_push_requested() -> void:
         if _settings.has_token() and _settings.auto_sync:
                 _run_sync(true)
 
 
-## The deck's own word about the day's pace, said once at every arrival: a
-## deck that has never carried one adopts this device's setting as its own
-## (the first save writes it into progress.json), and a deck that has one
-## becomes the setting -- so every device the deck reaches paces the day the
-## same, and "New cards each day" in Settings is the deck's number, not the
-## phone's.
-func _adopt_deck_pace() -> void:
+## The deck's own word about the choices that travel with it, said once at
+## every arrival: a deck that has never carried one adopts this device's
+## setting as its own (the first save writes it into progress.json), and a
+## deck that has one becomes the setting -- so every device the deck
+## reaches paces the day, dresses the verses and speaks the chrome the
+## same. The pace is an int whose silence is -1; the face and the tongue
+## are strings whose silence is "" -- the same adoption, three shapes of
+## the same silence.
+func _adopt_deck_choices() -> void:
         if _deck == null:
                 return
         if _deck.new_per_day < 0:
                 _deck.new_per_day = _settings.new_per_day
                 _deck.new_per_day_mod = _now()
-                return
-        if _deck.new_per_day != _settings.new_per_day:
+        elif _deck.new_per_day != _settings.new_per_day:
                 _settings.new_per_day = _deck.new_per_day
                 _settings.save()
+        if _deck.ayah_font.is_empty():
+                if not _settings.ayah_font.is_empty():
+                        _deck.ayah_font = _settings.ayah_font
+                        _deck.ayah_font_mod = _now()
+        elif _deck.ayah_font != _settings.ayah_font:
+                _settings.ayah_font = _deck.ayah_font
+                _settings.save()
+        if _deck.ui_lang.is_empty():
+                if not _settings.ui_lang.is_empty():
+                        _deck.ui_lang = _settings.ui_lang
+                        _deck.ui_lang_mod = _now()
+        elif _deck.ui_lang != _settings.ui_lang:
+                _settings.ui_lang = _deck.ui_lang
+                _settings.save()
+
+
+# --- the app's own tongue -------------------------------------------------------
+
+
+## The app's very first question, asked over the home page: a quiet card
+## naming each language in its own script, dismissed the moment it is
+## answered -- and never asked again, because the answer travels with the
+## deck (a new device inherits it in _adopt_deck_choices instead of being
+## asked twice).
+func _show_language_picker() -> void:
+        if get_node_or_null("LanguagePicker") != null:
+                return
+        var picker := LanguagePickerScript.new()
+        picker.name = "LanguagePicker"
+        add_child(picker)
+        picker.chosen.connect(_on_language_chosen)
+
+
+func _on_language_chosen(code: String) -> void:
+        var picker := get_node_or_null("LanguagePicker")
+        if picker != null:
+                picker.queue_free()
+        _apply_language(code)
+
+
+## The choice, wherever it was made: remembered on this device, spoken
+## through the app at once, and stamped into the deck's own progress so
+## every device the deck reaches inherits it. A home page already standing
+## in the old tongue is said again in the new one, because it is the page
+## the choice is most visible on.
+func _apply_language(code: String) -> void:
+        I18nScript.set_lang(code)
+        _settings.ui_lang = code
+        _settings.save()
+        if _deck != null:
+                _deck.ui_lang = code
+                _deck.ui_lang_mod = _now()
+                _deck.save_progress()
+        if _screen is HomeScript:
+                var old: Control = _screen
+                _screen = null
+                # The fading page keeps its place but gives up its name: two
+                # children of one parent cannot both be called Home, and the
+                # engine would quietly rename the newcomer instead.
+                old.name = "HomeLeaving"
+                old.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                ThemeScript.vanish(old)
+                _go_home()
 
 
 ## The library: the whole deck, read and listened to, nothing scheduled.
@@ -342,25 +414,34 @@ func _run_sync(quiet := false) -> void:
                 _maybe_schedule_sync_retry(quiet, result)
 
         # Progress may have merged in from another device -- the cards and the
-        # day's own pace alike; read the deck back.
+        # deck's own choices alike (pace, verses' face, tongue); read the deck
+        # back and speak whatever arrived.
         var reloaded: DeckScript = DeckScript.load(USER_DECK)
         if reloaded != null:
                 _deck = reloaded
-                _adopt_deck_pace()
+                _adopt_deck_choices()
                 _sync = GitHubSyncScript.new(_http, _auth)
+                # A language that arrived from another device is spoken at
+                # once, and the home page under this one is said again in
+                # it; a deck that has never answered keeps its own silence
+                # (the picker is asking, or Settings will).
+                if not _settings.ui_lang.is_empty() and _settings.ui_lang != I18nScript.lang():
+                        _apply_language(_settings.ui_lang)
+                else:
+                        ThemeScript.set_ayah_face(_settings.ayah_font)
 
         var line := ""
         if ok:
                 if int(result.get("pushed", 0)) + int(result.get("pulled", 0)) + int(result.get("merged", 0)) == 0:
-                        line = "Everything in step — synced just now"
+                        line = I18nScript.t("Everything in step — synced just now")
                 else:
-                        line = "Synced just now · %d sent, %d fetched, %d merged" % [
+                        line = I18nScript.t("Synced just now · %d sent, %d fetched, %d merged") % [
                                 result.get("pushed", 0), result.get("pulled", 0), result.get("merged", 0)
                         ]
         elif _sync_retrying:
-                line = "Connection trouble — the app will try again by itself"
+                line = I18nScript.t("Connection trouble — the app will try again by itself")
         else:
-                line = "Sync could not finish — your cards are safe here. Try again."
+                line = I18nScript.t("Sync could not finish — your cards are safe here. Try again.")
         if _screen is HomeScript:
                 _refresh_home()
         elif _screen is SettingsScreenScript:
@@ -418,21 +499,25 @@ func _refresh_home() -> void:
 
 func _sync_line() -> String:
         if not _settings.has_token():
-                return "Not connected — your deck lives on this device only"
+                return I18nScript.t("Not connected — your deck lives on this device only")
         if _syncing:
-                return "Syncing…"
+                return I18nScript.t("Syncing…")
         if _sync_retrying:
-                return "Connection trouble — the app will try again by itself"
+                return I18nScript.t("Connection trouble — the app will try again by itself")
         var waiting := _pending_answers()
         if waiting > 0:
                 if _answers_waiting > 0:
-                        return "%d %s waiting to sync" % [waiting, "answer" if waiting == 1 else "answers"]
-                # Progress moved without a session -- the day's own pace was
-                # chosen here -- and the number of "answers" would be a lie.
-                return "Changes waiting to sync"
+                        var template := I18nScript.t(
+                                "%d answer waiting to sync" if waiting == 1 else "%d answers waiting to sync"
+                        )
+                        return template % waiting
+                # Progress moved without a session -- the deck's own choices
+                # were changed here -- and the number of "answers" would be
+                # a lie.
+                return I18nScript.t("Changes waiting to sync")
         if _settings.last_sync > 0:
-                return "Last synced %s" % _ago(_now() - _settings.last_sync)
-        return "Connected — not synced yet"
+                return I18nScript.t("Last synced %s") % _ago(_now() - _settings.last_sync)
+        return I18nScript.t("Connected — not synced yet")
 
 
 ## Which of the coin's states the page is in: not connected at all; agreed
@@ -469,12 +554,12 @@ func _pending_answers() -> int:
 
 static func _ago(seconds: int) -> String:
         if seconds < 90:
-                return "just now"
+                return I18nScript.t("just now")
         if seconds < 3600:
-                return "%d min ago" % (seconds / 60)
+                return I18nScript.t("%d min ago") % (seconds / 60)
         if seconds < 86400:
-                return "%dh ago" % (seconds / 3600)
-        return "%dd ago" % (seconds / 86400)
+                return I18nScript.t("%dh ago") % (seconds / 3600)
+        return I18nScript.t("%dd ago") % (seconds / 86400)
 
 
 ## Screens change hands like pages: the outgoing one fades where it stands

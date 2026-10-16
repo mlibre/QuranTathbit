@@ -1,19 +1,22 @@
 class_name TathbitTheme
 extends RefCounted
 
-## The app's wardrobe: one warm paper palette, three typefaces, and the few
-## numbers every screen shares. Nothing here draws -- it only dresses, so a
-## heading on the home card is the same heading everywhere.
+## The app's wardrobe: one warm paper palette, a shelf of Quranic typefaces
+## the reader chooses between, and the few numbers every screen shares.
+## Nothing here draws -- it only dresses, so a heading on the home card is
+## the same heading everywhere.
 ##
-## Arabic verses wear Amiri, a Naskh typeface cut for Quranic text; Persian
-## wears Vazirmatn, whose calm sans keeps long translations restful; the
-## interface wears Vazirmatn too, so the chrome and the content agree.
+## Arabic verses wear the face the reader chose for them (Amiri Quran by
+## default), Persian wears Vazirmatn, whose calm sans keeps long
+## translations restful; the interface wears Vazirmatn too, so the chrome
+## and the content agree.
 
 ## An inner class cannot call this file's own static functions by their bare
 ## name -- the parser looks for them on the inner class and finds nothing. The
 ## file pins itself the way every cross-file reference in this project does:
 ## by path, so a machine with no editor class cache boots just the same.
 const THEME := preload("res://scripts/ui/theme.gd")
+const I18N := preload("res://scripts/ui/i18n.gd")
 
 const PAPER := Color("#FAF6ED")
 const CARD := Color("#FFFFFF")
@@ -31,8 +34,48 @@ const DANGER := Color("#B4553F")
 const AMIRI := "res://assets/fonts/Amiri-Regular.ttf"
 const AMIRI_BOLD := "res://assets/fonts/Amiri-Bold.ttf"
 const AMIRI_QURAN := "res://assets/fonts/AmiriQuran-Regular.ttf"
+const NOTO_NASKH := "res://assets/fonts/NotoNaskhArabic-Regular.ttf"
+const NOTO_NASKH_BOLD := "res://assets/fonts/NotoNaskhArabic-Bold.ttf"
 const VAZIR := "res://assets/fonts/Vazirmatn-Regular.ttf"
 const VAZIR_BOLD := "res://assets/fonts/Vazirmatn-Bold.ttf"
+
+## The faces a reader may choose between for the verses themselves, every
+## one of them from Google Fonts and carried inside the app. The mushaf
+## cut is the default because its harakat keep every curl at every size;
+## Amiri is the family's reading cut; Noto Naskh Arabic is the quiet
+## textbook Naskh. The labels are the fonts' own names and are never
+## translated -- a font's name is its name in every language.
+const AYAH_FACES := [
+        {"key": "amiri_quran", "label": "Amiri Quran"},
+        {"key": "amiri", "label": "Amiri"},
+        {"key": "noto_naskh", "label": "Noto Naskh Arabic"},
+]
+
+## The face scripture currently wears, as the reader chose it (or the
+## default before any choice). Set once at boot from the setting that
+## travels with the deck, and again from Settings the moment a choice is
+## made; every screen built afterwards dresses its verses in it.
+static var _ayah_face := "amiri_quran"
+
+
+static func set_ayah_face(key: String) -> void:
+        for face in AYAH_FACES:
+                if str(face["key"]) == key:
+                        _ayah_face = key
+                        return
+        _ayah_face = "amiri_quran"
+
+
+static func ayah_face_key() -> String:
+        return _ayah_face
+
+
+static func ayah_face_label(key: String) -> String:
+        for face in AYAH_FACES:
+                if str(face["key"]) == key:
+                        return str(face["label"])
+        return str(AYAH_FACES[0]["label"])
+
 
 ## The wash a selection wears. The engine's own RichTextLabel selection is a
 ## hard blue (0.1, 0.1, 1.0, 0.8) -- on this warm paper it reads as a spill
@@ -323,7 +366,7 @@ class VolumePopover extends PanelContainer:
                 var mute := Button.new()
                 mute.name = "Mute"
                 mute.custom_minimum_size = Vector2(38, 38)
-                mute.tooltip_text = "Mute or unmute"
+                mute.tooltip_text = I18N.t("Mute or unmute")
                 THEME.apply_mark_styles(mute, THEME.mark_button_styles(GREEN, true))
                 _mark = VolumeMark.new(GREEN_DEEP)
                 _mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1163,21 +1206,46 @@ static func quran() -> Font:
         return load(AMIRI_QURAN) as Font
 
 
+static func noto_naskh(bold := false) -> Font:
+        return load(NOTO_NASKH_BOLD if bold else NOTO_NASKH) as Font
+
+
 ## The face a verse wears, wherever scripture itself is shown: the study
-## card, the open page in the library, the shelf's own preview. Amiri Quran
-## is the family's mushaf cut -- the same hand as Amiri with the harakat
-## drawn larger and rounder, the way a vocalised text is read from. Amiri's
-## own damma at the shelf's small sizes flattens into a fatha's stroke -- a
-## reader learning the vowels read exactly that mistake off the preview --
-## and Amiri Quran's curl stays a curl at every size this app draws. There
-## is no bold in the mushaf cut: bold scripture falls back to the family's
+## card, the open page in the library, the shelf's own preview. The reader
+## chooses the hand the verses are read in (Amiri Quran by default -- the
+## family's mushaf cut, the same hand with the harakat drawn larger and
+## rounder, the way a vocalised text is read from). Amiri's own damma at
+## the shelf's small sizes flattens into a fatha's stroke -- a reader
+## learning the vowels read exactly that mistake off the preview -- and
+## Amiri Quran's curl stays a curl at every size this app draws. There is
+## no bold in the mushaf cut: bold scripture falls back to the family's
 ## own Bold, and references (which carry no vowels to lose) stay with Amiri.
 static func verse_face(script: String, bold := false) -> Font:
         match script:
                 "arabic":
-                        return amiri(BODY, bold) if bold else quran()
+                        return ayah_face(bold)
                 _:
                         return vazir(BODY, bold)
+
+
+## The chosen face itself, without asking what a line's script is: the
+## verse, the question's heading, the eyebrow above an answer -- all of
+## them Arabic, all of them in the hand the reader chose.
+static func ayah_face(bold := false) -> Font:
+        return ayah_face_for(_ayah_face, bold)
+
+
+## Any face by its key, chosen or not: the settings page draws one sample
+## in every face it offers, side by side, so the choice is judged on what
+## it chooses rather than on a description of it.
+static func ayah_face_for(key: String, bold := false) -> Font:
+        match key:
+                "amiri":
+                        return load(AMIRI_BOLD if bold else AMIRI) as Font
+                "noto_naskh":
+                        return load(NOTO_NASKH_BOLD if bold else NOTO_NASKH) as Font
+                _:
+                        return load(AMIRI_BOLD if bold else AMIRI_QURAN) as Font
 
 
 ## Which script is this line written in? Arabic gets the Quranic face and a

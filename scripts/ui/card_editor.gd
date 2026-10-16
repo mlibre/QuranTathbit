@@ -5,6 +5,7 @@ const CardScript := preload("res://scripts/data/card.gd")
 const CardViewScript := preload("res://scripts/ui/card_view.gd")
 const MarkdownScript := preload("res://scripts/ui/markdown.gd")
 const RtlFieldScript := preload("res://scripts/ui/rtl_field.gd")
+const I18nScript := preload("res://scripts/ui/i18n.gd")
 
 ## The card's own page, opened over whatever screen was reading it: not a
 ## small window over a dimmed room but a whole page of the app, arriving the
@@ -89,10 +90,10 @@ func _ready() -> void:
         _front.set_caret_at_end()
 
 func _build_top_bar() -> Control:
-        var bar: Dictionary = ThemeScript.top_bar("Edit card")
+        var bar: Dictionary = ThemeScript.top_bar(I18nScript.t("Edit card"))
         var row: HBoxContainer = bar["row"]
         var back: Button = bar["back"]
-        back.tooltip_text = "Back without saving"
+        back.tooltip_text = I18nScript.t("Back without saving")
         back.pressed.connect(_request_close)
         return row
 
@@ -114,10 +115,10 @@ func _build_mode_switch() -> Control:
                 var button := Button.new()
                 button.name = mode.capitalize()
                 button.custom_minimum_size = Vector2(78, 42)
-                button.text = mode.capitalize()
+                button.text = I18nScript.t(mode.capitalize())
                 button.tooltip_text = (
-                        "The words as their author wrote them" if mode == "write"
-                        else "The card as its reader will see it"
+                        I18nScript.t("The words as their author wrote them") if mode == "write"
+                        else I18nScript.t("The card as its reader will see it")
                 )
                 ThemeScript.pressable(button)
                 button.pressed.connect(_set_mode.bind(mode))
@@ -195,7 +196,7 @@ func _build_scroll() -> Control:
         _write_column.add_theme_constant_override("separation", 6)
         content.add_child(_write_column)
 
-        _write_column.add_child(_caption("QUESTION"))
+        _write_column.add_child(_caption(I18nScript.t("QUESTION")))
         _front = RtlFieldScript.new()
         _front.name = "Front"
         _front.one_line = true
@@ -206,7 +207,7 @@ func _build_scroll() -> Control:
         _front.set_text(_card.front)
 
         _write_column.add_child(_spacer(8))
-        _write_column.add_child(_caption("ANSWER"))
+        _write_column.add_child(_caption(I18nScript.t("ANSWER")))
         _back = RtlFieldScript.new()
         _back.name = "Back"
         _back.custom_minimum_size = Vector2(0, 180)
@@ -250,10 +251,10 @@ func _hint_row() -> Control:
         row.add_theme_constant_override("separation", 8)
         row.mouse_filter = Control.MOUSE_FILTER_IGNORE
         row.add_child(ThemeScript.key_chip("Esc"))
-        row.add_child(_hint_word("leave"))
+        row.add_child(_hint_word(I18nScript.t("leave")))
         row.add_child(ThemeScript.key_chip("Ctrl + Enter"))
-        row.add_child(_hint_word("save"))
-        row.add_child(_hint_word("·  *stars* lean a word"))
+        row.add_child(_hint_word(I18nScript.t("save")))
+        row.add_child(_hint_word(I18nScript.t("·  *stars* lean a word")))
         return row
 
 func _hint_word(text: String) -> Label:
@@ -285,12 +286,12 @@ func _build_footer() -> Control:
         stretch.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         stretch.mouse_filter = Control.MOUSE_FILTER_IGNORE
         _actions.add_child(stretch)
-        var quit := ThemeScript.ghost_button("Cancel", ThemeScript.INK_SOFT, 46)
+        var quit := ThemeScript.ghost_button(I18nScript.t("Cancel"), ThemeScript.INK_SOFT, 46)
         quit.name = "Cancel"
         quit.custom_minimum_size = Vector2(110, 46)
         quit.pressed.connect(_request_close)
         _actions.add_child(quit)
-        var keep := ThemeScript.primary_button("Save", 46)
+        var keep := ThemeScript.primary_button(I18nScript.t("Save"), 46)
         keep.name = "Save"
         keep.custom_minimum_size = Vector2(130, 46)
         keep.pressed.connect(_save)
@@ -307,17 +308,17 @@ func _build_footer() -> Control:
         _guard.add_theme_constant_override("separation", 10)
         var asking := Label.new()
         asking.name = "Asking"
-        asking.text = "The edits are not saved."
+        asking.text = I18nScript.t("The edits are not saved.")
         asking.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         asking.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
         asking.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
         ThemeScript.dress(asking, ThemeScript.CAPTION, ThemeScript.DANGER)
         _guard.add_child(asking)
-        var stay := ThemeScript.ghost_button("Keep editing", ThemeScript.GREEN_DEEP, 46, 21)
+        var stay := ThemeScript.ghost_button(I18nScript.t("Keep editing"), ThemeScript.GREEN_DEEP, 46, 21)
         stay.name = "Stay"
         stay.pressed.connect(_dismiss_guard)
         _guard.add_child(stay)
-        var discard := ThemeScript.ghost_button("Discard", ThemeScript.DANGER, 46, 21)
+        var discard := ThemeScript.ghost_button(I18nScript.t("Discard"), ThemeScript.DANGER, 46, 21)
         discard.name = "Discard"
         discard.pressed.connect(_close)
         _guard.add_child(discard)
@@ -410,16 +411,16 @@ func _save() -> void:
         var front := _front.get_text().strip_edges()
         var back := _back.get_text().strip_edges()
         if front.is_empty() or back.is_empty():
-                _warn.text = "A card needs both a question and an answer."
+                _warn.text = I18nScript.t("A card needs both a question and an answer.")
                 return
         if front == _card.front.strip_edges() and back == _card.back.strip_edges():
                 _close()
                 return
         if not _write(_card.folder.path_join("front.md"), front + "\n"):
-                _warn.text = "The question could not be saved."
+                _warn.text = I18nScript.t("The question could not be saved.")
                 return
         if not _write(_card.folder.path_join("back.md"), back + "\n"):
-                _warn.text = "The answer could not be saved."
+                _warn.text = I18nScript.t("The answer could not be saved.")
                 return
         _card.front = front
         _card.back = back

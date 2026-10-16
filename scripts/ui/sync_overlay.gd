@@ -1,6 +1,7 @@
 class_name SyncOverlay
 extends ColorRect
 const ThemeScript := preload("res://scripts/ui/theme.gd")
+const I18nScript := preload("res://scripts/ui/i18n.gd")
 
 ## What sync looks like while it happens: a quiet card over a dimmed screen
 ## that says plainly which phase is running, how far through it is, and that
@@ -8,6 +9,10 @@ const ThemeScript := preload("res://scripts/ui/theme.gd")
 ## engine speaks in short phrases -- "signing in", "uploading" -- and this
 ## screen turns them into words a person reads once and understands.
 
+## The engine's phases, each in plain words. The keys are the engine's own
+## phrases; the values are the English the table translates from, looked
+## up at the moment they are said, so the overlay speaks whatever tongue
+## the app is speaking.
 const PHRASES := {
         "signing in": "Signing in to GitHub",
         "reading repo": "Reading your repo",
@@ -68,7 +73,7 @@ func _ready() -> void:
         box.add_child(mark_row)
 
         var title := Label.new()
-        title.text = "Syncing"
+        title.text = I18nScript.t("Syncing")
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         ThemeScript.dress(title, ThemeScript.TITLE, ThemeScript.GREEN_DEEP, true)
         box.add_child(title)
@@ -79,7 +84,7 @@ func _ready() -> void:
         ThemeScript.dress(_phase, ThemeScript.BODY, ThemeScript.INK)
         # What it says before anything has reported: the first thing sync
         # actually does is sign in, so that is the first thing a person reads.
-        _phase.text = str(PHRASES["signing in"]) + "…"
+        _phase.text = I18nScript.t(str(PHRASES["signing in"])) + "…"
         box.add_child(_phase)
 
         _bar = ProgressBar.new()
@@ -97,7 +102,7 @@ func _ready() -> void:
         var reassurance := Label.new()
         reassurance.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         reassurance.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        reassurance.text = "Your cards stay on this device — sync only shares them."
+        reassurance.text = I18nScript.t("Your cards stay on this device — sync only shares them.")
         ThemeScript.dress(reassurance, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
         box.add_child(reassurance)
 
@@ -119,10 +124,10 @@ func _layout() -> void:
 func report(text: String, done: int, total: int) -> void:
         if _phase == null:
                 return
-        _phase.text = str(PHRASES.get(text, text.capitalize())) + "…"
+        _phase.text = I18nScript.t(str(PHRASES.get(text, text.capitalize()))) + "…"
         if total > 0:
                 _stop_sweep()
-                _count.text = "%d of %d" % [done, total]
+                _count.text = I18nScript.t("%d of %d") % [done, total]
                 _bar.value = 100.0 * float(done) / float(total)
         else:
                 _count.text = ""
@@ -137,9 +142,9 @@ func finish(ok: bool) -> void:
         _count.text = ""
         if ok:
                 _bar.value = 100.0
-                _phase.text = "Up to date"
+                _phase.text = I18nScript.t("Up to date")
         else:
-                _phase.text = "Sync could not finish"
+                _phase.text = I18nScript.t("Sync could not finish")
 
 
 func _start_sweep() -> void:

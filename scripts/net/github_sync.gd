@@ -493,10 +493,19 @@ static func _commit_message(sends: Array, deletes: Array) -> String:
 
 # --- progress merge ------------------------------------------------------------
 
-## Card by card: more reviews wins, then the later answer. The reader's own
-## pace rides the same merge: the choice made later wins, the way a later
-## answer breaks a card's tie. The file goes to the repo when the merge
-## changed it or when local study moved it past the bytes the repo last saw.
+## The choices that travel with the deck's progress: the day's pace, the
+## verses' own face, and the tongue the app's chrome speaks. Each is a
+## flat pair in progress.json (value + "_mod" stamp), each merges
+## later-choice-wins, and each is written back the same way -- one list,
+## so a new travelling choice cannot grow a merge of its own that drifts
+## from the others.
+const CHOICE_KEYS := ["new_per_day", "ayah_font", "ui_lang"]
+
+## Card by card: more reviews wins, then the later answer. The reader's
+## own choices ride the same merge: the choice made later wins, the way a
+## later answer breaks a card's tie. The file goes to the repo when the
+## merge changed it or when local study moved it past the bytes the repo
+## last saw.
 func _merge_progress(deck_path: String, remote: Dictionary, manifest: Dictionary) -> Dictionary:
         var local_path := deck_path.path_join("progress.json")
         var remote_sha := str(remote.get("progress.json", ""))
@@ -507,9 +516,9 @@ func _merge_progress(deck_path: String, remote: Dictionary, manifest: Dictionary
         if not remote_sha.is_empty() and remote_sha == baseline and not _progress_needs_push(local_path, manifest):
                 return {"merged": 0, "changed": false}
         var mine := _read_progress(local_path)
-        var pace := _read_pace(local_path)
+        var choices := _read_choices(local_path)
         var theirs: Dictionary = {}
-        var their_pace := {}
+        var their_choices: Dictionary = {}
         if not remote_sha.is_empty():
                 var fetched: Dictionary = await _get_raw(
                         "/repos/%s/%s/contents/%s" % [owner, repo, _encode_path("progress.json")]
@@ -519,7 +528,7 @@ func _merge_progress(deck_path: String, remote: Dictionary, manifest: Dictionary
                 var remote_data: Variant = JSON.parse_string(fetched.body.get_string_from_utf8())
                 if typeof(remote_data) == TYPE_DICTIONARY:
                         theirs = _progress_entries(fetched.body)
-                        their_pace = _pace_of(remote_data)
+                        their_choices = _choices_of(remote_data)
         var merged := 0
         for card_id in theirs.keys():
                 var their_state: Dictionary = theirs[card_id]
@@ -529,11 +538,14 @@ func _merge_progress(deck_path: String, remote: Dictionary, manifest: Dictionary
                 elif _progress_rank(their_state) > _progress_rank(mine[card_id]):
                         mine[card_id] = their_state
                         merged += 1
-        if not their_pace.is_empty() and (
-                pace.is_empty() or int(their_pace.get("mod", 0)) > int(pace.get("mod", 0))
-        ):
-                pace = their_pace
-                merged += 1
+        for key in CHOICE_KEYS:
+                var their_choice: Dictionary = their_choices.get(key, {})
+                if their_choice.is_empty():
+                        continue
+                var mine_choice: Dictionary = choices.get(key, {})
+                if mine_choice.is_empty() or int(their_choice.get("mod", 0)) > int(mine_choice.get("mod", 0)):
+                        choices[key] = their_choice
+                        merged += 1
         if not (merged > 0 or _progress_needs_push(local_path, manifest)):
                 return {"merged": 0, "changed": false}
         if merged > 0:
@@ -544,9 +556,10 @@ func _merge_progress(deck_path: String, remote: Dictionary, manifest: Dictionary
                 for card_id in mine.keys():
                         clean[card_id] = DeckScript.canonical_state(mine[card_id])
                 var doc := {"format": DeckScript.FORMAT, "cards": clean}
-                if not pace.is_empty():
-                        doc["new_per_day"] = int(pace["value"])
-                        doc["new_per_day_mod"] = int(pace["mod"])
+                for key in choices.keys():
+                        var choice: Dictionary = choices[key]
+                        doc[key] = choice["value"]
+                        doc[key + "_mod"] = int(choice["mod"])
                 file.store_string(JSON.stringify(doc, "\t") + "\n")
                 file.close()
         return {"merged": merged, "changed": true}
@@ -590,27 +603,32 @@ func _read_progress(path: String) -> Dictionary:
                         clean[card_id] = entries[card_id]
         return clean
 
-## The pace a parsed progress document carries, if it says one: how many new
-## cards a day offers, and when that choice was made. An empty dictionary
-## when the document is silent.
-static func _pace_of(data: Dictionary) -> Dictionary:
+## The choices a parsed progress document carries, if it says any: each
+## travelling key with its value and the moment it was chosen. A value of
+## the wrong type (a hand-edited file, a number where a font's key belongs)
+## is not a choice -- it is noise, and noise never travels.
+static func _choices_of(data: Dictionary) -> Dictionary:
         var out := {}
-        var value: Variant = data.get("new_per_day", null)
-        if typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT:
-                out["value"] = int(value)
-                var mod: Variant = data.get("new_per_day_mod", 0)
-                out["mod"] = int(mod) if (
-                        typeof(mod) == TYPE_INT or typeof(mod) == TYPE_FLOAT
-                ) else 0
+        for key in CHOICE_KEYS:
+                var value: Variant = data.get(key, null)
+                if value == null:
+                        continue
+                var mod: Variant = data.get(key + "_mod", 0)
+                out[key] = {
+                        "value": value,
+                        "mod": int(mod) if (
+                                typeof(mod) == TYPE_INT or typeof(mod) == TYPE_FLOAT
+                        ) else 0,
+                }
         return out
 
-func _read_pace(path: String) -> Dictionary:
+func _read_choices(path: String) -> Dictionary:
         if not FileAccess.file_exists(path):
                 return {}
         var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
         if typeof(data) != TYPE_DICTIONARY:
                 return {}
-        return _pace_of(data)
+        return _choices_of(data)
 
 # --- inventories ---------------------------------------------------------------
 

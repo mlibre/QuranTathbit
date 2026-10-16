@@ -7,6 +7,7 @@ const CardViewScript := preload("res://scripts/ui/card_view.gd")
 const CardEditorScript := preload("res://scripts/ui/card_editor.gd")
 const MarkdownScript := preload("res://scripts/ui/markdown.gd")
 const SchedulerScript := preload("res://scripts/data/scheduler.gd")
+const I18nScript := preload("res://scripts/ui/i18n.gd")
 
 ## The deck's own library, read as a book's index: every card in its
 ## order, gathered under its surah's name, each row a verse set directly
@@ -107,10 +108,10 @@ func _build() -> void:
         add_child(_rig.popup())
 
 func _top_bar() -> Control:
-        var bar: Dictionary = ThemeScript.top_bar("Browse")
+        var bar: Dictionary = ThemeScript.top_bar(I18nScript.t("Browse"))
         var row: HBoxContainer = bar["row"]
         var back: Button = bar["back"]
-        back.tooltip_text = "Back to home"
+        back.tooltip_text = I18nScript.t("Back to home")
         back.pressed.connect(func() -> void: closed.emit())
         # The same corner every playing screen leaves for the question of
         # loudness: one quiet coin, the same page under it.
@@ -128,7 +129,7 @@ func _top_bar() -> Control:
         mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
         center.add_child(mark)
         coin.add_child(center)
-        coin.tooltip_text = "Recitation volume"
+        coin.tooltip_text = I18nScript.t("Recitation volume")
         ThemeScript.pressable(coin)
         coin.pressed.connect(_rig.toggle)
         right.add_child(coin)
@@ -141,7 +142,7 @@ func _top_bar() -> Control:
 func _search_field() -> Control:
         var field := LineEdit.new()
         field.name = "Search"
-        field.placeholder_text = "Search the deck — a surah, a verse, 2:1…"
+        field.placeholder_text = I18nScript.t("Search the deck — a surah, a verse, 2:1…")
         field.custom_minimum_size = Vector2(0, 44)
         field.clear_button_enabled = true
         field.text_direction = TextDirection.TEXT_DIRECTION_LTR
@@ -220,22 +221,22 @@ func _rebuild_filters() -> void:
 func _pill_word(key: String) -> String:
         match key:
                 "due":
-                        return "Due"
+                        return I18nScript.t("Due")
                 "new":
-                        return "New"
+                        return I18nScript.t("New")
                 "learned":
-                        return "In review"
-        return "All"
+                        return I18nScript.t("In review")
+        return I18nScript.t("All")
 
 func _pill_tooltip(key: String) -> String:
         match key:
                 "due":
-                        return "What the day is asking for"
+                        return I18nScript.t("What the day is asking for")
                 "new":
-                        return "Cards never yet studied"
+                        return I18nScript.t("Cards never yet studied")
                 "learned":
-                        return "Cards resting between reviews"
-        return "The whole shelf"
+                        return I18nScript.t("Cards resting between reviews")
+        return I18nScript.t("The whole shelf")
 
 ## A pill at rest is nothing at all -- words on the paper; the pill that
 ## is chosen takes the page's own green wash, the colour of the deck's
@@ -490,7 +491,7 @@ func _rebuild() -> void:
         # that repeats them is a dashboard, not a book.
         summary.visible = asking
         if asking:
-                summary.text = "%d of %d cards" % [shown.size(), _deck.cards.size()]
+                summary.text = I18nScript.t("%d of %d cards") % [shown.size(), _deck.cards.size()]
         if shown.is_empty():
                 column.add_child(_empty_state())
                 _update_sticky()
@@ -559,27 +560,27 @@ func _empty_state() -> Control:
 
 func _empty_lead() -> String:
         if not _query.strip_edges().is_empty():
-                return "No cards answer"
+                return I18nScript.t("No cards answer")
         match _filter:
                 "due":
-                        return "Nothing is due today"
+                        return I18nScript.t("Nothing is due today")
                 "new":
-                        return "Every card has been started"
+                        return I18nScript.t("Every card has been started")
                 "learned":
-                        return "Nothing rests between reviews yet"
-        return "The shelf is empty"
+                        return I18nScript.t("Nothing rests between reviews yet")
+        return I18nScript.t("The shelf is empty")
 
 func _empty_under() -> String:
         if not _query.strip_edges().is_empty():
-                return "Try fewer words, or the verse's address — 2:1."
+                return I18nScript.t("Try fewer words, or the verse's address — 2:1.")
         match _filter:
                 "due":
-                        return "The deck rests, and so can its reader."
+                        return I18nScript.t("The deck rests, and so can its reader.")
                 "new":
-                        return "The whole deck is under way."
+                        return I18nScript.t("The whole deck is under way.")
                 "learned":
-                        return "Cards land here once reviews carry them."
-        return "A deck of folders and files, read from its own shelf."
+                        return I18nScript.t("Cards land here once reviews carry them.")
+        return I18nScript.t("A deck of folders and files, read from its own shelf.")
 
 ## The count and the rest a surah's title carries, written into the header
 ## that waits for them at the top of its own run of cards. How many rest in
@@ -592,10 +593,10 @@ func _set_header_count(column: VBoxContainer, count: int, resting: int) -> void:
                 if child.name.begins_with("Header"):
                         header = child
         if header != null:
-                var cards := "%d card%s" % [count, "" if count == 1 else "s"]
+                var cards := I18nScript.t("%d card") % count if count == 1 else I18nScript.t("%d cards") % count
                 var line := cards
                 if resting > 0:
-                        line += " · %d in review" % resting
+                        line += " · " + I18nScript.t("%d in review") % resting
                 (header.get_node("Line/Count") as Label).text = line
 
 ## A surah's own opening: its name in the gold of citations at a
@@ -914,7 +915,7 @@ func _fill_detail(detail: VBoxContainer, card: CardScript) -> void:
 func _pencil_row(card: CardScript) -> Control:
         var edit := Button.new()
         edit.name = "Edit"
-        edit.tooltip_text = "Edit this card"
+        edit.tooltip_text = I18nScript.t("Edit this card")
         edit.custom_minimum_size = Vector2(132, 40)
         edit.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
         var rest := ThemeScript.soft_stylebox(Color(0, 0, 0, 0), 8)
@@ -949,7 +950,7 @@ func _pencil_row(card: CardScript) -> Control:
         words.add_child(pencil)
         var label := Label.new()
         label.name = "Words"
-        label.text = "Edit card"
+        label.text = I18nScript.t("Edit card")
         label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
         ThemeScript.dress(label, 12, ThemeScript.GOLD_DEEP, true)
         words.add_child(label)
@@ -1045,18 +1046,18 @@ func _standing_of(card: CardScript) -> Dictionary:
                 "learning":
                         var due := int(state["due_ts"]) - now
                         if due <= 0:
-                                return {"text": "due now", "color": ThemeScript.GOLD_DEEP, "hollow": false}
+                                return {"text": I18nScript.t("due now"), "color": ThemeScript.GOLD_DEEP, "hollow": false}
                         return {
-                                "text": "in " + SchedulerScript.humanize(due),
+                                "text": I18nScript.t("in %s") % SchedulerScript.humanize(due),
                                 "color": ThemeScript.GOLD_DEEP,
                                 "hollow": false,
                         }
                 "review":
                         var today_idx := SchedulerScript.today(now)
                         if int(state["due_day"]) <= today_idx:
-                                return {"text": "due today", "color": ThemeScript.GOLD_DEEP, "hollow": false}
+                                return {"text": I18nScript.t("due today"), "color": ThemeScript.GOLD_DEEP, "hollow": false}
                         return {
-                                "text": "in %dd" % (int(state["due_day"]) - today_idx),
+                                "text": I18nScript.t("in %dd") % (int(state["due_day"]) - today_idx),
                                 "color": ThemeScript.GREEN_DEEP,
                                 "hollow": false,
                         }

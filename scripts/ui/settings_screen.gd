@@ -6,6 +6,7 @@ const GitHubAuthScript := preload("res://scripts/net/github_auth.gd")
 const SettingsScript := preload("res://scripts/data/settings.gd")
 const DeckScript := preload("res://scripts/data/deck.gd")
 const VersionScript := preload("res://scripts/data/version.gd")
+const I18nScript := preload("res://scripts/ui/i18n.gd")
 
 ## Settings is short on purpose: connect GitHub, name the repo, sync. The
 ## deck itself is edited as files -- in any editor, on any machine -- so
@@ -16,9 +17,10 @@ const VersionScript := preload("res://scripts/data/version.gd")
 signal closed
 signal account_changed
 signal sync_requested
-## A pace choice has settled: the progress file carries it, and the repo
-## should hear it without the user having to ask.
-signal pace_push_requested
+## A travelling choice has settled (the day's pace, the verses' face, the
+## app's tongue): the progress file carries it, and the repo should hear
+## it without the user having to ask.
+signal choice_push_requested
 
 var _http: HttpClientScript
 var _auth: GitHubAuthScript
@@ -26,22 +28,37 @@ var _settings: SettingsScript
 var _deck: DeckScript
 var _polling := false
 var _flow_uri := ""  # where "Open GitHub" sends the user while a flow is live
-var _pace_push: Timer  # one ask, once the hand stops stepping
+var _choice_push: Timer  # one ask, once the hand stops choosing
 
 func _ready() -> void:
         _build()
         resized.connect(_layout)
         call_deferred("_layout")
-        # A pace choice is one word, however many times the hand steps to say
-        # it: the ask waits for the stepping to stop, then speaks once.
-        _pace_push = Timer.new()
-        _pace_push.name = "PacePush"
-        _pace_push.one_shot = true
-        _pace_push.wait_time = 1.4
-        _pace_push.timeout.connect(func() -> void: pace_push_requested.emit())
-        add_child(_pace_push)
+        # A choice is one word, however many times the hand steps to say it:
+        # the ask waits for the stepping to stop, then speaks once.
+        _choice_push = Timer.new()
+        _choice_push.name = "ChoicePush"
+        _choice_push.one_shot = true
+        _choice_push.wait_time = 1.4
+        _choice_push.timeout.connect(func() -> void: choice_push_requested.emit())
+        add_child(_choice_push)
         # The cards arrive one after another, a beat apart: a page that
         # assembles itself reads as composed, not stamped.
+        var column: VBoxContainer = get_node("Margin/Scroll/Wrap/Column")
+        ThemeScript.stagger_in(column, 0.06, 0.26)
+
+## The page said again in a new tongue: the words are chosen at building,
+## so a language choice re-builds the page in place -- everything but the
+## choice's own timer, which keeps its ear for the next word.
+func _rebuild() -> void:
+        for child in get_children():
+                if child.name == "ChoicePush":
+                        continue
+                remove_child(child)
+                child.queue_free()
+        _build()
+        call_deferred("_layout")
+        _refresh()
         var column: VBoxContainer = get_node("Margin/Scroll/Wrap/Column")
         ThemeScript.stagger_in(column, 0.06, 0.26)
 
@@ -89,13 +106,14 @@ func _build() -> void:
         wrap.add_child(column)
 
         # The same header every screen above home wears: back the way they came.
-        var bar: Dictionary = ThemeScript.top_bar("Settings")
+        var bar: Dictionary = ThemeScript.top_bar(I18nScript.t("Settings"))
         var back: Button = bar["back"]
-        back.tooltip_text = "Back to home"
+        back.tooltip_text = I18nScript.t("Back to home")
         back.pressed.connect(func() -> void: closed.emit())
         column.add_child(bar["row"])
 
         column.add_child(_deck_body())
+        column.add_child(_reading_body())
         column.add_child(_github_body())
         column.add_child(_source_body())
         column.add_child(_about())
@@ -205,7 +223,7 @@ func _github_body() -> Control:
         var parts := _card("GitHub")
         var card: PanelContainer = parts[0]
         var box: VBoxContainer = parts[1]
-        _card_header(box, "GitHub sync")
+        _card_header(box, I18nScript.t("GitHub sync"))
 
         var state := _text("", ThemeScript.INK, ThemeScript.BODY)
         state.name = "State"
@@ -235,7 +253,7 @@ func _github_body() -> Control:
         chip_pad.add_child(code)
         flow.add_child(chip)
 
-        var hint := _text("Type this code at github.com/login/device, then wait here.", ThemeScript.INK_SOFT, ThemeScript.CAPTION, true)
+        var hint := _text(I18nScript.t("Type this code at github.com/login/device, then wait here."), ThemeScript.INK_SOFT, ThemeScript.CAPTION, true)
         hint.name = "Hint"
         flow.add_child(hint)
 
@@ -248,18 +266,18 @@ func _github_body() -> Control:
         actions.add_theme_constant_override("separation", 10)
         flow.add_child(actions)
 
-        var open := ThemeScript.ghost_button("Open GitHub", ThemeScript.GREEN, 44)
+        var open := ThemeScript.ghost_button(I18nScript.t("Open GitHub"), ThemeScript.GREEN, 44)
         open.name = "Open"
-        open.tooltip_text = "Open the sign-in page"
+        open.tooltip_text = I18nScript.t("Open the sign-in page")
         open.pressed.connect(func() -> void:
                 if not _flow_uri.is_empty():
                         OS.shell_open(_flow_uri)
         )
         actions.add_child(open)
 
-        var copy := ThemeScript.ghost_button("Copy code", ThemeScript.GREEN, 44, 22)
+        var copy := ThemeScript.ghost_button(I18nScript.t("Copy code"), ThemeScript.GREEN, 44, 22)
         copy.name = "Copy"
-        copy.tooltip_text = "Copy the code to the clipboard"
+        copy.tooltip_text = I18nScript.t("Copy the code to the clipboard")
         copy.pressed.connect(func() -> void:
                 var code_text: RichTextLabel = flow.get_node("Code/Pad/CodeText")
                 if not code_text.text.is_empty():
@@ -272,20 +290,20 @@ func _github_body() -> Control:
         buttons.add_theme_constant_override("separation", 10)
         box.add_child(buttons)
 
-        var connect := ThemeScript.primary_button("Connect GitHub", 46)
+        var connect := ThemeScript.primary_button(I18nScript.t("Connect GitHub"), 46)
         connect.name = "Connect"
         connect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        connect.tooltip_text = "Sign in with GitHub"
+        connect.tooltip_text = I18nScript.t("Sign in with GitHub")
         connect.pressed.connect(_begin_device_flow)
         buttons.add_child(connect)
 
-        var disconnect := ThemeScript.ghost_button("Disconnect", ThemeScript.DANGER, 46)
+        var disconnect := ThemeScript.ghost_button(I18nScript.t("Disconnect"), ThemeScript.DANGER, 46)
         disconnect.name = "Disconnect"
         disconnect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         disconnect.pressed.connect(_disconnect)
         buttons.add_child(disconnect)
 
-        box.add_child(_field_label("Personal access token"))
+        box.add_child(_field_label(I18nScript.t("Personal access token")))
         # The field owns its whole row: a token is forty characters, and a
         # thumb needs the field's full width to find its place in it. Paste
         # is not a button any more -- in a browser the page hands the app its
@@ -294,7 +312,9 @@ func _github_body() -> Control:
         # were always wanted: to see what arrived, and to keep it.
         var token := LineEdit.new()
         token.name = "Token"
-        token.placeholder_text = ("Paste the token GitHub shows you" if OS.has_feature("web") else "…or paste a repo token")
+        token.placeholder_text = (
+                I18nScript.t("Paste the token GitHub shows you") if OS.has_feature("web") else I18nScript.t("…or paste a repo token")
+        )
         token.secret = true
         token.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         token.custom_minimum_size = Vector2(0, 48)
@@ -308,21 +328,21 @@ func _github_body() -> Control:
         token_row.name = "TokenRow"
         token_row.add_theme_constant_override("separation", 8)
         box.add_child(token_row)
-        var show := ThemeScript.ghost_button("Show", ThemeScript.INK_SOFT, 44, 12)
+        var show := ThemeScript.ghost_button(I18nScript.t("Show"), ThemeScript.INK_SOFT, 44, 12)
         show.name = "ShowToken"
         show.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        show.tooltip_text = "Show or hide what was typed"
+        show.tooltip_text = I18nScript.t("Show or hide what was typed")
         show.pressed.connect(_toggle_token_shown)
         token_row.add_child(show)
         # Keeping the token is the row's errand, so it is the row's one
         # filled action; seeing is only a second thought beside it.
-        var save_token := ThemeScript.primary_button("Save token", 44)
+        var save_token := ThemeScript.primary_button(I18nScript.t("Save token"), 44)
         save_token.name = "SaveToken"
         save_token.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         save_token.pressed.connect(_save_token)
         token_row.add_child(save_token)
         var token_hint := _text(
-                "From github.com/settings/tokens — needs the repo scope. Stays on this device.",
+                I18nScript.t("From github.com/settings/tokens — needs the repo scope. Stays on this device."),
                 ThemeScript.INK_SOFT, ThemeScript.CAPTION
         )
         token_hint.name = "TokenHint"
@@ -331,10 +351,10 @@ func _github_body() -> Control:
         # The page's own division: the account above, the deck's home below.
         box.add_child(ThemeScript.hairline())
 
-        box.add_child(_field_label("Repository"))
+        box.add_child(_field_label(I18nScript.t("Repository")))
         var repo := LineEdit.new()
         repo.name = "Repo"
-        repo.placeholder_text = "Repository name"
+        repo.placeholder_text = I18nScript.t("Repository name")
         repo.custom_minimum_size = Vector2(0, 44)
         repo.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY))
         repo.add_theme_font_size_override("font_size", ThemeScript.BODY)
@@ -343,7 +363,7 @@ func _github_body() -> Control:
         box.add_child(repo)
         _paste_on_hold(repo)
         var repo_hint := _text(
-                "Where your deck lives on GitHub — created on first sync if it does not exist.",
+                I18nScript.t("Where your deck lives on GitHub — created on first sync if it does not exist."),
                 ThemeScript.INK_SOFT, ThemeScript.CAPTION
         )
         repo_hint.name = "RepoHint"
@@ -386,10 +406,10 @@ func _github_body() -> Control:
         auto_line.add_child(auto_words)
         var auto_label := Label.new()
         auto_label.name = "Label"
-        auto_label.text = "Sync quietly after each session"
+        auto_label.text = I18nScript.t("Sync quietly after each session")
         ThemeScript.dress(auto_label, ThemeScript.BODY, ThemeScript.INK, true)
         auto_words.add_child(auto_label)
-        var auto_sub := _text("after each session, and when the app opens", ThemeScript.INK_SOFT, 12)
+        var auto_sub := _text(I18nScript.t("after each session, and when the app opens"), ThemeScript.INK_SOFT, 12)
         auto_sub.name = "Sub"
         auto_words.add_child(auto_sub)
         var auto_switch := ThemeScript.SwitchMark.new(false)
@@ -404,9 +424,9 @@ func _github_body() -> Control:
         )
         box.add_child(auto_row)
 
-        var sync := ThemeScript.primary_button("Sync now", 46)
+        var sync := ThemeScript.primary_button(I18nScript.t("Sync now"), 46)
         sync.name = "Sync"
-        sync.tooltip_text = "Sync with GitHub"
+        sync.tooltip_text = I18nScript.t("Sync with GitHub")
         sync.pressed.connect(func() -> void: sync_requested.emit())
         box.add_child(sync)
 
@@ -429,7 +449,7 @@ func _deck_body() -> Control:
         folder.name = "Folder"
         box.add_child(folder)
 
-        var note := _text("Cards are folders on your disk. Edit them anywhere; sync carries them.", ThemeScript.INK_SOFT, ThemeScript.CAPTION)
+        var note := _text(I18nScript.t("Cards are folders on your disk. Edit them anywhere; sync carries them."), ThemeScript.INK_SOFT, ThemeScript.CAPTION)
         note.name = "Note"
         box.add_child(note)
 
@@ -438,14 +458,14 @@ func _deck_body() -> Control:
         # default of 20 is only where it starts -- so it lives here, beside
         # the deck it paces, as the one arithmetic the reader is asked to own.
         box.add_child(ThemeScript.hairline())
-        box.add_child(_field_label("New cards each day"))
+        box.add_child(_field_label(I18nScript.t("New cards each day")))
         var stepper := HBoxContainer.new()
         stepper.name = "NewPerDay"
         stepper.add_theme_constant_override("separation", 10)
         box.add_child(stepper)
         var less := ThemeScript.ghost_button("-", ThemeScript.GREEN_DEEP, 44)
         less.name = "StepLess"
-        less.tooltip_text = "Offer one fewer new card a day"
+        less.tooltip_text = I18nScript.t("Offer one fewer new card a day")
         less.custom_minimum_size = Vector2(52, 44)
         less.pressed.connect(_step_new_per_day.bind(-1))
         stepper.add_child(less)
@@ -465,12 +485,12 @@ func _deck_body() -> Control:
         stepper.add_child(value_chip)
         var more := ThemeScript.ghost_button("+", ThemeScript.GREEN_DEEP, 44)
         more.name = "StepMore"
-        more.tooltip_text = "Offer one more new card a day"
+        more.tooltip_text = I18nScript.t("Offer one more new card a day")
         more.custom_minimum_size = Vector2(52, 44)
         more.pressed.connect(_step_new_per_day.bind(1))
         stepper.add_child(more)
         var pace := _text(
-                "How many unseen cards a day offers — 0 studies only reviews. Carried\nwith your deck, so every device paces the day the same.",
+                I18nScript.t("How many unseen cards a day offers — 0 studies only reviews. Carried\nwith your deck, so every device paces the day the same."),
                 ThemeScript.INK_SOFT, 12
         )
         pace.name = "Pace"
@@ -492,16 +512,210 @@ func _step_new_per_day(delta: int) -> void:
                 _deck.save_progress()
         var value: Label = get_node("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/NewPerDay/Chip/StepValue")
         value.text = str(_settings.new_per_day)
-        if _pace_push != null:
+        _ask_deck_push()
+
+## How the reading reads: the hand the verses are written in, and the tongue
+## the app's own words speak. Both are the reader's to choose, both are
+## shown (a font's name in the UI's own face beside a verse drawn in the
+## font itself; a language named in its own script), and both travel with
+## the deck -- one reader, one way of reading, every device.
+func _reading_body() -> Control:
+        var parts := _card("Reading")
+        var card: PanelContainer = parts[0]
+        var box: VBoxContainer = parts[1]
+        _card_header(box, I18nScript.t("Reading"))
+
+        box.add_child(_field_label(I18nScript.t("Ayah font")))
+        var faces := HBoxContainer.new()
+        faces.name = "AyahFaces"
+        faces.add_theme_constant_override("separation", 8)
+        box.add_child(faces)
+        # The standing choices are read from the theme and the tongue it
+        # speaks, not from the settings object: this page builds before its
+        # setup() arrives, and the theme already wears whatever choice the
+        # deck carried into boot. A choice made here re-says the page, so
+        # the segments can never disagree with what they chose.
+        var current_face := ThemeScript.ayah_face_key()
+        for face in ThemeScript.AYAH_FACES:
+                faces.add_child(_ayah_font_segment(str(face["key"]), str(face["label"]), str(face["key"]) == current_face))
+        box.add_child(_caption_line(I18nScript.t("The face the verses are read in, wherever scripture is shown. Carried with your deck.")))
+
+        box.add_child(ThemeScript.hairline())
+
+        box.add_child(_field_label(I18nScript.t("App language")))
+        var langs := HBoxContainer.new()
+        langs.name = "AppLanguages"
+        langs.add_theme_constant_override("separation", 8)
+        box.add_child(langs)
+        # The standing tongue, straight from the mouth that speaks it.
+        var current_lang := I18nScript.lang()
+        for code in I18nScript.LANGS:
+                langs.add_child(_language_segment(code, code == current_lang))
+        box.add_child(_caption_line(I18nScript.t("Menus and messages only — the verses and their translations stay as they are. Carried with your deck.")))
+        return card
+
+## One font, one segment: its own name in the UI's face, and beneath it a
+## line of scripture drawn in the font itself -- the choice is judged on
+## what it chooses, not on a description of it.
+func _ayah_font_segment(key: String, label: String, on: bool) -> Button:
+        var button := Button.new()
+        button.name = "Face" + key.capitalize()
+        button.set_meta("choice", key)
+        button.toggle_mode = false
+        button.custom_minimum_size = Vector2(0, 66)
+        button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        _dress_segment(button, on)
+        var stack := VBoxContainer.new()
+        stack.name = "Stack"
+        stack.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        stack.alignment = BoxContainer.ALIGNMENT_CENTER
+        stack.add_theme_constant_override("separation", 2)
+        stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        var name := Label.new()
+        name.name = "Name"
+        name.text = label
+        name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        ThemeScript.dress(name, 12, ThemeScript.GREEN_DEEP if on else ThemeScript.INK_SOFT, on)
+        stack.add_child(name)
+        var sample := Label.new()
+        sample.name = "Sample"
+        # The basmala, harakat and all: every curl a verse's face draws, at
+        # the size a shelf's preview shows it.
+        sample.text = "بِسْمِ اللَّهِ"
+        sample.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        sample.text_direction = TextDirection.TEXT_DIRECTION_AUTO
+        sample.add_theme_font_override("font", ThemeScript.ayah_face_for(key))
+        sample.add_theme_font_size_override("font_size", 19)
+        sample.add_theme_color_override("font_color", ThemeScript.INK)
+        stack.add_child(sample)
+        var pad := MarginContainer.new()
+        pad.name = "Pad"
+        pad.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        pad.add_theme_constant_override("margin_left", 8)
+        pad.add_theme_constant_override("margin_right", 8)
+        pad.add_theme_constant_override("margin_top", 4)
+        pad.add_theme_constant_override("margin_bottom", 4)
+        pad.add_child(stack)
+        button.add_child(pad)
+        ThemeScript.pressable(button)
+        button.pressed.connect(_choose_ayah_font.bind(key))
+        return button
+
+## One language, one segment, named in its own script.
+func _language_segment(code: String, on: bool) -> Button:
+        var button := Button.new()
+        button.name = "Lang" + code.capitalize()
+        button.set_meta("choice", code)
+        button.toggle_mode = false
+        button.custom_minimum_size = Vector2(0, 46)
+        button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        _dress_segment(button, on)
+        var label := Label.new()
+        label.name = "Name"
+        label.text = I18nScript.lang_label(code)
+        label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+        ThemeScript.dress(label, ThemeScript.BODY, ThemeScript.GREEN_DEEP if on else ThemeScript.INK_SOFT, on)
+        var pad := MarginContainer.new()
+        pad.name = "Pad"
+        pad.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        pad.add_theme_constant_override("margin_left", 8)
+        pad.add_theme_constant_override("margin_right", 8)
+        pad.add_child(label)
+        button.add_child(pad)
+        ThemeScript.pressable(button)
+        button.pressed.connect(_choose_ui_lang.bind(code))
+        return button
+
+## A segment at rest is quiet paper; the chosen one wears the page's own
+## green wash -- the way a book's folios are marked, not the way a form's
+## checkboxes are.
+func _dress_segment(button: Button, on: bool) -> void:
+        var rest := ThemeScript.soft_stylebox(Color(0, 0, 0, 0), 12)
+        rest.border_color = Color(
+                ThemeScript.GREEN.r, ThemeScript.GREEN.g, ThemeScript.GREEN.b, 0.35 if on else 0.16
+        )
+        rest.set_border_width_all(1)
+        var wash := rest.duplicate() as StyleBoxFlat
+        wash.bg_color = Color(ThemeScript.GREEN.r, ThemeScript.GREEN.g, ThemeScript.GREEN.b, 0.10)
+        var held := wash.duplicate() as StyleBoxFlat
+        held.bg_color = Color(ThemeScript.GREEN.r, ThemeScript.GREEN.g, ThemeScript.GREEN.b, 0.16)
+        if on:
+                rest.bg_color = Color(ThemeScript.GREEN.r, ThemeScript.GREEN.g, ThemeScript.GREEN.b, 0.10)
+        button.add_theme_stylebox_override("normal", rest)
+        button.add_theme_stylebox_override("hover", held if not on else wash)
+        button.add_theme_stylebox_override("pressed", held)
+        button.add_theme_stylebox_override("focus", wash)
+
+## A quiet explanatory line under a choice, the caption a field's label
+## never quite is.
+func _caption_line(what: String) -> RichTextLabel:
+        return _text(what, ThemeScript.INK_SOFT, 12)
+
+## The verses' own face, chosen: the setting remembers it on this device,
+## the theme wears it from this breath on, and the deck's own progress file
+## carries it to every device the deck reaches.
+func _choose_ayah_font(key: String) -> void:
+        if key == _settings.ayah_font:
+                return
+        _settings.ayah_font = key
+        _settings.save()
+        ThemeScript.set_ayah_face(key)
+        if _deck != null:
+                _deck.ayah_font = key
+                _deck.ayah_font_mod = int(Time.get_unix_time_from_system())
+                _deck.save_progress()
+        _redress_segments("Margin/Scroll/Wrap/Column/Reading/Padding/Box/AyahFaces", key)
+        _ask_deck_push()
+
+## The app's own tongue, chosen: remembered here, spoken through the app at
+## once, carried with the deck -- and this page is said again in it, because
+## this is the page the choice was made on.
+func _choose_ui_lang(code: String) -> void:
+        if code == _settings.ui_lang:
+                return
+        _settings.ui_lang = code
+        _settings.save()
+        I18nScript.set_lang(code)
+        if _deck != null:
+                _deck.ui_lang = code
+                _deck.ui_lang_mod = int(Time.get_unix_time_from_system())
+                _deck.save_progress()
+        _rebuild()
+        _ask_deck_push()
+
+## The chosen segment says itself, without rebuilding the page: the font
+## row re-dresses in place (its samples already wear every face), and the
+## language row -- re-said by _rebuild -- never reaches this.
+func _redress_segments(path: String, chosen: String) -> void:
+        var row: HBoxContainer = get_node_or_null(path)
+        if row == null:
+                return
+        for child in row.get_children():
+                var button := child as Button
+                if button == null:
+                        continue
+                var key := str(button.get_meta("choice", ""))
+                _dress_segment(button, key == chosen)
+                var name: Label = button.get_node_or_null("Pad/Stack/Name")
+                if name != null:
+                        ThemeScript.dress(name, 12, ThemeScript.GREEN_DEEP if key == chosen else ThemeScript.INK_SOFT, key == chosen)
+
+## One ask, once the hand stops choosing: the deck's own file has the word,
+## and the repo hears it without anyone pressing anything.
+func _ask_deck_push() -> void:
+        if _choice_push != null:
                 # The engine's Timer has no restart(); a stopped start is one.
-                _pace_push.stop()
-                _pace_push.start()
+                _choice_push.stop()
+                _choice_push.start()
 
 func _source_body() -> Control:
         var parts := _card("DataSource")
         var card: PanelContainer = parts[0]
         var box: VBoxContainer = parts[1]
-        _card_header(box, "Data source")
+        _card_header(box, I18nScript.t("Data source"))
         box.add_theme_constant_override("separation", 8)
 
         var what := RichTextLabel.new()
@@ -511,9 +725,8 @@ func _source_body() -> Control:
         what.scroll_active = false
         what.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         what.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        what.text = (
-                "The deck's verses, Persian translation and recitations come from "
-                + "[url=https://quran.makarem.ir/]quran.makarem.ir[/url], carried unchanged from the deck package."
+        what.text = I18nScript.t(
+                "The deck's verses, Persian translation and recitations come from [url=https://quran.makarem.ir/]quran.makarem.ir[/url], carried unchanged from the deck package."
         )
         what.add_theme_font_override("normal_font", ThemeScript.vazir(ThemeScript.CAPTION))
         what.add_theme_font_size_override("normal_font_size", ThemeScript.CAPTION)
@@ -524,7 +737,7 @@ func _source_body() -> Control:
         what.meta_clicked.connect(func(meta: Variant) -> void: OS.shell_open(str(meta)))
         box.add_child(what)
 
-        var open := ThemeScript.ghost_button("Open quran.makarem.ir", ThemeScript.GOLD_DEEP, 42)
+        var open := ThemeScript.ghost_button(I18nScript.t("Open quran.makarem.ir"), ThemeScript.GOLD_DEEP, 42)
         open.name = "Open"
         # The deck's source is read when the button is pressed: the screen
         # builds before its setup() brings the deck in.
@@ -537,7 +750,7 @@ func _source_body() -> Control:
         box.add_child(open)
 
         if OS.has_feature("web"):
-                var note := _text("In the browser, recitations stream from this site while you study.", ThemeScript.INK_SOFT, ThemeScript.CAPTION)
+                var note := _text(I18nScript.t("In the browser, recitations stream from this site while you study."), ThemeScript.INK_SOFT, ThemeScript.CAPTION)
                 note.name = "WebNote"
                 box.add_child(note)
         return card
@@ -559,7 +772,7 @@ func _about() -> Control:
         arabic.add_theme_font_size_override("font_size", 16)
         arabic.add_theme_color_override("font_color", ThemeScript.GOLD)
         box.add_child(arabic)
-        var label := _text("QuranTathbit v%s" % VersionScript.VERSION, ThemeScript.INK_SOFT, ThemeScript.CAPTION, true)
+        var label := _text(I18nScript.t("QuranTathbit v%s") % VersionScript.VERSION, ThemeScript.INK_SOFT, ThemeScript.CAPTION, true)
         label.name = "Line"
         box.add_child(label)
         return box
@@ -617,13 +830,13 @@ func _refresh() -> void:
         _dress_promise_row(auto, _settings.auto_sync)
         (auto.get_node("AutoPad/AutoLine/Switch") as ThemeScript.SwitchMark).set_on(_settings.auto_sync)
         if _settings.has_token() and not _settings.owner.is_empty():
-                state.text = "Connected as @%s" % _settings.owner
+                state.text = I18nScript.t("Connected as @%s") % _settings.owner
         elif _settings.has_token():
-                state.text = "Token saved"
+                state.text = I18nScript.t("Token saved")
         elif OS.has_feature("web"):
-                state.text = "Not connected. In a browser you sign in with a one-minute token — press Connect GitHub and it walks you through."
+                state.text = I18nScript.t("Not connected. In a browser you sign in with a one-minute token — press Connect GitHub and it walks you through.")
         else:
-                state.text = "Not connected. Sync keeps your progress on your own GitHub repo."
+                state.text = I18nScript.t("Not connected. Sync keeps your progress on your own GitHub repo.")
         connect.visible = not _settings.has_token()
         disconnect.visible = _settings.has_token()
         var name: RichTextLabel = get_node("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/Name")
@@ -647,7 +860,7 @@ func _begin_device_flow() -> void:
                 return
         if not _auth.is_configured():
                 var state0: RichTextLabel = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State")
-                state0.text = "This build has no GitHub app id yet. Add your OAuth app's client id to scripts/net/github_auth.gd, or paste a token below."
+                state0.text = I18nScript.t("This build has no GitHub app id yet. Add your OAuth app's client id to scripts/net/github_auth.gd, or paste a token below.")
                 return
         var began: Dictionary = await _auth.begin(_http)
         var flow: VBoxContainer = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Flow")
@@ -659,9 +872,9 @@ func _begin_device_flow() -> void:
                 if OS.has_feature("web"):
                         # Unreachable on the web (the branch above), kept as a
                         # safety net: say what works instead of what failed.
-                        state.text = "Browsers cannot open GitHub's sign-in page (cross-origin rules). Use Connect GitHub for the token steps instead."
+                        state.text = I18nScript.t("Browsers cannot open GitHub's sign-in page (cross-origin rules). Use Connect GitHub for the token steps instead.")
                 else:
-                        state.text = "Could not reach GitHub. Check your connection and try again."
+                        state.text = I18nScript.t("Could not reach GitHub. Check your connection and try again.")
                 return
         (code.get_node("Pad/CodeText") as RichTextLabel).text = _pretty_code(str(began.user_code))
         code.visible = true
@@ -689,7 +902,7 @@ func _begin_device_flow() -> void:
                 flow.visible = false
                 connect.disabled = false
                 _flow_uri = ""
-                get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State").text = "That flow did not complete. Try again when ready."
+                get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State").text = I18nScript.t("That flow did not complete. Try again when ready.")
                 return
         _polling = false
         _flow_uri = ""
@@ -709,19 +922,17 @@ func _pretty_code(code: String) -> String:
 ## the browser against api.github.com, which does allow it.
 func _begin_web_connect() -> void:
         var state: RichTextLabel = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State")
-        state.text = "Signing in inside a browser takes a token — GitHub's sign-in page cannot be opened from another site, and no static site can change that. One minute, three steps:"
+        state.text = I18nScript.t("Signing in inside a browser takes a token — GitHub's sign-in page cannot be opened from another site, and no static site can change that. One minute, three steps:")
         var flow: VBoxContainer = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Flow")
         var code: PanelContainer = flow.get_node("Code")
         var hint: RichTextLabel = flow.get_node("Hint")
         var open: Button = flow.get_node("Actions/Open")
         code.visible = false
         (flow.get_node("Actions/Copy") as Button).visible = false
-        hint.text = (
-                "1. Press the button — GitHub opens with the form filled in: the name and the repo permission are already set.\n"
-                + "2. Generate the token, then copy the string it shows you.\n"
-                + "3. Come back here, paste it into the box below (Ctrl+V, or hold the box on a phone), then press Save."
+        hint.text = I18nScript.t(
+                "1. Press the button — GitHub opens with the form filled in: the name and the repo permission are already set.\n2. Generate the token, then copy the string it shows you.\n3. Come back here, paste it into the box below (Ctrl+V, or hold the box on a phone), then press Save."
         )
-        open.text = "Create a token on GitHub"
+        open.text = I18nScript.t("Create a token on GitHub")
         _flow_uri = "https://github.com/settings/tokens/new?scopes=repo&description=QuranTathbit%20sync"
         flow.visible = true
         get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Token").grab_focus()
@@ -729,11 +940,11 @@ func _begin_web_connect() -> void:
 func _finish(token: String) -> void:
         var who: Dictionary = await _auth.whoami(_http, token)
         if who.has("error"):
-                get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State").text = "Connected, but we could not read your login."
+                get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State").text = I18nScript.t("Connected, but we could not read your login.")
                 _settings.token = token
         else:
                 _settings.owner = str(who.login)
-                get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State").text = "Connected as @%s" % _settings.owner
+                get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State").text = I18nScript.t("Connected as @%s") % _settings.owner
         _settings.token = token
         _settings.setup_done = true
         _settings.save()
@@ -752,7 +963,7 @@ func _save_token() -> void:
         var value := token.text.strip_edges()
         var who: Dictionary = await _auth.whoami(_http, value)
         if who.has("error"):
-                get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State").text = "That token did not work. Check it and try again."
+                get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State").text = I18nScript.t("That token did not work. Check it and try again.")
                 return
         _settings.token = value
         _settings.owner = str(who.login)
@@ -802,7 +1013,7 @@ func _paste_token() -> void:
                 return
         var clip := DisplayServer.clipboard_get().strip_edges()
         if clip.is_empty():
-                _token_note("Nothing on the clipboard. Copy the token first, then hold the field to paste.")
+                _token_note(I18nScript.t("Nothing on the clipboard. Copy the token first, then hold the field to paste."))
                 return
         field.text = clip
         field.caret_column = clip.length()
@@ -816,7 +1027,7 @@ func _paste_token() -> void:
 func _paste_from_page(field: LineEdit) -> void:
         var bridge: Object = Engine.get_singleton("JavaScriptBridge")
         if bridge == null:
-                _token_note("This build cannot read the clipboard — type the token instead.")
+                _token_note(I18nScript.t("This build cannot read the clipboard — type the token instead."))
                 return
         var ask := (
                 "(function(){var d=document.documentElement;"
@@ -841,16 +1052,16 @@ func _paste_from_page(field: LineEdit) -> void:
                 if answer.begins_with("ok:"):
                         var clip := answer.substr(3).strip_edges()
                         if clip.is_empty():
-                                _token_note("The clipboard is empty. Copy the token on GitHub, then hold the field to paste.")
+                                _token_note(I18nScript.t("The clipboard is empty. Copy the token on GitHub, then hold the field to paste."))
                                 return
                         field.text = clip
                         field.caret_column = clip.length()
                         field.grab_focus()
-                        _token_note("Pasted — press Save token when it looks right.")
+                        _token_note(I18nScript.t("Pasted — press Save token when it looks right."))
                         return
-                _token_note("This browser would not share its clipboard. Copy the token, tap the field, and use your keyboard's paste.")
+                _token_note(I18nScript.t("This browser would not share its clipboard. Copy the token, tap the field, and use your keyboard's paste."))
                 return
-        _token_note("The clipboard did not answer. Hold the field again to paste.")
+        _token_note(I18nScript.t("The clipboard did not answer. Hold the field again to paste."))
 
 
 ## A secret field keeps neither typos nor pastes visible; a hand that wants
@@ -860,7 +1071,7 @@ func _toggle_token_shown() -> void:
         var field := _token_field()
         field.secret = not field.secret
         var show: Button = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/TokenRow/ShowToken")
-        show.text = "Hide" if not field.secret else "Show"
+        show.text = I18nScript.t("Hide") if not field.secret else I18nScript.t("Show")
 
 
 func _token_field() -> LineEdit:

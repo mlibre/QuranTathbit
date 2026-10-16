@@ -40,6 +40,15 @@ var dirty := false
 ## device's setting into the file and it becomes the deck's own number.
 var new_per_day := -1
 var new_per_day_mod := 0  # when the pace was last chosen, unix seconds
+## The face the verses wear (theme.gd's AYAH_FACES keys) and the tongue the
+## app's own chrome speaks (i18n.gd's LANGS). Both travel with the deck the
+## way the pace does: empty while the progress file has never said one, and
+## stamped with the moment of the choice so a later choice can win the
+## merge, the way a later answer breaks a card's tie.
+var ayah_font := ""
+var ayah_font_mod := 0
+var ui_lang := ""
+var ui_lang_mod := 0
 
 static func load(path: String):
         var deck = (load("res://scripts/data/deck.gd") as GDScript).new()
@@ -120,6 +129,10 @@ func _load_progress() -> void:
                 new_per_day_mod = int(mod) if (
                         typeof(mod) == TYPE_INT or typeof(mod) == TYPE_FLOAT
                 ) else 0
+        ayah_font = _str_choice(data as Dictionary, "ayah_font", ayah_font)
+        ayah_font_mod = _int_choice(data as Dictionary, "ayah_font_mod", ayah_font_mod)
+        ui_lang = _str_choice(data as Dictionary, "ui_lang", ui_lang)
+        ui_lang_mod = _int_choice(data as Dictionary, "ui_lang_mod", ui_lang_mod)
         for card in cards:
                 var saved: Variant = entries.get(card.id)
                 if typeof(saved) != TYPE_DICTIONARY:
@@ -148,10 +161,32 @@ func save_progress() -> bool:
         if new_per_day >= 0:
                 doc["new_per_day"] = new_per_day
                 doc["new_per_day_mod"] = new_per_day_mod
+        if not ayah_font.is_empty():
+                doc["ayah_font"] = ayah_font
+                doc["ayah_font_mod"] = ayah_font_mod
+        if not ui_lang.is_empty():
+                doc["ui_lang"] = ui_lang
+                doc["ui_lang_mod"] = ui_lang_mod
         file.store_string(JSON.stringify(doc, "\t") + "\n")
         file.close()
         dirty = false
         return true
+
+
+## A string choice read honestly: a hand-edited progress file can carry a
+## number where a word belongs, and a number dressed as the font's key
+## would dress every verse in a face that does not exist.
+static func _str_choice(data: Dictionary, key: String, fallback: String) -> String:
+        var value: Variant = data.get(key, null)
+        return str(value) if typeof(value) == TYPE_STRING else fallback
+
+
+## An int choice read honestly, the same tolerance for JSON's floats.
+static func _int_choice(data: Dictionary, key: String, fallback: int) -> int:
+        var value: Variant = data.get(key, null)
+        if typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT:
+                return int(value)
+        return fallback
 
 
 ## JSON reads every number back as a float, so a file saved, loaded and

@@ -298,6 +298,8 @@ text = tr("{player} found {item}").format({
 
 Use named placeholders and translator context. `tr_n` is for nonnegative integer counts; languages can have more than two plural forms. Some text-bearing properties auto-translate; disable auto translation for user-generated names/content and use `NO_TRANSLATE`/`TRANSLATORS:` hints in extraction where appropriate.
 
+When the engine's translation pipeline does not fit (a project that must boot headless with no imported-resource cache, cold), a hand-rolled table works well and needs no import step: a static `t(what)` on a plain GDScript class, keyed by the English string itself so the key is the fallback and a missing translation reads in English instead of as a bare token. Keep the chosen language in a static var set at boot, substitute format tokens after `t()` returns, and keep every translation's placeholder order identical to the English key (GDScript's `%` feeds an array, not named holes). Ask the question once on first run, keep the answer in Settings, and let a language choice re-say an already-built screen by rebuilding it in place — but rename the outgoing node first (see SKILL.md's sibling-name trap).
+
 ### Fonts, shaping, RTL, and text server data
 
 - Use a font covering every intended script; configure fallbacks.

@@ -2,6 +2,7 @@ class_name CardView
 extends VBoxContainer
 const ThemeScript := preload("res://scripts/ui/theme.gd")
 const MarkdownScript := preload("res://scripts/ui/markdown.gd")
+const I18nScript := preload("res://scripts/ui/i18n.gd")
 
 ## Draws a card side: the markdown turned into calm, centered paragraphs.
 ## Arabic verses take the Quranic typeface at a size you can read across the
@@ -77,7 +78,11 @@ func show_text(text: String, folder: String, lead := false, ref_line := "", stag
                         ThemeScript.settle_in(footer, 0.1, 0.26)
 
 ## The reference the question asked for, small and gold above the answer:
-## the thread that ties what is being read to what was asked.
+## the thread that ties what is being read to what was asked. On the answer
+## side it is the question's own voice returning -- the same Arabic the
+## reader was asked to recite from, in the same face the verses wear, a
+## breath larger than a caption because here it is the page's one thread
+## back to the question, not a footnote.
 func _add_eyebrow(ref_line: String) -> void:
         var label := RichTextLabel.new()
         label.name = "Eyebrow"
@@ -92,9 +97,9 @@ func _add_eyebrow(ref_line: String) -> void:
                 HORIZONTAL_ALIGNMENT_RIGHT if script != "plain" else HORIZONTAL_ALIGNMENT_CENTER
         )
         label.add_theme_font_override("normal_font", (
-                ThemeScript.amiri(15) if script == "arabic" else ThemeScript.vazir(13, true)
+                ThemeScript.ayah_face() if script == "arabic" else ThemeScript.vazir(15, true)
         ))
-        label.add_theme_font_size_override("normal_font_size", 15 if script == "arabic" else 13)
+        label.add_theme_font_size_override("normal_font_size", 17 if script == "arabic" else 15)
         label.add_theme_color_override("default_color", ThemeScript.GOLD_DEEP)
         # The reader's hand rests on the page's own gold, not the engine's blue.
         label.add_theme_color_override("selection_color", ThemeScript.SELECT)
@@ -283,15 +288,16 @@ func _make_audio_button(name: String, path: String, persian := false) -> Button:
         # name carries one, so two recitations on one card are never mistaken
         # for each other.
         var verse := _verse_label(name)
-        var word := "Persian" if persian else "Listen"
+        var word := I18nScript.t("Persian") if persian else I18nScript.t("Listen")
         var idle_text := word if verse.is_empty() else "%s · %s" % [word, verse]
         # A Button measures its own text, and this button's words live in
         # children it cannot see: the width is set by hand from the widest
         # line the button will ever carry, so the pill is a pill on arrival
-        # and never jumps between states.
+        # and never jumps between states. The widest line is measured in the
+        # tongue the app is speaking, not the last one it spoke.
         var font := ThemeScript.vazir(ThemeScript.CAPTION)
         var widest := maxf(
-                font.get_string_size("Listening…", HORIZONTAL_ALIGNMENT_LEFT, -1, ThemeScript.CAPTION).x,
+                font.get_string_size(I18nScript.t("Listening…"), HORIZONTAL_ALIGNMENT_LEFT, -1, ThemeScript.CAPTION).x,
                 font.get_string_size(idle_text, HORIZONTAL_ALIGNMENT_LEFT, -1, ThemeScript.CAPTION).x
         )
         # 48 tall, not 46: a fingertip deserves the whole guideline, and on a
@@ -422,16 +428,16 @@ func _set_button_state(button: Button, state: String) -> void:
                 "playing":
                         icon.color = ThemeScript.GOLD
                         icon.speaking = true
-                        label.text = "Listening…"
+                        label.text = I18nScript.t("Listening…")
                 "loading":
-                        label.text = "Fetching…"
+                        label.text = I18nScript.t("Fetching…")
                 "missing":
                         icon.color = ThemeScript.INK_SOFT
-                        label.text = "Unavailable"
+                        label.text = I18nScript.t("Unavailable")
                 _:
                         icon.color = ink
                         icon.speaking = false
-                        label.text = str(button.get_meta("idle_text", "Listen"))
+                        label.text = str(button.get_meta("idle_text", I18nScript.t("Listen")))
         icon.queue_redraw()
 
 func _stream_from_site(path: String, button: Button) -> void:

@@ -14,7 +14,7 @@ extends SceneTree
 
 const MainScript := preload("res://scripts/main.gd")
 
-const SHOTS := 13
+const SHOTS := 16
 
 var _out := "/tmp/shots"
 var _saved := 0
@@ -33,6 +33,14 @@ func _init() -> void:
         root.add_child(main)
         await main.ready
         await create_timer(0.8).timeout
+
+        # The app's very first question: which tongue its own words speak.
+        # A frame of the question, then the answer this film reads in.
+        await _shot("language")
+        var picker: Control = main.get_node_or_null("LanguagePicker")
+        if picker != null:
+                (picker.get_node("Centre/Card/Pad/Box/Languages/Langen") as Button).pressed.emit()
+                await create_timer(0.6).timeout
 
         await _shot("home")
         main._start_session()
@@ -68,6 +76,18 @@ func _init() -> void:
         main._on_settings_pressed()
         await create_timer(0.8).timeout
         await _shot("settings")
+        # The reading card: the verses' face and the app's tongue, offered as
+        # what they are -- a basmala drawn in each hand, a language named in
+        # its own script.
+        var settings_screen: Control = main.get_node("Settings")
+        var reading: Control = settings_screen.get_node_or_null("Margin/Scroll/Wrap/Column/Reading")
+        if reading != null:
+                var scroll: ScrollContainer = settings_screen.get_node("Margin/Scroll")
+                scroll.scroll_vertical = int(
+                        maxf(0.0, reading.get_global_rect().position.y - scroll.get_global_rect().position.y)
+                )
+                await create_timer(0.5).timeout
+                await _shot("reading")
         main.get_node("Settings").closed.emit()
         await create_timer(0.6).timeout
         await _shot("home_again")
@@ -99,6 +119,13 @@ func _init() -> void:
         browse.closed.emit()
         await create_timer(0.6).timeout
         await _shot("home_third")
+        # The app said again in the reader's own tongue: the same home page,
+        # the same verses, only the chrome translated.
+        main._apply_language("fa")
+        await create_timer(0.8).timeout
+        await _shot("home_fa")
+        main._apply_language("en")
+        await create_timer(0.5).timeout
 
         print("captures: %d of %d shot(s) in %s" % [_saved, SHOTS, _out])
         quit(0 if _saved >= SHOTS else 1)

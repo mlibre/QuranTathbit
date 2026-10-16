@@ -64,6 +64,14 @@ A few quiet extras:
   digits work) and filters for what is due, new, or resting.
 - **Set your own pace.** Settings → *New cards each day* (default 20, set
   it to 0 for review-only days).
+- **Choose the verse's typeface.** Settings → *Reading*: **Amiri Quran**
+  (the default), **Amiri**, or **Noto Naskh Arabic** — each shown by its own
+  drawing of the Basmala, so you choose with your eyes. Your pick follows
+  the deck to every device.
+- **The app speaks your language.** Menus and messages in English, فارسی or
+  العربية — asked once the first time you open the app, changeable anytime
+  in Settings. The verses and their Persian translation always stay exactly
+  as they are.
 - **Copy any verse or translation** — drag or long-press, and paste it
   anywhere.
 
@@ -92,8 +100,9 @@ While editing a card: **Esc** closes without saving, **Ctrl+Enter** saves.
   [quran.makarem.ir](https://quran.makarem.ir); no other source is used.
 - **Code** — MIT; **algorithm** — SM-2 (the same spaced-repetition math
   Anki uses). Both attributions live in the [LICENSE](LICENSE).
-- **Typefaces** — Amiri Quran for the verses, Amiri for references,
-  Vazirmatn for Persian, each under its SIL OFL license in `assets/fonts/`.
+- **Typefaces** — Amiri Quran for the verses, Amiri for references, Noto
+  Naskh Arabic as the reader's alternative, Vazirmatn for Persian — all from
+  Google Fonts, each under its SIL OFL license in `assets/fonts/`.
 
 ## For developers
 

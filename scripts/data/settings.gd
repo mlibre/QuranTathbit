@@ -24,6 +24,19 @@ var volume := 1.0  # recitation loudness, 0 (silent) to 1 (full); remembered bet
 ## every device the deck reaches paces itself the same -- this copy is the
 ## device's working memory of it, adopted from the deck at boot.
 var new_per_day := SchedulerScript.NEW_PER_DAY
+## The face the verses themselves wear, wherever scripture is shown: one of
+## theme.gd's AYAH_FACES ("amiri_quran", "amiri", "noto_naskh"). Empty
+## means no choice has been made, and the default mushaf cut stands. Like
+## the day's pace, the choice travels with the deck's own progress.json,
+## so every device the deck reaches dresses its verses the same -- this
+## copy is the device's working memory of it, adopted from the deck at boot.
+var ayah_font := ""
+## The tongue the app's own chrome speaks ("en", "fa", "ar" -- i18n.gd's
+## LANGS). The verses and their Persian translation are the deck's content
+## and never change; this dresses only menus, buttons and messages. It
+## travels with the deck the same way, and stays empty until the reader
+## answers the app's first question (or picks one in Settings).
+var ui_lang := ""
 
 
 static func load_settings():
@@ -34,7 +47,7 @@ static func load_settings():
         if typeof(data) != TYPE_DICTIONARY:
                 push_warning("Settings: %s unreadable; using defaults" % PATH)
                 return s
-        for key in ["token", "owner", "repo", "deck_folder", "last_sync", "setup_done", "auto_sync", "volume", "new_per_day"]:
+        for key in ["token", "owner", "repo", "deck_folder", "last_sync", "setup_done", "auto_sync", "volume", "new_per_day", "ayah_font", "ui_lang"]:
                 if not data.has(key):
                         continue
                 # JSON reads every number back as a float, and every saved int
@@ -71,6 +84,8 @@ func save() -> bool:
                                 "auto_sync": auto_sync,
                                 "volume": volume,
                                 "new_per_day": new_per_day,
+                                "ayah_font": ayah_font,
+                                "ui_lang": ui_lang,
                         },
                         "\t"
                 )

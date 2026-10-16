@@ -4,6 +4,7 @@ const ThemeScript := preload("res://scripts/ui/theme.gd")
 const DeckScript := preload("res://scripts/data/deck.gd")
 const SchedulerScript := preload("res://scripts/data/scheduler.gd")
 const MarkdownScript := preload("res://scripts/ui/markdown.gd")
+const I18nScript := preload("res://scripts/ui/i18n.gd")
 
 ## The only front door: the deck's name, what is waiting today, and the one
 ## button that matters. The page's whole second subject -- the deck's other
@@ -74,9 +75,9 @@ func setup(deck: DeckScript, counts: Dictionary, sync_line: String, sync_state :
         title.text = deck.name
         var waiting: int = counts["due"] + counts["new"]
         caption.text = (
-                "%d cards · %d learned · nothing waiting" % [deck.cards.size(), counts["learned"]]
+                I18nScript.t("%d cards · %d learned · nothing waiting") % [deck.cards.size(), counts["learned"]]
                 if waiting == 0
-                else "%d cards · %d learned · %d waiting" % [deck.cards.size(), counts["learned"], waiting]
+                else I18nScript.t("%d cards · %d learned · %d waiting") % [deck.cards.size(), counts["learned"], waiting]
         )
 
         _apply_counts(counts)
@@ -112,7 +113,7 @@ func _apply_counts(counts: Dictionary) -> void:
         ThemeScript.count_up(learned_pill, int(counts["learned"]))
         var study: Button = get_node("Margin/Column/Study")
         if counts["due"] + counts["new"] == 0:
-                study.text = "All caught up"
+                study.text = I18nScript.t("All caught up")
                 study.disabled = true
                 # A day with nothing waiting is an answer, not an absence: the
                 # button rests in the day's own green, warm and settled,
@@ -123,7 +124,7 @@ func _apply_counts(counts: Dictionary) -> void:
                 study.add_theme_stylebox_override("disabled", rest)
                 study.add_theme_color_override("font_disabled_color", ThemeScript.GREEN_DEEP)
         else:
-                study.text = "Study" if counts["due"] > 0 else "Learn new cards"
+                study.text = I18nScript.t("Study") if counts["due"] > 0 else I18nScript.t("Learn new cards")
                 study.disabled = false
 
 ## The sync coin says the state before any words do: a green coin when the
@@ -167,7 +168,7 @@ func _set_sync_state(text: String, state: String) -> void:
 ## the page: the one honest thing between "you answered" and "it is safe
 ## on GitHub".
 func set_syncing() -> void:
-        _set_sync_state("Syncing…", "syncing")
+        _set_sync_state(I18nScript.t("Syncing…"), "syncing")
 
 
 ## The next card's heading: the first line of its front, plain text. The
@@ -237,14 +238,14 @@ func _build() -> void:
                 "SyncCoin",
                 Vector2(-136.0, -88.0),
                 ThemeScript.SyncMark.new(ThemeScript.INK_SOFT),
-                "Not connected",
+                I18nScript.t("Not connected"),
                 func() -> void: sync_pressed.emit()
         ))
         add_child(_corner_coin(
                 "SettingsCorner",
                 Vector2(-76.0, -28.0),
                 ThemeScript.SlidersMark.new(ThemeScript.GREEN_DEEP),
-                "Settings",
+                I18nScript.t("Settings"),
                 func() -> void: settings_pressed.emit()
         ))
         # The third coin sleeps until the page hears that a newer version
@@ -254,7 +255,7 @@ func _build() -> void:
                 "UpdateCoin",
                 Vector2(-196.0, -148.0),
                 ThemeScript.UpdateMark.new(),
-                "Install the new version",
+                I18nScript.t("Install the new version"),
                 func() -> void: update_pressed.emit()
         )
         update.visible = false
@@ -364,7 +365,7 @@ func _deck_card() -> Control:
 
         var eyebrow := Label.new()
         eyebrow.name = "Eyebrow"
-        eyebrow.text = "NEXT UP"
+        eyebrow.text = I18nScript.t("NEXT UP")
         eyebrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         ThemeScript.dress(eyebrow, 12, ThemeScript.GOLD_DEEP, true)
         box.add_child(eyebrow)
@@ -407,7 +408,7 @@ func _pill(title: String, key: String) -> Control:
         box.add_child(value)
 
         var name := Label.new()
-        name.text = title
+        name.text = I18nScript.t(title)
         name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         ThemeScript.dress(name, 13, ThemeScript.INK, true)
         box.add_child(name)
@@ -483,7 +484,7 @@ func _fit_sync_line() -> void:
         label.custom_minimum_size = Vector2(minf(widest, avail), 0.0)
 
 func _study_button() -> Control:
-        var button := ThemeScript.primary_button("Study", 60)
+        var button := ThemeScript.primary_button(I18nScript.t("Study"), 60)
         button.name = "Study"
         button.custom_minimum_size = Vector2(340, 60)
         button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -494,11 +495,11 @@ func _study_button() -> Control:
 ## session it sits under, a thought rather than an errand -- the outline
 ## that says the deck is a book as well as a queue.
 func _browse_button() -> Control:
-        var button := ThemeScript.ghost_button("Browse the cards", ThemeScript.GREEN, 50)
+        var button := ThemeScript.ghost_button(I18nScript.t("Browse the cards"), ThemeScript.GREEN, 50)
         button.name = "Browse"
         button.custom_minimum_size = Vector2(340, 50)
         button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-        button.tooltip_text = "Read the whole deck, card by card"
+        button.tooltip_text = I18nScript.t("Read the whole deck, card by card")
         button.pressed.connect(func() -> void: browse_pressed.emit())
         return button
 
@@ -521,7 +522,7 @@ func offer_update() -> void:
         var column: VBoxContainer = get_node("Margin/Column")
         var line := Label.new()
         line.name = "Update"
-        line.text = "A new version is ready — the gold button up top installs it."
+        line.text = I18nScript.t("A new version is ready — the gold button up top installs it.")
         line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         line.size_flags_horizontal = Control.SIZE_EXPAND_FILL

@@ -6,6 +6,7 @@ const SchedulerScript := preload("res://scripts/data/scheduler.gd")
 const CardViewScript := preload("res://scripts/ui/card_view.gd")
 const CardEditorScript := preload("res://scripts/ui/card_editor.gd")
 const MarkdownScript := preload("res://scripts/ui/markdown.gd")
+const I18nScript := preload("res://scripts/ui/i18n.gd")
 
 ## A session: one card at a time, question first, then the answer, then how
 ## well it went. Nothing else is on screen while you study -- no counters
@@ -27,6 +28,10 @@ const AGAIN_COLOR := Color("#B4553F")
 const HARD_COLOR := Color("#96762A")
 const GOOD_COLOR := Color("#1E6B52")
 const EASY_COLOR := Color("#14513D")
+## The session's card is a touch wider than the library's page: a verse and
+## its translation are read together here, and the extra measure lets the
+## pair breathe on one line where the shelf keeps its own economy.
+const CARD_MEASURE := 800
 
 var _cards: Array = []
 var _index := 0
@@ -128,9 +133,9 @@ func _key_hints() -> Control:
                 label.text = what
                 ThemeScript.dress(label, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
                 row.add_child(label)
-        hint.call("Space", "reveal")
-        hint.call("1–4", "answer")
-        hint.call("Esc", "close")
+        hint.call("Space", I18nScript.t("reveal"))
+        hint.call("1–4", I18nScript.t("answer"))
+        hint.call("Esc", I18nScript.t("close"))
         return row
 
 ## Back the way the user came, the count in the middle, room on the right:
@@ -142,7 +147,7 @@ func _top_bar() -> Control:
         var bar: Dictionary = ThemeScript.top_bar("")
         var row: HBoxContainer = bar["row"]
         var back: Button = bar["back"]
-        back.tooltip_text = "Back to home"
+        back.tooltip_text = I18nScript.t("Back to home")
         back.pressed.connect(func() -> void: closed.emit())
         # Two coins on the right move the centre left by their extra width;
         # a quiet spacer of the same width after the way back keeps the
@@ -174,7 +179,7 @@ func _top_bar() -> Control:
         edit.name = "Edit"
         edit.custom_minimum_size = Vector2(48, 48)
         edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        edit.tooltip_text = "Edit this card"
+        edit.tooltip_text = I18nScript.t("Edit this card")
         ThemeScript.apply_mark_styles(edit, ThemeScript.mark_button_styles(ThemeScript.GOLD, true))
         var pencil := ThemeScript.PencilMark.new(ThemeScript.GOLD_DEEP)
         pencil.name = "PencilMark"
@@ -203,7 +208,7 @@ func _top_bar() -> Control:
         mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
         center.add_child(mark)
         coin.add_child(center)
-        coin.tooltip_text = "Recitation volume"
+        coin.tooltip_text = I18nScript.t("Recitation volume")
         ThemeScript.pressable(coin)
         coin.pressed.connect(_rig.toggle)
         pair.add_child(coin)
@@ -267,13 +272,13 @@ func _footer() -> Control:
         var row := CenterContainer.new()
         row.name = "Footer"
 
-        var show := ThemeScript.primary_button("Show answer", 58)
+        var show := ThemeScript.primary_button(I18nScript.t("Show answer"), 58)
         show.name = "ShowAnswer"
         show.custom_minimum_size = Vector2(320, 58)
         show.pressed.connect(_reveal)
         row.add_child(show)
 
-        var done := ThemeScript.ghost_button("Done", ThemeScript.GREEN, 58)
+        var done := ThemeScript.ghost_button(I18nScript.t("Done"), ThemeScript.GREEN, 58)
         done.name = "Done"
         done.custom_minimum_size = Vector2(320, 58)
         done.visible = false
@@ -308,7 +313,7 @@ func _layout() -> void:
         var surface: ScrollContainer = get_node("Margin/Column/Surface")
         var fill: VBoxContainer = get_node("Margin/Column/Surface/Fill")
         var card: PanelContainer = get_node(PANEL)
-        var width: float = minf(size.x - 48.0, ThemeScript.MEASURE)
+        var width: float = minf(size.x - 48.0, CARD_MEASURE)
         card.custom_minimum_size = Vector2(maxf(width, 280.0), 260.0)
         # The centre the question side needs: the filler is never shorter than
         # the surface, so a short card floats in the middle of the page.
@@ -349,7 +354,7 @@ func _show_front(incoming := false) -> void:
         _view.visible = true
         var card: CardScript = _cards[_index]
         var progress: Label = get_node("Margin/Column/TopBar/Progress")
-        progress.text = "%d of %d" % [_index + 1, _cards.size()]
+        progress.text = I18nScript.t("%d of %d") % [_index + 1, _cards.size()]
         _tween_bar(100.0 * float(_index) / float(_cards.size()))
         _view.show_text(card.front, card.folder, true)
         get_node("Margin/Column/Footer/ShowAnswer").visible = true
@@ -478,7 +483,7 @@ func _answer_button(option: Dictionary, index: int) -> Control:
         row.add_child(stack)
         var word := Label.new()
         word.name = "Word"
-        word.text = str(option.button).capitalize()
+        word.text = I18nScript.t(str(option.button).capitalize())
         ThemeScript.dress(word, 14, grade, true)
         stack.add_child(word)
         var wait := Label.new()
@@ -542,10 +547,10 @@ func _settle_card(incoming: bool) -> void:
 func _duration() -> String:
         var minutes := int(round((Time.get_ticks_msec() - _started_ms) / 60000.0))
         if minutes < 1:
-                return "under a minute"
+                return I18nScript.t("under a minute")
         if minutes == 1:
-                return "1 minute"
-        return "%d minutes" % minutes
+                return I18nScript.t("1 minute")
+        return I18nScript.t("%d minutes") % minutes
 
 ## The grades of this session, one line, in their own colours -- a look back
 ## at how it went, in the order the buttons stand.
@@ -560,7 +565,7 @@ func _grades_line() -> String:
         for key in ["again", "hard", "good", "easy"]:
                 var count := int(_grade_counts.get(key, 0))
                 if count > 0:
-                        parts.append("[color=%s]%d %s[/color]" % [tones[key], count, key])
+                        parts.append("[color=%s]%d %s[/color]" % [tones[key], count, I18nScript.t(key)])
         if parts.is_empty():
                 return ""
         return " · ".join(parts)
@@ -568,7 +573,7 @@ func _grades_line() -> String:
 func _show_done() -> void:
         _tween_bar(100.0)
         var progress: Label = get_node("Margin/Column/TopBar/Progress")
-        progress.text = "complete"
+        progress.text = I18nScript.t("complete")
         _view.visible = false
         _clear_answers()
         # The page the last answer faded out is the page the summary stands on:
@@ -592,14 +597,14 @@ func _show_done() -> void:
 
         var title := Label.new()
         title.name = "Title"
-        title.text = "Session complete"
+        title.text = I18nScript.t("Session complete")
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         ThemeScript.dress(title, ThemeScript.TITLE, ThemeScript.GREEN_DEEP, true)
         summary.add_child(title)
 
         var body := Label.new()
         body.name = "Body"
-        body.text = "You answered %d cards in %s. Everything is saved." % [_answered_count, _duration()]
+        body.text = I18nScript.t("You answered %d cards in %s. Everything is saved.") % [_answered_count, _duration()]
         body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         ThemeScript.dress(body, ThemeScript.BODY, ThemeScript.INK)
@@ -628,7 +633,7 @@ func _show_done() -> void:
 
         var rest := Label.new()
         rest.name = "Rest"
-        rest.text = "Rest is part of learning."
+        rest.text = I18nScript.t("Rest is part of learning.")
         rest.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         ThemeScript.dress(rest, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
         summary.add_child(rest)

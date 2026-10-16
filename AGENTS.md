@@ -33,8 +33,9 @@ Windows, web) in Godot 4.7 with GDScript only.
 
 ## Look and feel
 
-- **Calm and bright.** Warm paper, a deep green, a gold accent, a Quranic
-  typeface for the verses, Vazirmatn for everything else. Never dark, grim
+- **Calm and bright.** Warm paper, a deep green, a gold accent, a choice of
+  Quranic typefaces for the verses (Google Fonts only, licenses carried in
+  `assets/fonts/`), Vazirmatn for everything else. Never dark, grim
   or clinical — this is a companion for something revered.
 - **Still at rest, alive in answer.** Nothing loops, pulses or drifts on its
   own; the screen at rest is a page. Motion answers three things only:
@@ -64,6 +65,13 @@ Windows, web) in Godot 4.7 with GDScript only.
 - **Cache-free boot safety.** A fresh clone has no editor-built class cache,
   so every cross-file class reference is pinned behind a `preload` constant
   and quoted `extends` paths — `tools/battery.sh`'s cold pass enforces it.
+- **The chrome speaks the reader's tongue; the deck never changes.** Every
+  user-visible string of the interface goes through `scripts/ui/i18n.gd`'s
+  `t()` (English is the key and the fallback), in English, فارسی and
+  العربية. The verses and their Persian translation are the deck's own
+  content and are never translated. The language is asked once on first run
+  and afterwards lives in Settings; like the day's pace, it travels with the
+  deck's `progress.json`, merging by its own moment.
 - **Fail visibly.** A deck that will not load, a sync that cannot finish, a
   card whose media is missing — each says so, never silently.
 - **Simple, deep, robust.** Handle the real inputs (a hand-corrupted

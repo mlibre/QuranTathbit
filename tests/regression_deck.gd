@@ -19,6 +19,7 @@ func _init() -> void:
         _test_progress_round_trip()
         _test_progress_bytes_are_stable()
         _test_pace_round_trip()
+        _test_choice_round_trip()
         _test_broken_progress()
         _test_script_classification()
         _teardown()
@@ -131,6 +132,34 @@ func _test_pace_round_trip() -> void:
         }) + "\n")
         var broken: DeckScript = DeckScript.load(ROOT)
         _is(broken.new_per_day, -1, "a pace that is not a number is not a pace")
+
+## The face the verses wear and the tongue the app speaks ride the progress
+## file beside the pace, and read with the same honesty: a chosen word
+## round-trips with its moment, a value of the wrong shape is not a choice,
+## and a file that never said either says nothing.
+func _test_choice_round_trip() -> void:
+        var deck: DeckScript = DeckScript.load(ROOT)
+        _is(deck.ayah_font, "", "a deck whose progress never said a face says none")
+        _is(deck.ui_lang, "", "a deck whose progress never said a tongue says none")
+        deck.ayah_font = "noto_naskh"
+        deck.ayah_font_mod = 1792000300
+        deck.ui_lang = "fa"
+        deck.ui_lang_mod = 1792000301
+        _ok(deck.save_progress(), "progress saves with the choices")
+        var reloaded: DeckScript = DeckScript.load(ROOT)
+        _is(reloaded.ayah_font, "noto_naskh", "the chosen face rides the progress file")
+        _is(reloaded.ayah_font_mod, 1792000300, "and so does the moment it was chosen")
+        _is(reloaded.ui_lang, "fa", "the chosen tongue rides the progress file")
+        _is(reloaded.ui_lang_mod, 1792000301, "with its own moment beside it")
+        var raw := FileAccess.get_file_as_string(ROOT.path_join("progress.json"))
+        _ok(raw.contains("\"ayah_font\": \"noto_naskh\""), "the face is written where sync reads it")
+        _ok(raw.contains("\"ui_lang\": \"fa\""), "the tongue is written where sync reads it")
+        _write(ROOT.path_join("progress.json"), JSON.stringify({
+                "format": 1, "cards": {}, "ayah_font": 12, "ui_lang": true,
+        }) + "\n")
+        var broken: DeckScript = DeckScript.load(ROOT)
+        _is(broken.ayah_font, "", "a face that is not a word is not a face")
+        _is(broken.ui_lang, "", "a tongue that is not a word is not a tongue")
 
 func _test_broken_progress() -> void:
         _write(ROOT.path_join("progress.json"), "{ not json at all")

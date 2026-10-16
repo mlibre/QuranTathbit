@@ -34,6 +34,7 @@ func _init() -> void:
                 return
 
         await _check_home_numbers(home)
+        await _check_language_picker(main)
         await _check_study_session(main)
         await _check_settings(main)
         await _check_browse(main)
@@ -103,6 +104,42 @@ func _check_home_numbers(home: Control) -> void:
                 "the turning mark pivots at its own centre"
         )
         sync_mark.set_working(false)
+
+
+## The app's very first question, asked exactly once: a fresh install has
+## never answered for its tongue, so the picker stands over the home page
+## until a language is chosen -- and the choice is remembered on the device,
+## carried with the deck, and never asked again on any device the deck
+## reaches.
+func _check_language_picker(main: Node) -> void:
+        var picker: Control = main.get_node_or_null("LanguagePicker")
+        _ok(picker != null, "a first run offers the app's language")
+        if picker == null:
+                return
+        _ok(
+                picker.get_node_or_null("Centre/Card/Pad/Box/Languages/Langen") != null,
+                "each language is named in its own script"
+        )
+        (picker.get_node("Centre/Card/Pad/Box/Languages/Langen") as Button).pressed.emit()
+        await create_timer(0.6).timeout
+        _ok(main.get_node_or_null("LanguagePicker") == null, "the picker leaves once answered")
+        _ok(main.get_node_or_null("Home") != null, "home stands beneath, said in the tongue chosen")
+        var remembered: Variant = JSON.parse_string(
+                FileAccess.get_file_as_string("user://settings.json")
+        )
+        _ok(
+                typeof(remembered) == TYPE_DICTIONARY
+                        and str((remembered as Dictionary).get("ui_lang", "")) == "en",
+                "the choice is remembered on this device"
+        )
+        var carried: Variant = JSON.parse_string(
+                FileAccess.get_file_as_string("user://decks/quran/progress.json")
+        )
+        _ok(
+                typeof(carried) == TYPE_DICTIONARY
+                        and str((carried as Dictionary).get("ui_lang", "")) == "en",
+                "the choice is carried with the deck"
+        )
 
 
 ## The engine's own hit test, walked by hand: deepest topmost control at a
@@ -182,6 +219,28 @@ func _check_study_session(main: Node) -> void:
         # so the verse is never read without knowing which one was asked for.
         var eyebrow := view.get_node_or_null("Body/Eyebrow")
         _ok(eyebrow != null and str(eyebrow.text).length() > 0, "the question rides along above the answer")
+        if eyebrow != null:
+                _is(
+                        eyebrow.get_theme_font_size("normal_font_size"),
+                        17,
+                        "the eyebrow stands a breath larger above the answer"
+                )
+                _ok(
+                        str(eyebrow.get_theme_font("normal_font").resource_path).ends_with(
+                                "AmiriQuran-Regular.ttf"
+                        ),
+                        "the eyebrow wears the face the verses wear"
+                )
+        # The session's card takes its own measure, a touch wider than the
+        # library's page: a verse and its translation breathe on one line.
+        var card_panel: PanelContainer = study.get_node_or_null("Margin/Column/Surface/Fill/CardPanel")
+        if card_panel != null:
+                var expected := maxf(minf(study.size.x - 48.0, 800.0), 280.0)
+                _is(
+                        int(round(card_panel.custom_minimum_size.x)),
+                        int(round(expected)),
+                        "the session's card takes its own wider measure"
+                )
         # The verse wears the mushaf's own cut -- Amiri Quran, whose larger
         # harakat stay round at every size this app draws; Amiri's damma at
         # the shelf's small sizes read as a fatha's stroke, and a reader
@@ -475,6 +534,63 @@ func _check_settings(main: Node) -> void:
                                 and int((paced as Dictionary).get("new_per_day", -1)) == 20,
                         "a chosen pace is stamped into the deck's own progress file"
                 )
+        # The reading card: the verses' own face and the app's own tongue,
+        # both the reader's to choose, both shown as what they are, and both
+        # carried with the deck the way the pace is.
+        var faces: HBoxContainer = settings.get_node_or_null(
+                "Margin/Scroll/Wrap/Column/Reading/Padding/Box/AyahFaces"
+        )
+        _ok(
+                faces != null and faces.get_child_count() == 3,
+                "the reading card offers every face the verses can wear"
+        )
+        if faces != null and faces.get_child_count() == 3:
+                var sample := (faces.get_child(2).get_node("Pad/Stack/Sample") as Label)
+                _ok(
+                        str(sample.get_theme_font("font").resource_path).ends_with(
+                                "NotoNaskhArabic-Regular.ttf"
+                        ),
+                        "each face is judged by its own drawing of the basmala"
+                )
+                (faces.get_child(2) as Button).pressed.emit()
+                _is(main._settings.ayah_font, "noto_naskh", "a chosen face is remembered")
+                _is(ThemeScript.ayah_face_key(), "noto_naskh", "the theme wears the chosen face at once")
+                var stamped: Variant = JSON.parse_string(
+                        FileAccess.get_file_as_string("user://decks/quran/progress.json")
+                )
+                _ok(
+                        typeof(stamped) == TYPE_DICTIONARY
+                                and str((stamped as Dictionary).get("ayah_font", "")) == "noto_naskh",
+                        "the chosen face is stamped into the deck's own progress file"
+                )
+                (faces.get_child(0) as Button).pressed.emit()
+                _is(ThemeScript.ayah_face_key(), "amiri_quran", "the mushaf cut returns")
+        var langs: HBoxContainer = settings.get_node_or_null(
+                "Margin/Scroll/Wrap/Column/Reading/Padding/Box/AppLanguages"
+        )
+        _ok(
+                langs != null and langs.get_child_count() == 3,
+                "the reading card offers every tongue the app speaks"
+        )
+        if langs != null and langs.get_child_count() == 3:
+                (langs.get_child(1) as Button).pressed.emit()
+                await create_timer(0.3).timeout
+                var said: Label = settings.get_node_or_null("Margin/Scroll/Wrap/Column/TopBar/Title")
+                _ok(said != null and said.text == "تنظیمات", "the page is said again in the tongue chosen")
+                _is(main._settings.ui_lang, "fa", "the tongue is remembered")
+                var langs_again: HBoxContainer = settings.get_node_or_null(
+                        "Margin/Scroll/Wrap/Column/Reading/Padding/Box/AppLanguages"
+                )
+                if langs_again != null and langs_again.get_child_count() == 3:
+                        (langs_again.get_child(0) as Button).pressed.emit()
+                        await create_timer(0.3).timeout
+                        var said_again: Label = settings.get_node_or_null(
+                                "Margin/Scroll/Wrap/Column/TopBar/Title"
+                        )
+                        _ok(
+                                said_again != null and said_again.text == "Settings",
+                                "the page returns to English when English is chosen"
+                        )
         # The home page answers the offer the same hour it changes: counts
         # carry the cap, and a smaller day is a smaller new count.
         var counts_now: Dictionary = SchedulerScript.counts(main._deck, int(Time.get_unix_time_from_system()), 3)
