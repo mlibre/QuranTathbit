@@ -6,16 +6,20 @@ One deck, studied one card at a time, kept as plain folders and files, synced
 through the user's own GitHub repository. Cross-platform (Android, Linux,
 Windows, web) in Godot 4.7 with GDScript only.
 
-- **One deck, no deck manager.** No deck creation and no card editor in the
-  app — cards are edited as files, anywhere; the app studies, reads and
-  syncs them. A read-only card browser (the library) belongs here: a deck of
-  scripture is also a book to read through. A feature that needs a second
-  deck does not belong here.
+- **One deck, no deck manager.** No deck creation and no deck manager in
+  the app — the deck is folders and files, studied, read, synced, and
+  edited on the spot through the one editor the session and the library
+  share (it writes the card's own front.md/back.md, nothing else). A deck
+  of scripture is also a book to read through, so the library belongs
+  here. A feature that needs a second deck does not belong here.
 - **Anki's math, exactly.** The scheduler is Anki's SM-2 with Anki's
   parameters, not an approximation. No FSRS, no custom scheduler.
 - **Folders and files, no database.** The deck is folders and markdown; the
   converter that seeds it is a developer tool, and the app never parses
-  Anki's formats. `progress.json` is the only file the app writes.
+  Anki's formats. The app writes `progress.json`; the on-the-spot editor
+  writes the card's own `front.md`/`back.md`; and the installer may deliver
+  bundled media a deck does not yet have (the Persian translation
+  recitations) — additively, never overwriting what is already there.
 - **Local first.** The deck is fully usable offline, forever. Sync never
   blocks study and never loses work: a failed transfer is reported and
   retried, and progress merges card by card so two offline devices both keep

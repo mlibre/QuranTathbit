@@ -27,7 +27,6 @@ static var _web_cache := {}
 
 var _player: AudioStreamPlayer
 var _folder := ""
-var _buttons: Array = []
 var _fetching := false
 var _playing_path := ""
 var _playing_button: Button = null
@@ -141,8 +140,23 @@ func _add_text(markdown: String, link: String, lead := false) -> void:
                 # usually -- sits centred like the rest of the page, not
                 # orphaned against the left edge.
                 label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        label.add_theme_font_override("normal_font", ThemeScript.font_for(script, ThemeScript.BODY))
-        label.add_theme_font_size_override("normal_font_size", _size_for(script, lead))
+        var face: Font = ThemeScript.font_for(script, ThemeScript.BODY)
+        label.add_theme_font_override("normal_font", face)
+        # The deck's emphasis marks mean a lean, and a lean needs a face that
+        # leans: the engine's [i] falls back to the upright normal when no
+        # italic is given, and the stars the author wrote would show as
+        # nothing at all. Every script gets the sheared twin of its own face.
+        var bold_face: Font = ThemeScript.font_for(script, ThemeScript.BODY, true)
+        label.add_theme_font_override("bold_font", bold_face)
+        label.add_theme_font_override("italics_font", ThemeScript.leaning(face))
+        label.add_theme_font_override("bold_italics_font", ThemeScript.leaning(bold_face))
+        # The size rides on all four faces: a run that leans must not also
+        # shrink back to the theme's default size.
+        var face_size := _size_for(script, lead)
+        label.add_theme_font_size_override("normal_font_size", face_size)
+        label.add_theme_font_size_override("bold_font_size", face_size)
+        label.add_theme_font_size_override("italics_font_size", face_size)
+        label.add_theme_font_size_override("bold_italics_font_size", face_size)
         label.text = _bbcode(markdown, script)
         label.add_theme_color_override("default_color", ThemeScript.INK if script != "plain" else ThemeScript.INK_SOFT)
         # Scripture breathes between its lines; the lead, most of all.
@@ -169,10 +183,12 @@ func _with_bottom_room(control: Control, room: int) -> MarginContainer:
         wrap.add_child(control)
         return wrap
 
-## The card's citation, as a page's own footer: a gentle rule, then the
-## source at the bottom-left, quiet and clickable -- the place a book puts
-## the page's provenance, so the verses never have to share their room
-## with an address.
+## The card's citation, as a page's own footer: a breath of space, then a
+## gentle rule, then the source at the bottom-left, quiet and clickable --
+## the place a book puts the page's provenance, so the verses never have to
+## share their room with an address. The breath above the rule is what
+## keeps the last of the verses -- and the recitation's button, which
+## follows them -- from standing on the footer's own line.
 func _add_footer(markdown: String, url: String) -> void:
         var label_text := MarkdownScript.plain(markdown)
         var box := VBoxContainer.new()
@@ -181,6 +197,11 @@ func _add_footer(markdown: String, url: String) -> void:
         box.add_theme_constant_override("separation", 8)
         box.mouse_filter = Control.MOUSE_FILTER_PASS
         add_child(box)
+        var breath := Control.new()
+        breath.name = "Breath"
+        breath.custom_minimum_size = Vector2(0, 20)
+        breath.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        box.add_child(breath)
         box.add_child(ThemeScript.hairline())
         var line := RichTextLabel.new()
         line.name = "Citation"
@@ -200,23 +221,64 @@ func _add_media(name: String) -> void:
         var path := _folder.path_join(name)
         var extension := name.get_extension().to_lower()
         if extension in AUDIO_EXTENSIONS:
-                _add_audio_button(name, path)
+                _add_verse_voices(name, path)
         elif extension in IMAGE_EXTENSIONS:
                 _add_image(path)
         else:
                 push_warning("CardView: unknown media type %s" % name)
 
+## The verse's two voices, side by side: its own recitation and its Persian
+## translation, one flow that sits them together on a desk's width and
+## lets them stack on a phone's -- a verse's voices belong to the verse,
+## not to a column of pills that never ends.
+func _add_verse_voices(name: String, path: String) -> void:
+        var flow := HFlowContainer.new()
+        flow.name = "Voices:" + name
+        flow.alignment = FlowContainer.ALIGNMENT_CENTER
+        flow.add_theme_constant_override("h_separation", 10)
+        flow.add_theme_constant_override("v_separation", 10)
+        # FILL, not SHRINK: a flow only wraps when its width is actually
+        # constrained, and a shrink-centred flow is never narrower than its
+        # single line. Filling the page lets the pair sit together on a desk
+        # and stack on a phone, each line centred as the alignment says.
+        flow.size_flags_horizontal = Control.SIZE_FILL
+        flow.mouse_filter = Control.MOUSE_FILTER_PASS
+        flow.add_child(_make_audio_button(name, path, false))
+        var translation := _translation_path(name)
+        if not translation.is_empty():
+                flow.add_child(_make_audio_button(name, translation, true))
+        _body.add_child(flow)
+
+## The Persian translation's own address, when the deck carries it: a
+## sibling file named after the verse -- 002001-fa.mp3 beside 002001.mp3,
+## fetched once from quran.makarem.ir's CDN and shipped with the deck ever
+## since. A browser cannot look at the disk, so there the translation is
+## offered on the site's promise -- the same promise the verse's own
+## recitation already rides -- and a deck without it says so honestly if
+## the translation is asked for anyway.
+func _translation_path(name: String) -> String:
+        if _verse_label(name).is_empty():
+                return ""
+        var file := "%s-fa.%s" % [name.get_basename(), name.get_extension()]
+        var path := _folder.path_join(file)
+        if OS.has_feature("web") or FileAccess.file_exists(path):
+                return path
+        return ""
+
 ## The recitation, as a gold oval that speaks: a drawn triangle at rest, a
 ## breathing column of bars while the voice runs -- the one motion the app
-## allows itself, because it is the sound's own feedback.
-func _add_audio_button(name: String, path: String) -> void:
+## allows itself, because it is the sound's own feedback. The translation's
+## button wears the same shape in the page's own white with gold lettering,
+## so the two voices of one verse stand together without competing.
+func _make_audio_button(name: String, path: String, persian := false) -> Button:
         var button := Button.new()
-        button.name = "Audio:" + name
+        button.name = ("Translation:" if persian else "Audio:") + name
         # The words the button carries: the verse's own address when the file
         # name carries one, so two recitations on one card are never mistaken
         # for each other.
         var verse := _verse_label(name)
-        var idle_text := "Listen" if verse.is_empty() else "Listen · %s" % verse
+        var word := "Persian" if persian else "Listen"
+        var idle_text := word if verse.is_empty() else "%s · %s" % [word, verse]
         # A Button measures its own text, and this button's words live in
         # children it cannot see: the width is set by hand from the widest
         # line the button will ever carry, so the pill is a pill on arrival
@@ -232,16 +294,21 @@ func _add_audio_button(name: String, path: String) -> void:
         button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         button.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
         button.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        button.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
-        button.add_theme_color_override("font_hover_color", ThemeScript.GREEN_DEEP)
-        button.add_theme_color_override("font_focus_color", ThemeScript.GREEN_DEEP)
+        var ink := ThemeScript.GOLD_DEEP if persian else ThemeScript.GREEN_DEEP
+        button.add_theme_color_override("font_color", ink)
+        button.add_theme_color_override("font_hover_color", ink)
+        button.add_theme_color_override("font_focus_color", ink)
         # A gold pill with a real edge: the recitation is an action, and an
         # action on this page wears a fill deep enough to see against the card
-        # and an edge crisp enough to read as something that gives.
-        var rest := ThemeScript.button_stylebox(Color("#F2E3BC"), 23)
+        # and an edge crisp enough to read as something that gives. The
+        # translation keeps the same coin in white, so a reader can tell the
+        # two voices apart at a glance.
+        var rest_fill := Color("#FFFFFF") if persian else Color("#F2E3BC")
+        var rest := ThemeScript.button_stylebox(rest_fill, 23)
         rest.border_color = ThemeScript.GOLD
         rest.set_border_width_all(2)
-        var hover := ThemeScript.button_stylebox(Color("#EAD9AC"), 23)
+        var hover_fill := ThemeScript.GOLD_SOFT if persian else Color("#EAD9AC")
+        var hover := ThemeScript.button_stylebox(hover_fill, 23)
         hover.border_color = ThemeScript.GOLD_DEEP
         hover.set_border_width_all(2)
         button.add_theme_stylebox_override("normal", rest)
@@ -252,6 +319,7 @@ func _add_audio_button(name: String, path: String) -> void:
         speaking.set_border_width_all(1)
         button.add_theme_stylebox_override("focus", speaking)
         button.set_meta("idle_text", idle_text)
+        button.set_meta("persian", persian)
         ThemeScript.pressable(button)
         button.pressed.connect(_toggle_audio.bind(path, button))
         # The marks are drawn, not typed: no font in this app carries the
@@ -266,17 +334,16 @@ func _add_audio_button(name: String, path: String) -> void:
         row.add_theme_constant_override("separation", 9)
         row.mouse_filter = Control.MOUSE_FILTER_IGNORE
         center.add_child(row)
-        var icon := ThemeScript.SoundMark.new(ThemeScript.GREEN_DEEP)
+        var icon := ThemeScript.SoundMark.new(ink)
         icon.name = "Icon"
         icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
         row.add_child(icon)
         var label := Label.new()
         label.name = "Label"
         label.text = idle_text
-        ThemeScript.dress(label, ThemeScript.CAPTION, ThemeScript.GREEN_DEEP)
+        ThemeScript.dress(label, ThemeScript.CAPTION, ink)
         row.add_child(label)
-        _body.add_child(button)
-        _buttons.append(button)
+        return button
 
 func _add_image(path: String) -> void:
         var image := Image.new()
@@ -344,6 +411,7 @@ func _on_audio_finished() -> void:
 func _set_button_state(button: Button, state: String) -> void:
         var icon: ThemeScript.SoundMark = button.get_node("Center/Row/Icon")
         var label: Label = button.get_node("Center/Row/Label")
+        var ink: Color = ThemeScript.GOLD_DEEP if bool(button.get_meta("persian", false)) else ThemeScript.GREEN_DEEP
         match state:
                 "playing":
                         icon.color = ThemeScript.GOLD
@@ -355,7 +423,7 @@ func _set_button_state(button: Button, state: String) -> void:
                         icon.color = ThemeScript.INK_SOFT
                         label.text = "Unavailable"
                 _:
-                        icon.color = ThemeScript.GREEN_DEEP
+                        icon.color = ink
                         icon.speaking = false
                         label.text = str(button.get_meta("idle_text", "Listen"))
         icon.queue_redraw()
@@ -439,20 +507,17 @@ func _size_for(script: String, lead := false) -> int:
                 _:
                         return ThemeScript.CAPTION
 
-static func _bbcode(markdown: String, script := "plain") -> String:
+static func _bbcode(markdown: String, _script := "plain") -> String:
         var text := markdown
         text = _links(text)
         text = _bold(text)
-        # A slanted letter is a Latin letter's own emphasis; the Quranic and
-        # Persian faces have no such voice, and the engine would tilt them
-        # by force -- the bismillah leaning like a sign in the wind. What the
-        # deck's author marked with asterisks on a scripture line was
-        # emphasis of meaning, not of slope: it is honoured upright.
-        if script == "plain":
-                text = _italic(text)
-        else:
-                text = text.replace("*", "")
-        return text
+        # The author's asterisks are emphasis, and emphasis is honoured in
+        # every script. Neither Amiri nor Vazirmatn ships an italic, so the
+        # engine tilts them by force -- and that lean is the voice the deck's
+        # author asked for when they wrapped the bismillah in stars. Stripping
+        # the marks instead made the emphasis vanish entirely, and the author
+        # asked, four exclamation marks deep, where their stars had gone.
+        return _italic(text)
 
 
 ## Markdown links become clickable BBCode. Images are skipped -- the view's
@@ -478,6 +543,5 @@ func _clear() -> void:
         if footer != null:
                 remove_child(footer)
                 footer.queue_free()
-        _buttons.clear()
         _playing_button = null
         _playing_path = ""

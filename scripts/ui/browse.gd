@@ -4,22 +4,34 @@ const ThemeScript := preload("res://scripts/ui/theme.gd")
 const DeckScript := preload("res://scripts/data/deck.gd")
 const CardScript := preload("res://scripts/data/card.gd")
 const CardViewScript := preload("res://scripts/ui/card_view.gd")
+const CardEditorScript := preload("res://scripts/ui/card_editor.gd")
 const MarkdownScript := preload("res://scripts/ui/markdown.gd")
 const SchedulerScript := preload("res://scripts/data/scheduler.gd")
 
 ## The deck's own library: every card in its order, grouped by surah, each
-## row a verse-reference with its standing beside it. A row opens in place --
-## the verses, the translation, the recitation -- because a deck of scripture
-## is also a book to read through, not only a box of questions to be asked.
-## Nothing here schedules or edits: reading and listening are all it does,
-## and the study session keeps its own work to itself.
+## row a verse-reference with its first words and its standing beside it. A
+## row opens in place -- the verses, the translation, the recitations --
+## because a deck of scripture is also a book to read through, not only a
+## box of questions to be asked.
+##
+## The page's one question of its own is the search field under the header:
+## it reads the reference, the verses' own words, the surah's name and the
+## verse's address (2:1), in the hand's own digits -- Persian and Arabic
+## numerals alike -- and keeps the library to the cards that answer. Nothing
+## here schedules: reading, listening and the pencil are all it does, and
+## the study session keeps its own work to itself.
 
 signal closed
 signal volume_changed(value: float)
+signal edited(card: CardScript)
 
 var volume := 1.0  # the recitation's loudness here, as the last session left it
 var _player: AudioStreamPlayer
 var _open_row: Button = null
+var _deck: DeckScript
+var _due := 0
+var _query := ""
+var _rebuild_tween: SceneTreeTimer = null
 
 func _ready() -> void:
         _player = AudioStreamPlayer.new()
@@ -38,26 +50,13 @@ func _exit_tree() -> void:
 func setup(deck: DeckScript, p_volume: float) -> void:
         volume = p_volume
         _apply_volume(volume)
+        _deck = deck
+        _due = SchedulerScript.counts(deck, int(Time.get_unix_time_from_system()))["due"]
         if not is_node_ready():
                 await ready
-        var column: VBoxContainer = get_node("Margin/Column/Scroll/Wrap/Column")
-        for child in column.get_children():
-                column.remove_child(child)
-                child.queue_free()
-        _open_row = null
-        var surah := ""
-        for card in deck.cards:
-                var reference := _reference_of(card)
-                var card_surah := _surah_of(reference)
-                if card_surah != surah:
-                        surah = card_surah
-                        column.add_child(_surah_header(surah, card.id))
-                column.add_child(_entry(card, reference))
-        var tail := Control.new()
-        tail.name = "Tail"
-        tail.custom_minimum_size = Vector2(0, 18)
-        column.add_child(tail)
-        ThemeScript.stagger_in(column, 0.02, 0.2)
+        _query = ""
+        (get_node("Margin/Column/Search") as LineEdit).text = ""
+        _rebuild()
 
 func _build() -> void:
         set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -79,6 +78,8 @@ func _build() -> void:
         margin.add_child(column)
 
         column.add_child(_top_bar())
+        column.add_child(_search_field())
+        column.add_child(_summary_line())
         column.add_child(_surface())
         add_child(_volume_popup())
 
@@ -109,6 +110,46 @@ func _top_bar() -> Control:
         coin.pressed.connect(_toggle_volume_popup)
         right.add_child(coin)
         return row
+
+## The library's one question: which cards? The field reads as it is typed
+## and the shelf answers a breath later, so the page never stutters over a
+## fast hand.
+func _search_field() -> Control:
+        var field := LineEdit.new()
+        field.name = "Search"
+        field.placeholder_text = "Search the deck — a surah, a verse, 2:1…"
+        field.custom_minimum_size = Vector2(0, 46)
+        field.clear_button_enabled = true
+        field.text_direction = TextDirection.TEXT_DIRECTION_LTR
+        field.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
+        field.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+        field.add_theme_color_override("font_color", ThemeScript.INK)
+        field.add_theme_color_override("font_placeholder_color", ThemeScript.INK_SOFT)
+        field.add_theme_color_override("caret_color", ThemeScript.GREEN_DEEP)
+        var page := ThemeScript.soft_stylebox(ThemeScript.CARD, 14)
+        page.border_color = ThemeScript.LINE
+        page.set_border_width_all(1)
+        page.content_margin_left = 16
+        page.content_margin_right = 12
+        page.content_margin_top = 4
+        page.content_margin_bottom = 4
+        field.add_theme_stylebox_override("normal", page)
+        var visited := page.duplicate() as StyleBoxFlat
+        visited.border_color = ThemeScript.GOLD
+        visited.set_border_width_all(2)
+        field.add_theme_stylebox_override("hover", visited)
+        field.add_theme_stylebox_override("focus", visited)
+        field.text_changed.connect(_on_search_changed)
+        return field
+
+## The shelf's own account of itself: how many cards it holds, how many the
+## day is asking for -- and, while a search stands, how many answer it.
+func _summary_line() -> Control:
+        var label := Label.new()
+        label.name = "Summary"
+        label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        ThemeScript.dress(label, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
+        return label
 
 func _surface() -> Control:
         var scroll := ScrollContainer.new()
@@ -156,10 +197,116 @@ func _apply_volume(v: float) -> void:
                 mark.muted = volume <= 0.005
                 mark.queue_redraw()
 
+# --- the search ----------------------------------------------------------------------
+
+## The hand types; the shelf follows a breath behind, once, when the hand
+## pauses -- not once a letter, which would rebuild the page under a fast
+## typist's fingers.
+func _on_search_changed(text: String) -> void:
+        _query = text
+        if _rebuild_tween != null:
+                _rebuild_tween.timeout.disconnect(_rebuild)
+        _rebuild_tween = get_tree().create_timer(0.22)
+        _rebuild_tween.timeout.connect(_rebuild)
+
+## A card answers the search when any of its own words do: the reference it
+## asks with, the verses and translations it answers with, its surah's
+## name, or its verse's address. Digits read as digits whatever hand wrote
+## them -- ۲:۱ and 2:1 are the same question.
+func _matches(card: CardScript) -> bool:
+        var q := _normalize_digits(_query).to_lower().strip_edges()
+        if q.is_empty():
+                return true
+        var parts := PackedStringArray([
+                _reference_of(card), card.front, card.back, card.id,
+        ])
+        for address in _addresses_of(card):
+                parts.append(address)
+        return _normalize_digits("\n".join(parts)).to_lower().contains(q)
+
+## The verse addresses a card carries, from the media its markdown names:
+## 002001.mp3 is surah 2, verse 1, said the way a search asks for it.
+func _addresses_of(card: CardScript) -> PackedStringArray:
+        var out := PackedStringArray()
+        var finder := RegEx.create_from_string("\\b(\\d{6})\\.(?:mp3|ogg|wav|m4a)\\b")
+        for found in finder.search_all(card.front + "\n" + card.back):
+                var stem := str(found.get_string(1))
+                if stem.is_valid_int():
+                        out.append("%d:%d" % [int(stem.substr(0, 3)), int(stem.substr(3, 3))])
+        return out
+
+## Persian ۰-۹ and Arabic ٠-٩ become the digits a search can compare.
+static func _normalize_digits(text: String) -> String:
+        var out := text
+        for i in 10:
+                out = out.replace(String.chr(0x06F0 + i), str(i))
+                out = out.replace(String.chr(0x0660 + i), str(i))
+        return out
+
 # --- the list ------------------------------------------------------------------------
 
-## A surah's own running title: the name alone, gold, over a hairline -- the
-## book's way of saying a new chapter has begun without a banner.
+## The shelf itself, rebuilt whole: the cards that answer the search, under
+## their surahs' names, with the page's account of them above.
+func _rebuild() -> void:
+        _rebuild_tween = null
+        var column: VBoxContainer = get_node("Margin/Column/Scroll/Wrap/Column")
+        for child in column.get_children():
+                column.remove_child(child)
+                child.queue_free()
+        _open_row = null
+        var shown: Array = []
+        for card in _deck.cards:
+                if _matches(card):
+                        shown.append(card)
+        var summary: Label = get_node("Margin/Column/Summary")
+        if _query.strip_edges().is_empty():
+                summary.text = "%d cards · %d due today" % [_deck.cards.size(), _due]
+        else:
+                summary.text = "%d of %d cards" % [shown.size(), _deck.cards.size()]
+        if shown.is_empty():
+                var empty := Label.new()
+                empty.name = "Empty"
+                empty.text = "No cards answer — try fewer words."
+                empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                ThemeScript.dress(empty, ThemeScript.BODY, ThemeScript.INK_SOFT)
+                column.add_child(empty)
+                return
+        var surah := ""
+        var in_surah := 0
+        for card in shown:
+                var reference := _reference_of(card)
+                var card_surah := _surah_of(reference)
+                if card_surah != surah:
+                        if not surah.is_empty():
+                                _set_header_count(column, in_surah)
+                        surah = card_surah
+                        in_surah = 0
+                        column.add_child(_surah_header(surah, (card as CardScript).id))
+                in_surah += 1
+                column.add_child(_entry(card, reference))
+        _set_header_count(column, in_surah)
+        var tail := Control.new()
+        tail.name = "Tail"
+        tail.custom_minimum_size = Vector2(0, 18)
+        column.add_child(tail)
+        if _query.strip_edges().is_empty():
+                ThemeScript.stagger_in(column, 0.015, 0.18)
+
+## The count a surah's title carries, written into the header that waits
+## for it at the top of its own run of cards.
+func _set_header_count(column: VBoxContainer, count: int) -> void:
+        var header: VBoxContainer = null
+        for child in column.get_children():
+                if child.name.begins_with("Header"):
+                        header = child
+        if header != null:
+                (header.get_node("Line/Count") as Label).text = "%d card%s" % [
+                        count, "" if count == 1 else "s"
+                ]
+
+## A surah's own running title: the name alone, gold, with its count at the
+## far end and a hairline under both -- the book's way of saying a new
+## chapter has begun without a banner.
 func _surah_header(surah: String, of_card: String) -> Control:
         var box := VBoxContainer.new()
         # One name per node: the engine renames a second "Header" into an
@@ -168,24 +315,37 @@ func _surah_header(surah: String, of_card: String) -> Control:
         box.name = "Header" + of_card
         box.add_theme_constant_override("separation", 6)
         box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        var line := HBoxContainer.new()
+        line.name = "Line"
+        line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        line.add_theme_constant_override("separation", 12)
         var label := Label.new()
         label.name = "Name"
         label.text = surah
         label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
         label.text_direction = TextDirection.TEXT_DIRECTION_AUTO
+        label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         label.add_theme_font_override("font", ThemeScript.font_for(
                 ThemeScript.reference_script(surah), 15, true
         ))
         label.add_theme_font_size_override("font_size", 15)
         label.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP)
-        box.add_child(label)
+        line.add_child(label)
+        var count := Label.new()
+        count.name = "Count"
+        count.text = ""
+        count.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+        ThemeScript.dress(count, 12, ThemeScript.INK_SOFT)
+        line.add_child(count)
+        box.add_child(line)
         box.add_child(ThemeScript.hairline())
         return box
 
 ## One card in the library: its row, and the page that opens under it. The
-## row says the reference and the card's standing; the page beneath carries
-## the verses, the translation and the recitation, exactly as a session
-## would show them.
+## row says the reference, the verse's own first words beneath it, and the
+## card's standing at the far end; the page beneath carries the verses, the
+## translations, the recitations and the pencil, exactly as a session would
+## show them.
 func _entry(card: CardScript, reference: String) -> Control:
         var entry := VBoxContainer.new()
         entry.name = "Entry" + card.id
@@ -194,15 +354,15 @@ func _entry(card: CardScript, reference: String) -> Control:
         var row := Button.new()
         row.name = "Row"
         row.toggle_mode = false
-        row.custom_minimum_size = Vector2(0, 56)
+        row.custom_minimum_size = Vector2(0, 68)
         row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         var rest := ThemeScript.soft_stylebox(ThemeScript.CARD, 14)
         rest.border_color = ThemeScript.LINE
         rest.set_border_width_all(1)
         rest.content_margin_left = 16
         rest.content_margin_right = 16
-        rest.content_margin_top = 8
-        rest.content_margin_bottom = 8
+        rest.content_margin_top = 9
+        rest.content_margin_bottom = 9
         var hover := rest.duplicate() as StyleBoxFlat
         hover.bg_color = Color(
                 ThemeScript.GREEN.r, ThemeScript.GREEN.g, ThemeScript.GREEN.b, 0.05
@@ -230,11 +390,18 @@ func _entry(card: CardScript, reference: String) -> Control:
         disclose.size_flags_vertical = Control.SIZE_SHRINK_CENTER
         line.add_child(disclose)
 
+        var words := VBoxContainer.new()
+        words.name = "Words"
+        words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+        words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        words.add_theme_constant_override("separation", 2)
+        line.add_child(words)
+
         var ref_label := Label.new()
         ref_label.name = "Ref"
         ref_label.text = reference
         ref_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        ref_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
         ref_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
         ref_label.text_direction = TextDirection.TEXT_DIRECTION_AUTO
         ref_label.clip_text = true
@@ -242,16 +409,40 @@ func _entry(card: CardScript, reference: String) -> Control:
         ref_label.add_theme_font_override("font", ThemeScript.font_for(script, 18))
         ref_label.add_theme_font_size_override("font_size", 18)
         ref_label.add_theme_color_override("font_color", ThemeScript.INK)
-        line.add_child(ref_label)
+        words.add_child(ref_label)
+
+        # The verse's own first words, so a shelf of references is also a
+        # shelf of verses: a reader finds the line they half-remember.
+        var preview_text := _preview_of(card)
+        if not preview_text.is_empty():
+                var preview := Label.new()
+                preview.name = "Preview"
+                preview.text = preview_text
+                preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+                preview.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+                preview.text_direction = TextDirection.TEXT_DIRECTION_AUTO
+                preview.clip_text = true
+                var preview_script := ThemeScript.script_of(preview_text)
+                preview.add_theme_font_override("font", ThemeScript.font_for(preview_script, 12))
+                preview.add_theme_font_size_override("font_size", 12)
+                preview.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
+                words.add_child(preview)
 
         var standing := _standing_of(card)
+        var chip := HBoxContainer.new()
+        chip.name = "Chip"
+        chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+        chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        chip.add_theme_constant_override("separation", 6)
+        var dot := ThemeScript.StatusDot.new(standing["color"])
+        dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+        chip.add_child(dot)
         var status := Label.new()
         status.name = "Status"
         status.text = str(standing["text"])
-        status.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-        status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
         ThemeScript.dress(status, 12, standing["color"], true)
-        line.add_child(status)
+        chip.add_child(status)
+        line.add_child(chip)
 
         entry.add_child(row)
 
@@ -259,12 +450,7 @@ func _entry(card: CardScript, reference: String) -> Control:
         detail.name = "Detail"
         detail.visible = false
         detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        var pad := MarginContainer.new()
-        pad.name = "Pad"
-        pad.add_theme_constant_override("margin_left", 14)
-        pad.add_theme_constant_override("margin_right", 14)
-        pad.add_theme_constant_override("margin_bottom", 10)
-        detail.add_child(pad)
+        detail.add_theme_constant_override("separation", 10)
         entry.add_child(detail)
         return entry
 
@@ -282,16 +468,40 @@ func _toggle_row(row: Button, card: CardScript, entry: VBoxContainer) -> void:
                 var old: VBoxContainer = _open_row.get_parent().get_node("Detail")
                 _close_detail(old)
         _set_row_open(row, true)
-        for child in detail.get_child(0).get_children():
-                detail.get_child(0).remove_child(child)
-                child.queue_free()
-        var view := CardViewScript.new(_player)
-        view.name = "View"
-        view.show_text(card.back, card.folder)
-        detail.get_child(0).add_child(view)
+        _fill_detail(detail, card)
         detail.visible = true
         ThemeScript.settle_in(detail, 0.0, 0.24)
         _open_row = row
+
+## The card's page under its row: the same card a session shows -- verses,
+## translations, recitations, citation at the foot -- dressed as the page it
+## is, on the app's own card, with the pencil at hand for the fix a reader
+## notices mid-read.
+func _fill_detail(detail: VBoxContainer, card: CardScript) -> void:
+        for child in detail.get_children():
+                detail.remove_child(child)
+                child.queue_free()
+        var panel := PanelContainer.new()
+        panel.name = "Card"
+        panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        panel.add_theme_stylebox_override("panel", ThemeScript.card_stylebox())
+        detail.add_child(panel)
+        var pad := MarginContainer.new()
+        pad.name = "Pad"
+        pad.add_theme_constant_override("margin_left", 24)
+        pad.add_theme_constant_override("margin_right", 24)
+        pad.add_theme_constant_override("margin_top", 22)
+        pad.add_theme_constant_override("margin_bottom", 22)
+        panel.add_child(pad)
+        var view := CardViewScript.new(_player)
+        view.name = "View"
+        view.show_text(card.back, card.folder)
+        pad.add_child(view)
+        var edit := ThemeScript.ghost_button("Edit card", ThemeScript.GOLD_DEEP, 42, 21)
+        edit.name = "Edit"
+        edit.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        edit.pressed.connect(_open_editor.bind(card))
+        detail.add_child(edit)
 
 func _set_row_open(row: Button, open: bool) -> void:
         var mark: ThemeScript.DisclosureMark = row.get_node("Line/Disclose")
@@ -300,10 +510,38 @@ func _set_row_open(row: Button, open: bool) -> void:
         mark.queue_redraw()
 
 func _close_detail(detail: VBoxContainer) -> void:
-        for child in detail.get_child(0).get_children():
-                detail.get_child(0).remove_child(child)
+        for child in detail.get_children():
+                detail.remove_child(child)
                 child.queue_free()
         detail.visible = false
+
+# --- the pencil ----------------------------------------------------------------------
+
+## The pencil opens the card's own page over the library, the same page a
+## session opens: the words as the author wrote them, saved to the very
+## files the deck is.
+func _open_editor(card: CardScript) -> void:
+        if get_node_or_null("Editor") != null:
+                return
+        var editor := CardEditorScript.new(card)
+        editor.name = "Editor"
+        add_child(editor)
+        editor.saved.connect(_on_editor_saved)
+
+## A saved edit re-opens the row's page with the words as they now are, and
+## the row's own reference follows its question's first line.
+func _on_editor_saved(card: CardScript) -> void:
+        edited.emit(card)
+        var entry: VBoxContainer = get_node_or_null("Margin/Column/Scroll/Wrap/Column/Entry" + card.id)
+        if entry == null:
+                return
+        (entry.get_node("Row/Line/Words/Ref") as Label).text = _reference_of(card)
+        var detail: VBoxContainer = entry.get_node("Detail")
+        if detail.visible:
+                _fill_detail(detail, card)
+                ThemeScript.settle_in(detail, 0.0, 0.24)
+
+# --- the card's own words ------------------------------------------------------------
 
 ## The reference the card asks for: the first plain line of its front.
 func _reference_of(card: CardScript) -> String:
@@ -312,6 +550,17 @@ func _reference_of(card: CardScript) -> String:
                 if not plain.is_empty():
                         return plain
         return card.id
+
+## The verse's first words, for the row's second line: the first plain line
+## of the card's answer that carries words a reader would recognise.
+func _preview_of(card: CardScript) -> String:
+        for block in MarkdownScript.parse(card.back):
+                if block.kind != "text":
+                        continue
+                var plain := MarkdownScript.plain(block.text).strip_edges()
+                if not plain.is_empty():
+                        return plain
+        return ""
 
 ## The surah a reference belongs to: its own words before the dash.
 func _surah_of(reference: String) -> String:
@@ -359,7 +608,9 @@ func _layout() -> void:
         margin.add_theme_constant_override("margin_left", 16 if narrow else 24)
         margin.add_theme_constant_override("margin_right", 16 if narrow else 24)
         var column: VBoxContainer = get_node("Margin/Column/Scroll/Wrap/Column")
-        column.custom_minimum_size = Vector2(minf(600.0, size.x - 32.0), 0.0)
+        # A landscape window is a reading desk: the shelf takes a reader's
+        # measure, the same one a session's card takes.
+        column.custom_minimum_size = Vector2(minf(ThemeScript.MEASURE, size.x - 32.0), 0.0)
         # The volume's page hangs from its own corner, under the coin.
         var popup: Control = get_node_or_null("VolumePopup")
         if popup != null:
@@ -374,6 +625,9 @@ func _layout() -> void:
 func _input(event: InputEvent) -> void:
         if not visible:
                 return
+        # The editor owns the page while it is open; Esc belongs to it.
+        if get_node_or_null("Editor") != null:
+                return
         var popup: Control = get_node_or_null("VolumePopup")
         if popup != null and popup.visible and event is InputEventMouseButton and event.pressed:
                 var press := event as InputEventMouseButton
@@ -381,7 +635,15 @@ func _input(event: InputEvent) -> void:
                 var inside_coin := coin != null and coin.get_global_rect().has_point(press.position)
                 if not inside_coin and not popup.get_global_rect().has_point(press.position):
                         popup.visible = false
+        # While the search field is being written in, the page's keys are
+        # the field's own; Esc leaves the field first, and only a second
+        # Esc leaves the library.
+        var search: LineEdit = get_node_or_null("Margin/Column/Search")
+        var writing := search != null and search.has_focus()
         if event is InputEventKey and event.pressed and not event.echo:
                 if event.keycode == KEY_ESCAPE:
-                        closed.emit()
+                        if writing:
+                                search.release_focus()
+                        else:
+                                closed.emit()
                         get_viewport().set_input_as_handled()

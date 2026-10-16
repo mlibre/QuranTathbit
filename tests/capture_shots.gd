@@ -14,7 +14,7 @@ extends SceneTree
 
 const MainScript := preload("res://scripts/main.gd")
 
-const SHOTS := 11
+const SHOTS := 13
 
 var _out := "/tmp/shots"
 var _saved := 0
@@ -55,6 +55,14 @@ func _init() -> void:
         await _shot("volume")
         study._toggle_volume_popup()
         await create_timer(0.3).timeout
+        # The pencil: a card noticed mid-study is fixed mid-study, on the
+        # card's own page over the session.
+        study._open_editor()
+        await create_timer(0.8).timeout
+        await _shot("editor")
+        if study.get_node_or_null("Editor") != null:
+                (study.get_node("Editor") as Control).queue_free()
+                await create_timer(0.3).timeout
         study.closed.emit()
         await create_timer(0.7).timeout
         main._on_settings_pressed()
@@ -78,6 +86,16 @@ func _init() -> void:
                 (first_entry.get_node("Row") as Button).pressed.emit()
                 await create_timer(0.7).timeout
                 await _shot("browse_open")
+        # The shelf answers its search field: an address finds its card.
+        var search: LineEdit = browse.get_node_or_null("Margin/Column/Search")
+        if search != null:
+                search.text = "2:93"
+                browse._on_search_changed("2:93")
+                await create_timer(0.8).timeout
+                await _shot("browse_search")
+                search.text = ""
+                browse._on_search_changed("")
+                await create_timer(0.4).timeout
         browse.closed.emit()
         await create_timer(0.6).timeout
         await _shot("home_third")

@@ -1,14 +1,18 @@
 extends SceneTree
 
-## Animated capture: the same first-session walk tests/capture_shots.gd
-## makes, filmed continuously at ten frames a second so tools/make_gif.py
-## can assemble one GIF of the app at work. Needs a display -- Xvfb is
-## enough; headless mode cannot render, so it cannot carry this one.
+## Animated capture: the app's whole day, filmed continuously at ten
+## frames a second so tools/make_gif.py can assemble one GIF of the app at
+## work. Needs a display -- Xvfb is enough; headless mode cannot render, so
+## it cannot carry this one.
 ##
-##     Xvfb :99 -screen 0 480x800x24 &
-##     DISPLAY=:99 godot --path . --resolution 480x800 \
+## The film is landscape, the desk's own shape: a window with room for the
+## card beside its margins, the library's shelf at a reader's measure. Run
+## it at the same size the film should show:
+##
+##     Xvfb :99 -screen 0 1280x800x24 &
+##     DISPLAY=:99 godot --path . --resolution 1280x800 \
 ##             --script tests/capture_gif.gd -- /tmp/gifframes
-##     python3 tools/make_gif.py /tmp/gifframes docs/media/app.gif
+##     python3 tools/make_gif.py /tmp/gifframes docs/media/app.gif 640
 ##
 ## The out directory defaults to /tmp/gifframes; name another after -- to
 ## put the frames somewhere else. The install is wiped first, so every
@@ -33,7 +37,7 @@ func _init() -> void:
         root.add_child(main)
         await main.ready
         _film()
-        await _beat(10)
+        await _beat(12)
 
         main._start_session()
         await _beat(13)
@@ -51,6 +55,27 @@ func _init() -> void:
         study._answer("hard")
         await _beat(11)
         study.closed.emit()
+        await _beat(11)
+
+        # The library: the shelf, its search field, and the card a search
+        # finds -- the deck as a book, asked a question and answering.
+        main._on_browse_pressed()
+        await _beat(13)
+        var browse: Control = main.get_node("Browse")
+        var search: LineEdit = browse.get_node_or_null("Margin/Column/Search")
+        if search != null:
+                for typed in ["2", ":", "9", "3"]:
+                        search.text = search.text + typed
+                        browse._on_search_changed(search.text)
+                        await _beat(6)
+                await _beat(8)
+                var column: VBoxContainer = browse.get_node("Margin/Column/Scroll/Wrap/Column")
+                for child in column.get_children():
+                        if child.name.begins_with("Entry"):
+                                (child.get_node("Row") as Button).pressed.emit()
+                                break
+                await _beat(16)
+        browse.closed.emit()
         await _beat(11)
 
         _filming = false

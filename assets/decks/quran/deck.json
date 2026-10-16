@@ -2,6 +2,7 @@
   "format": 1,
   "name": "Quran",
   "source": "https://quran.makarem.ir/",
+  "translation_audio": "https://cdn.makarem.ir/quransound/persian-kabiri/",
   "cards": [
     "001",
     "002",

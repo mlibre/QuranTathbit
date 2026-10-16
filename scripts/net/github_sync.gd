@@ -31,7 +31,10 @@ const GitHubAuthScript := preload("res://scripts/net/github_auth.gd")
 ##
 ## The checksums are git blob checksums, the same values GitHub lists in a
 ## tree, so a file that matches the repo byte for byte is recognised as
-## identical and skipped: a quiet sync moves nothing at all.
+## identical and skipped: a quiet sync moves nothing at all. The branch's
+## own HEAD is kept in the manifest too, so a sync with nothing to say and
+## an unmoved HEAD is git's "already up to date" -- two questions asked,
+## no tree walked, no file fetched.
 ##
 ## Only the card layout is ever touched: deck.json, progress.json, and the
 ## numbered card folders. Godot's editor metadata (.import, .uid) is never
@@ -98,6 +101,17 @@ func sync(deck_path: String, on_progress: Callable = Callable()) -> Dictionary:
         var head := await _head_sha()
         if head.is_empty():
                 return {"ok": false, "error": "head_failed"}
+
+        # Git's own first question: has the branch moved? When the deck has
+        # nothing to say and HEAD is where the last sync left it, the tree
+        # cannot have changed and the exchange is already over -- the same
+        # way `git pull` answers "Already up to date" before touching a
+        # single object.
+        var manifest := _load_manifest()
+        if head == str(manifest.get("_head", "")) and _nothing_to_say(deck_path, manifest):
+                _report(on_progress, "in step", 0, 0)
+                return {"ok": true, "pushed": 0, "pulled": 0, "merged": 0}
+
         var tree: Dictionary = await _get_json(
                 "/repos/%s/%s/git/trees/%s?recursive=1" % [owner, repo, _branch]
         )
@@ -107,7 +121,6 @@ func sync(deck_path: String, on_progress: Callable = Callable()) -> Dictionary:
         var remote := _tree_shas(tree.body_json)
 
         # Remember where we started, so a mid-run failure does not lie later.
-        var manifest := _load_manifest()
         var local := _local_files(deck_path)
         var plan := _plan(local, remote, manifest, carry_media)
 
@@ -150,6 +163,7 @@ func sync(deck_path: String, on_progress: Callable = Callable()) -> Dictionary:
                 sends.append("progress.json")
 
         var pushed := 0
+        var settled_head := head
         if not (sends.is_empty() and deletes.is_empty()):
                 _report(on_progress, "uploading", 0, sends.size())
                 var blob_shas: Dictionary = await _create_blobs(deck_path, sends, on_progress)
@@ -192,11 +206,20 @@ func sync(deck_path: String, on_progress: Callable = Callable()) -> Dictionary:
                                 "merged": int(merge.get("merged", 0)),
                                 "failed": failed,
                         }
+                if landed.has("sha"):
+                        settled_head = str(landed.sha)
                 pushed = sends.size() + deletes.size()
 
-        # Everything that now agrees, locally and remotely, is the new baseline.
-        # Anything that failed to transfer stays out, so the next run retries it.
-        _write_manifest(deck_path, failed, "progress.json" if progress_failed else "")
+        # Everything that now agrees, locally and remotely, is the new
+        # baseline -- and the branch's own HEAD is remembered with it, so
+        # the next quiet sync can answer "already up to date" from the
+        # branch alone. Anything that failed to transfer stays out of both,
+        # so the next run looks at the tree again and retries.
+        var clean_finish: bool = failed.is_empty() and not progress_failed
+        _write_manifest(
+                deck_path, failed, "progress.json" if progress_failed else "",
+                settled_head if clean_finish else ""
+        )
 
         return {
                 "ok": failed.is_empty() and not progress_failed,
@@ -206,16 +229,52 @@ func sync(deck_path: String, on_progress: Callable = Callable()) -> Dictionary:
                 "failed": failed,
         }
 
-func _write_manifest(deck_path: String, failed: Array, progress_failed_path: String) -> void:
+func _write_manifest(deck_path: String, failed: Array, progress_failed_path: String, settled_head := "") -> void:
         var after := _local_files(deck_path)
         var fresh: Dictionary = {}
         for path in after.keys():
                 if failed.has(path) or (path == progress_failed_path and not progress_failed_path.is_empty()):
                         continue
+                # A machine that does not carry media must not remember it as
+                # agreed: the manifest is what "already synced" means, and a
+                # browser never agreed about files it cannot hold. Recording
+                # them anyway let a later desktop sync believe the repo had
+                # media it had never received.
+                if not carry_media and _is_media(path):
+                        continue
                 fresh[path] = after[path]
+        # The branch this agreement was reached against, for the next run's
+        # first question. An empty head -- a run that did not finish clean --
+        # forces the next run to look at the tree instead of trusting it.
+        if not settled_head.is_empty():
+                fresh["_head"] = settled_head
         _save_manifest(fresh)
 
 # --- planning ------------------------------------------------------------------
+
+## Does this deck have anything to say to the repo? Every deck file agrees
+## with the last sync's record of it, nothing the last sync knew has been
+## deleted since, and the progress file has not moved -- the deck and the
+## baseline are one, and only the branch's word is needed to finish.
+func _nothing_to_say(deck_path: String, manifest: Dictionary) -> bool:
+        if _progress_needs_push(deck_path.path_join("progress.json"), manifest):
+                return false
+        var local := _local_files(deck_path)
+        for path in local.keys():
+                if path == "progress.json" or _is_editor_metadata(path):
+                        continue
+                if not carry_media and _is_media(path):
+                        continue
+                if str(manifest.get(path, "")) != str(local[path]):
+                        return false
+        for path in manifest.keys():
+                if str(path) == "_head" or path == "progress.json":
+                        continue
+                if not carry_media and _is_media(str(path)):
+                        continue  # a file this machine does not carry is not a deletion
+                if not local.has(str(path)):
+                        return false  # removed here; the repo should hear
+        return true
 
 ## The plan says what each file needs: send, pull, or delete. progress.json
 ## never appears here -- the merge owns it.

@@ -4,6 +4,7 @@ const ThemeScript := preload("res://scripts/ui/theme.gd")
 const CardScript := preload("res://scripts/data/card.gd")
 const SchedulerScript := preload("res://scripts/data/scheduler.gd")
 const CardViewScript := preload("res://scripts/ui/card_view.gd")
+const CardEditorScript := preload("res://scripts/ui/card_editor.gd")
 const MarkdownScript := preload("res://scripts/ui/markdown.gd")
 
 ## A session: one card at a time, question first, then the answer, then how
@@ -19,6 +20,7 @@ const MarkdownScript := preload("res://scripts/ui/markdown.gd")
 signal closed
 signal answered(card: CardScript, button: String)
 signal volume_changed(value: float)
+signal edited(card: CardScript)
 
 const PANEL := "Margin/Column/Surface/Fill/CardPanel"
 const AGAIN_COLOR := Color("#B4553F")
@@ -131,13 +133,25 @@ func _key_hints() -> Control:
         return row
 
 ## Back the way the user came, the count in the middle, room on the right:
-## the same bones every screen's header shares.
+## the same bones every screen's header shares. The right corner carries
+## two coins -- the pencil that opens the card for editing, and the speaker
+## that asks how loud -- with a spacer of the same width beside the way
+## back, so the count in the middle stays the middle.
 func _top_bar() -> Control:
         var bar: Dictionary = ThemeScript.top_bar("")
         var row: HBoxContainer = bar["row"]
         var back: Button = bar["back"]
         back.tooltip_text = "Back to home"
         back.pressed.connect(func() -> void: closed.emit())
+        # Two coins on the right move the centre left by their extra width;
+        # a quiet spacer of the same width after the way back keeps the
+        # count where every other screen keeps it.
+        var spacer := Control.new()
+        spacer.name = "Spacer"
+        spacer.custom_minimum_size = Vector2(54, 0)
+        spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        row.add_child(spacer)
+        row.move_child(spacer, 1)
         # The header's middle is this screen's count, not its name: the user
         # knows where they are; what they want to know is how far is left.
         var progress: Label = bar["title"]
@@ -145,13 +159,39 @@ func _top_bar() -> Control:
         progress.size_flags_vertical = Control.SIZE_SHRINK_CENTER
         progress.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
         ThemeScript.dress(progress, 15, ThemeScript.INK_SOFT, true)
-        # The corner every screen leaves empty gets this screen's own second
-        # question: how loud the recitation speaks. One quiet coin, beside
-        # the way back, where a thumb already knows the corner lives.
+        # The corner every screen leaves empty gets this screen's own two
+        # questions: the card's own words, and how loud they are spoken.
         var right: Control = bar["right"]
+        right.custom_minimum_size = Vector2(102, 48)
+        var pair := HBoxContainer.new()
+        pair.name = "Pair"
+        pair.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        pair.add_theme_constant_override("separation", 6)
+        right.add_child(pair)
+
+        var edit := Button.new()
+        edit.name = "Edit"
+        edit.custom_minimum_size = Vector2(48, 48)
+        edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        edit.tooltip_text = "Edit this card"
+        ThemeScript.apply_mark_styles(edit, ThemeScript.mark_button_styles(ThemeScript.GOLD, true))
+        var pencil := ThemeScript.PencilMark.new(ThemeScript.GOLD_DEEP)
+        pencil.name = "PencilMark"
+        var edit_center := CenterContainer.new()
+        edit_center.name = "Mark"
+        edit_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        edit_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        pencil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        edit_center.add_child(pencil)
+        edit.add_child(edit_center)
+        ThemeScript.pressable(edit)
+        edit.pressed.connect(_open_editor)
+        pair.add_child(edit)
+
         var coin := Button.new()
         coin.name = "Volume"
-        coin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        coin.custom_minimum_size = Vector2(48, 48)
+        coin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         ThemeScript.apply_mark_styles(coin, ThemeScript.mark_button_styles(ThemeScript.GREEN, true))
         var mark := ThemeScript.VolumeMark.new(ThemeScript.GREEN_DEEP)
         mark.name = "VolumeMark"
@@ -165,7 +205,7 @@ func _top_bar() -> Control:
         coin.tooltip_text = "Recitation volume"
         ThemeScript.pressable(coin)
         coin.pressed.connect(_toggle_volume_popup)
-        right.add_child(coin)
+        pair.add_child(coin)
         return row
 
 func _surface() -> Control:
@@ -273,7 +313,7 @@ func _apply_volume(v: float) -> void:
         # floor instead, silence for the ear and a number for the maths.
         _player.volume_db = linear_to_db(maxf(volume, 0.0001))
         var mark: ThemeScript.VolumeMark = get_node_or_null(
-                "Margin/Column/TopBar/Right/Volume/Mark/VolumeMark"
+                "Margin/Column/TopBar/Right/Pair/Volume/Mark/VolumeMark"
         )
         if mark != null:
                 mark.muted = volume <= 0.005
@@ -636,8 +676,39 @@ func _show_done() -> void:
         get_node("Margin/Column/Footer/ShowAnswer").visible = false
         get_node("Margin/Column/Footer/Done").visible = true
 
+# --- the card, editable on the spot --------------------------------------------------
+
+## The pencil opens the card's own page over the session: the words as the
+## author wrote them, ready for the fix a reader notices while studying.
+## Added after everything else, the editor stands above the page and is
+## offered the keyboard first; the screen beneath goes quiet until it
+## closes.
+func _open_editor() -> void:
+        if _index >= _cards.size():
+                return
+        if get_node_or_null("Editor") != null:
+                return
+        var editor := CardEditorScript.new(_cards[_index])
+        editor.name = "Editor"
+        add_child(editor)
+        editor.saved.connect(_on_editor_saved)
+
+## A saved edit is the same card, re-read: the page shows the words as they
+## now are, on whichever side was standing when the pencil was pressed.
+func _on_editor_saved(card: CardScript) -> void:
+        edited.emit(card)
+        if _revealed:
+                _view.show_text(card.back, card.folder, false, _reference_of(card))
+        else:
+                _view.show_text(card.front, card.folder, true)
+
 func _input(event: InputEvent) -> void:
         if not visible:
+                return
+        # The editor owns the page while it is open: the session's own keys
+        # (Space to reveal, 1-4 to answer) would otherwise reach into its
+        # fields, and a reader typing a space would answer a card instead.
+        if get_node_or_null("Editor") != null:
                 return
         # A popover closes the way popovers do: any press outside it. The
         # coin that opened it is outside it too -- its own press will close
@@ -646,7 +717,7 @@ func _input(event: InputEvent) -> void:
         var popup: PanelContainer = get_node_or_null("VolumePopup")
         if popup != null and popup.visible and event is InputEventMouseButton and event.pressed:
                 var press := event as InputEventMouseButton
-                var coin: Button = get_node_or_null("Margin/Column/TopBar/Right/Volume")
+                var coin: Button = get_node_or_null("Margin/Column/TopBar/Right/Pair/Volume")
                 var inside_coin := coin != null and coin.get_global_rect().has_point(press.position)
                 if not inside_coin and not popup.get_global_rect().has_point(press.position):
                         popup.visible = false

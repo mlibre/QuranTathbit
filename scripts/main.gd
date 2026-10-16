@@ -13,14 +13,23 @@ const StudyScript := preload("res://scripts/ui/study.gd")
 const SettingsScreenScript := preload("res://scripts/ui/settings_screen.gd")
 const BrowseScript := preload("res://scripts/ui/browse.gd")
 
-## QuranTathbit: one deck, kept in folders and files, studied one card at a
-## time. This root owns the small amount of state the app has -- settings,
+## QuranTathbit: one deck, kept in folders and files, studied one card at
+## a time. This root owns the small amount of state the app has -- settings,
 ## the deck, the network clients, the session -- and moves between its four
-## screens: home, the session, the library, settings. Nothing edits a card
-## in here: the deck is files, and the app reads them.
+## screens: home, the session, the library, settings. Cards are edited on
+## the spot in the session and the library, through the same editor; every
+## edit lands in the card's own files, and the deck's git-backed sync
+## carries it to the repo from there.
 
 const BUNDLED_DECK := "res://assets/decks/quran"
 const USER_DECK := "user://decks/quran"
+
+## How long a quiet sync waits before trying again after a network
+## failure, and how many times. The sync is resumable by design -- whatever
+## landed is the baseline the next attempt continues from -- so a retry is
+## a resume, and three of them carry an interrupted opening across most
+## bad connections without a hand on the button.
+const SYNC_RETRY_WAITS := [8.0, 25.0, 60.0]
 
 var _settings: SettingsScript
 var _deck: DeckScript
@@ -31,12 +40,17 @@ var _screen: Control
 var _update_waiting := false  # a newer web version was announced; Home owes the user the offer
 var _syncing := false  # one sync at a time; a second press is a question, not a demand
 var _answers_waiting := 0  # answers given since the repo last heard from this deck
+var _deck_edited := false  # a card was edited in the app since the repo last heard
 var _sync_failed := false  # the last sync could not finish; the deck is honest about it
+var _sync_retrying := false  # a failed quiet sync is waiting to try again
+var _sync_attempts := 0  # how many retries this quiet run has made
+var _sync_generation := 0  # a new run cancels the retries an older one left pending
 var _paste_callback: Variant = null  # the page's paste hook, kept alive for the app's whole life
 
 
 func _ready() -> void:
         _install_deck()
+        _deliver_translations()
         _settings = SettingsScript.load_settings()
         _deck = DeckScript.load(USER_DECK)
         if _deck == null:
@@ -99,6 +113,41 @@ func _copy_tree(from: String, to: String) -> void:
                 _copy_tree(from.path_join(entry), sub_to)
 
 
+## The deck the package first installed did not carry the Persian
+## translations; an updated app does. They are delivered the way the deck
+## itself was installed -- copied from the package into the user's deck,
+## additively and quietly: a file that is already there is never touched,
+## so nothing a user or a sync did here is undone. The files ride the
+## deck's own sync afterwards, like any other card media. On the web the
+## package carries no audio at all, so there is nothing to deliver and the
+## recitations stream from the site, as they always have.
+func _deliver_translations() -> void:
+        if OS.has_feature("web"):
+                return
+        var delivered := 0
+        for folder in DirAccess.get_directories_at(BUNDLED_DECK):
+                var from := BUNDLED_DECK.path_join(folder)
+                var into := USER_DECK.path_join(folder)
+                for entry in DirAccess.get_files_at(from):
+                        if not entry.ends_with("-fa.mp3"):
+                                continue
+                        var target := into.path_join(entry)
+                        if FileAccess.file_exists(target):
+                                continue
+                        if not DirAccess.dir_exists_absolute(into):
+                                DirAccess.make_dir_recursive_absolute(into)
+                        var data := FileAccess.get_file_as_bytes(from.path_join(entry))
+                        var file := FileAccess.open(target, FileAccess.WRITE)
+                        if file == null:
+                                push_error("QuranTathbit: cannot deliver %s" % target)
+                                continue
+                        file.store_buffer(data)
+                        file.close()
+                        delivered += 1
+        if delivered > 0:
+                print("QuranTathbit: delivered %d Persian translation(s)" % delivered)
+
+
 # --- screens -------------------------------------------------------------------
 
 func _go_home() -> void:
@@ -134,6 +183,7 @@ func _start_session() -> void:
         _swap(study)
         study.start(cards)
         study.answered.connect(_on_answered)
+        study.edited.connect(_on_card_edited)
         study.closed.connect(_on_session_closed)
         study.volume_changed.connect(_on_volume_changed)
 
@@ -148,10 +198,11 @@ func _on_volume_changed(value: float) -> void:
 ## A session's answers are the one thing this app makes that another device
 ## wants; when the session closes, the deck says so to GitHub on its own --
 ## quietly, under the page it returns to -- so "synced" is never a thing
-## the user has to remember to ask for.
+## the user has to remember to ask for. An edit made on the spot rides the
+## same closing door, even when the session answered nothing.
 func _on_session_closed() -> void:
         _go_home()
-        if _settings.has_token() and _settings.auto_sync and _answers_waiting > 0:
+        if _settings.has_token() and _settings.auto_sync and _pending_answers() > 0:
                 _run_sync(true)
 
 
@@ -159,6 +210,16 @@ func _on_answered(card: CardScript, button: String) -> void:
         _deck.answer(card, button, _now())
         _deck.save_progress()
         _answers_waiting += 1
+
+
+## A card edited on the spot: the files are written, the deck in memory is
+## current, and the next sync -- asked for or automatic -- carries the edit
+## to the repo as part of its one commit, exactly as a hand-edited file
+## would have been.
+func _on_card_edited(_card: CardScript) -> void:
+        _deck_edited = true
+        if _screen is HomeScript:
+                _refresh_home()
 
 
 func _on_settings_pressed() -> void:
@@ -184,6 +245,7 @@ func _on_browse_pressed() -> void:
         _swap(browse)
         browse.setup(_deck, _settings.volume)
         browse.closed.connect(_go_home)
+        browse.edited.connect(_on_card_edited)
         browse.volume_changed.connect(_on_volume_changed)
 
 
@@ -209,11 +271,16 @@ func _on_sync_pressed() -> void:
 ## phase in plain words, a bar that knows how far along it is, and the
 ## promise that the deck is safe on this machine whatever the network
 ## does. The app stays usable when it fails -- the deck is local first,
-## always.
+## always. A quiet sync that the network interrupts is retried on the
+## app's own -- each retry a resume, because everything that landed is
+## already the baseline -- so an interrupted opening heals itself without
+## a hand on the button.
 func _run_sync(quiet := false) -> void:
         if _syncing:
                 return
         _syncing = true
+        _sync_generation += 1
+        _sync_retrying = false
         if _screen is HomeScript:
                 (_screen as HomeScript).set_syncing()
         var overlay: Control = null
@@ -231,13 +298,17 @@ func _run_sync(quiet := false) -> void:
         _syncing = false
         # Only a finished sync may move the "last synced" clock: a failed run
         # must leave the app honest about when it last heard from the repo.
-        if bool(result.get("ok", false)):
+        var ok := bool(result.get("ok", false))
+        if ok:
+                _sync_attempts = 0
                 _settings.last_sync = _now()
                 _settings.save()
                 _answers_waiting = 0
+                _deck_edited = false
                 _sync_failed = false
         else:
                 _sync_failed = true
+                _maybe_schedule_sync_retry(quiet, result)
 
         # Progress may have merged in from another device; read the deck back.
         var reloaded: DeckScript = DeckScript.load(USER_DECK)
@@ -246,13 +317,15 @@ func _run_sync(quiet := false) -> void:
                 _sync = GitHubSyncScript.new(_http, _auth)
 
         var line := ""
-        if bool(result.get("ok", false)):
+        if ok:
                 if int(result.get("pushed", 0)) + int(result.get("pulled", 0)) + int(result.get("merged", 0)) == 0:
                         line = "Everything in step — synced just now"
                 else:
                         line = "Synced just now · %d sent, %d fetched, %d merged" % [
                                 result.get("pushed", 0), result.get("pulled", 0), result.get("merged", 0)
                         ]
+        elif _sync_retrying:
+                line = "Connection trouble — the app will try again by itself"
         else:
                 line = "Sync could not finish — your cards are safe here. Try again."
         if _screen is HomeScript:
@@ -262,6 +335,37 @@ func _run_sync(quiet := false) -> void:
                 screen.note_sync_result(line)
                 # The settings screen keeps its own account of the moment; the
                 # home line recomputes when the user goes back to it.
+
+
+## Should this failure be tried again without being asked? Anything the
+## network could have caused, yes; a token the repo does not accept, no --
+## that will not heal on its own, and the answer is in Settings, not in a
+## retry loop.
+func _sync_retryable(error: String) -> bool:
+        return error != "no_token" and error != "auth_failed"
+
+
+## The quiet promise kept: a network-failed sync schedules its own next
+## attempt, with a longer wait each time, until one lands or the waits run
+## out. A newer run -- the hand's own press, a session closing -- cancels
+## whatever this one left waiting, because that run speaks for itself.
+func _maybe_schedule_sync_retry(quiet: bool, result: Dictionary) -> bool:
+        if not quiet:
+                return false
+        if _sync_attempts >= SYNC_RETRY_WAITS.size():
+                return false
+        if not _sync_retryable(str(result.get("error", ""))):
+                return false
+        var wait: float = SYNC_RETRY_WAITS[_sync_attempts]
+        _sync_attempts += 1
+        _sync_retrying = true
+        var generation := _sync_generation
+        get_tree().create_timer(wait).timeout.connect(func() -> void:
+                if generation == _sync_generation and not _syncing:
+                        _sync_retrying = false
+                        _run_sync(true)
+        )
+        return true
 
 
 ## Home is told the same five things every time it is refreshed -- from its
@@ -279,6 +383,8 @@ func _sync_line() -> String:
                 return "Not connected — your deck lives on this device only"
         if _syncing:
                 return "Syncing…"
+        if _sync_retrying:
+                return "Connection trouble — the app will try again by itself"
         var waiting := _pending_answers()
         if waiting > 0:
                 return "%d %s waiting to sync" % [waiting, "answer" if waiting == 1 else "answers"]
@@ -289,13 +395,15 @@ func _sync_line() -> String:
 
 ## Which of the coin's states the page is in: not connected at all; agreed
 ## with the repo at least once; connected but never yet taken there;
-## holding work the repo has not seen; or the last attempt could not
-## finish.
+## holding work the repo has not seen; waiting to try a failed sync again;
+## or the last attempt could not finish.
 func _sync_state() -> String:
         if not _settings.has_token():
                 return "off"
         if _syncing:
                 return "syncing"
+        if _sync_retrying:
+                return "pending"
         if _pending_answers() > 0:
                 return "pending"
         if _sync_failed:
@@ -305,12 +413,15 @@ func _sync_state() -> String:
         return "pending"
 
 
-## Answers the repo has not seen: the ones this session gave, or the ones a
-## previous session left behind when its sync could not finish -- read from
-## the same baseline the sync engine keeps, without touching the network.
+## Answers the repo has not seen: the ones this session gave, a card the
+## pencil touched, or the ones a previous session left behind when its sync
+## could not finish -- read from the same baseline the sync engine keeps,
+## without touching the network.
 func _pending_answers() -> int:
         if _answers_waiting > 0:
                 return _answers_waiting
+        if _deck_edited:
+                return 1
         return 1 if GitHubSyncScript.progress_dirty(USER_DECK) else 0
 
 

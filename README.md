@@ -51,7 +51,7 @@ No installer, no dependencies, no account: the download *is* the app.
 
 ## A study session
 
-![The app at work — home, a card, its answer, the next card](docs/media/app.gif)
+![The app at work — home, a card, its answer, the library, a search](docs/media/app.gif)
 
 On a phone the same session lays out for a hand — a phone's own page
 width, two answer buttons to a row, every target a thumb tall:
@@ -65,15 +65,22 @@ width, two answer buttons to a row, every target a thumb tall:
 2. **Question** — the surah and āyāt in Arabic, set large in the middle of
    the page. Press **Space** (or **Show answer**) when you are ready.
 3. **Answer** — the verse again, the Persian translation a step behind, and
-   the recitation, each button saying which verse will speak. Four buttons
-   ask how it went — **Again**, **Hard**, **Good**, **Easy** — each carrying
-   its next interval as its biggest word, so the cost of each choice is
-   visible up front.
+   beside each verse's recitation its Persian translation, spoken — each
+   pill saying which verse and which voice will speak. Four buttons ask how
+   it went — **Again**, **Hard**, **Good**, **Easy** — each carrying its
+   next interval as its biggest word, so the cost of each choice is
+   visible up front. A typo noticed mid-study is fixed mid-study: the
+   pencil in the corner opens the card itself, saves to the very files the
+   deck is, and the next sync carries the edit to GitHub like any other.
 4. **Rest** — when the queue is empty, the app says so and tells you to come
    back tomorrow. Progress is saved automatically.
 
 Every verse, translation and explanation is selectable — drag, or long-press
-on a touch screen — so you can paste any of it into your notes.
+on a touch screen — so you can paste any of it into your notes. The deck is
+also a book: **Browse** under the day's button opens the whole library —
+every card under its surah's name, searchable by the surah, the verse's own
+words, or its address (`2:93`, `۲:۹۳` — the hand's own digits both), each
+card opening in place to read and listen.
 
 ## Sync, in plain words
 
@@ -88,7 +95,10 @@ Sync is quiet and it is cheap. It runs on its own after each session — the
 status line under the day's button says what it is doing, and it can be
 switched off in Settings — and a sync with nothing to say moves nothing at
 all: no file is re-sent, none is re-fetched, and a run that finds everything
-already in step is a handful of lookups, never a round trip.
+already in step asks two questions of the branch and stops. A sync the
+network interrupts is retried on the app's own — each retry resuming from
+wherever the last one landed — so an interrupted opening heals itself
+without a hand on the button.
 
 ## Keyboard shortcuts
 
@@ -98,6 +108,7 @@ already in step is a handful of lookups, never a round trip.
 | **1** – **4**         | answer **Again**, **Hard**, **Good**, **Easy** |
 | **Esc**               | close the session                              |
 
+While editing a card: **Esc** closes without saving, **Ctrl+Enter** saves.
 In the browser, keys the browser owns — **F5**, **F11**, **Ctrl+F** and
 friends — keep working as on any other page.
 
@@ -105,6 +116,8 @@ friends — keep working as on any other page.
 
 - **Card data** — verses, Persian translation, and recitations from
   [quran.makarem.ir](https://quran.makarem.ir); no other source is used.
+  The Persian translation recitations are Hojatollah Kabiri's, from the
+  site's own library (`persian-kabiri`), recorded in `deck.json`.
 - **Code** — MIT; **algorithm** — SM-2. Both attributions live in the
   [LICENSE](LICENSE).
 - **Typefaces** — Amiri for the Arabic verses, Vazirmatn for the Persian

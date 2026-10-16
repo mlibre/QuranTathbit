@@ -27,6 +27,7 @@ func _init() -> void:
         await _test_quiet_sync_asks_for_nothing()
         await _test_failed_push_retries()
         await _test_ref_conflict_retries()
+        await _test_head_short_circuit()
         await _test_foreign_files_are_left_alone()
         await _test_shared_deck_arrives()
         await _test_editor_metadata_never_travels()
@@ -57,6 +58,8 @@ class FakeGitHub:
         var files := {}  # path -> {"sha": ..., "content": bytes}
         var blobs := {}  # blob sha -> bytes, exactly what the blobs API holds
         var commits := 0
+        var head := "head-0"  # the ref the branch points at, one truth for every answer
+        var tree_gets := 0  # full tree walks, the thing a settled sync never makes
         var fail_blobs := false  # every blob POST answers 500
         var ref_conflicts := 0  # the first ref updates answer 409
         var blob_posts := 0  # uploads, even the ones that fail
@@ -75,7 +78,7 @@ class FakeGitHub:
                 if url.ends_with("/user/repos"):
                         return _json(201, {"default_branch": "main"})
                 if method == "GET" and url.contains("/git/ref/heads/"):
-                        return _json(200, {"object": {"sha": "head-%d" % commits}})
+                        return _json(200, {"object": {"sha": head}})
                 if method == "POST" and url.ends_with("/git/blobs"):
                         blob_posts += 1
                         if fail_blobs:
@@ -93,13 +96,15 @@ class FakeGitHub:
                 if method == "POST" and url.ends_with("/git/commits"):
                         commit_posts += 1
                         commits += 1
-                        return _json(201, {"sha": "commit-%d" % commits})
+                        head = "head-%d" % commits
+                        return _json(201, {"sha": head})
                 if method == "PATCH" and url.contains("/git/refs/heads/"):
                         if ref_conflicts > 0:
                                 ref_conflicts -= 1
                                 return _json(409, {})
-                        return _json(200, {"object": {"sha": "commit-%d" % commits}})
+                        return _json(200, {"object": {"sha": head}})
                 if method == "GET" and url.contains("/git/trees/"):
+                        tree_gets += 1
                         var tree := []
                         for p in files.keys():
                                 tree.append({"path": p, "sha": files[p].sha, "type": "blob"})
@@ -112,6 +117,16 @@ class FakeGitHub:
                                 return _json(404, {})
                         return _raw(200, files[path].content)
                 return _json(404, {})
+
+        ## Another device pushed: the file changes and the branch moves,
+        ## together, the way a real commit does both at once.
+        func commit_change(path: String, content: String) -> void:
+                commits += 1
+                head = "head-%d" % commits
+                files[path] = {
+                        "sha": _content_sha(content.to_utf8_buffer()),
+                        "content": content.to_utf8_buffer(),
+                }
 
         ## One tree carries everything a sync says: new blobs land, entries with
         ## a null sha vanish, and everything else -- the user's own files -- keeps
@@ -251,12 +266,12 @@ func _test_local_edit_wins() -> void:
         await sync.sync(DECK)
         # The card is edited here and there at once.
         _write(DECK.path_join("001/front.md"), "Q1 edited here")
-        fake.files["001/front.md"] = {"sha": "theirs", "content": "Q1 edited there".to_utf8_buffer()}
+        fake.commit_change("001/front.md", "Q1 edited there")
         var result: Dictionary = await sync.sync(DECK)
         _ok(bool(result.get("ok", false)), "a conflicting sync completes")
         _is(_read(DECK.path_join("001/front.md")), "Q1 edited here", "the local edit wins a content conflict")
         # And an untouched file follows the remote.
-        fake.files["001/back.md"] = {"sha": "theirs2", "content": "A1 edited there".to_utf8_buffer()}
+        fake.commit_change("001/back.md", "A1 edited there")
         await sync.sync(DECK)
         _is(_read(DECK.path_join("001/back.md")), "A1 edited there", "an untouched file follows the remote")
 
@@ -271,12 +286,9 @@ func _test_progress_merges() -> void:
                 "001": {"status": "review", "ivl": 4, "ease": 2.5, "reps": 3, "lapses": 0, "mod": 1000, "due_day": 100, "step": 0, "relearning": false, "due_ts": 0},
                 "002": {"status": "review", "ivl": 1, "ease": 2.5, "reps": 1, "lapses": 0, "mod": 900, "due_day": 100, "step": 0, "relearning": false, "due_ts": 0},
         })
-        fake.files["progress.json"] = {
-                "sha": "prog",
-                "content": (JSON.stringify({"format": 1, "cards": {
-                        "001": {"status": "review", "ivl": 10, "ease": 2.5, "reps": 9, "lapses": 1, "mod": 2000, "due_day": 100, "step": 0, "relearning": false, "due_ts": 0},
-                }}) + "\n").to_utf8_buffer(),
-        }
+        fake.commit_change("progress.json", (JSON.stringify({"format": 1, "cards": {
+                "001": {"status": "review", "ivl": 10, "ease": 2.5, "reps": 9, "lapses": 1, "mod": 2000, "due_day": 100, "step": 0, "relearning": false, "due_ts": 0},
+        }}) + "\n"))
         var result: Dictionary = await sync.sync(DECK)
         _ok(bool(result.get("ok", false)), "a progress sync completes")
         _is(result.merged, 1, "one card's progress merges in (got %d)" % result.merged)
@@ -397,13 +409,45 @@ func _test_ref_conflict_retries() -> void:
         _ok(bool(result.get("ok", false)), "a sync past a moved ref succeeds (%s)" % str(result.get("error", "")))
         _is(fake.files["001/front.md"].content.get_string_from_utf8(), "Q1 raced", "the raced edit lands after the retry")
 
+## Git's own shortcut: a sync with nothing to say against an unmoved
+## branch asks its two questions and stops -- no tree walk, no file
+## fetches. A moved branch or a local edit gets the full exchange.
+func _test_head_short_circuit() -> void:
+        _write_deck({"001": ["Q1", "A1"]})
+        var fake := FakeGitHub.new()
+        var sync := _make_sync(fake)
+        await sync.sync(DECK)
+        _write_progress({
+                "001": {"status": "review", "ivl": 4, "ease": 2.5, "reps": 2, "lapses": 0, "mod": 1000, "due_day": 100, "step": 0, "relearning": false, "due_ts": 0},
+        })
+        await sync.sync(DECK)  # the progress lands once; the branch is remembered
+        fake.tree_gets = 0
+        fake.blob_posts = 0
+        var in_step: Dictionary = await sync.sync(DECK)
+        _ok(bool(in_step.get("ok", false)), "a settled sync against an unmoved branch succeeds")
+        _is(fake.tree_gets, 0, "an unmoved branch is not even walked (got %d)" % fake.tree_gets)
+        _is(fake.blob_posts, 0, "nothing is uploaded when there is nothing to say")
+        # Another device pushes: the branch moves, and the sync looks again.
+        fake.commit_change("001/back.md", "A1 from elsewhere")
+        fake.tree_gets = 0
+        var moved: Dictionary = await sync.sync(DECK)
+        _ok(bool(moved.get("ok", false)), "a sync past a moved branch succeeds")
+        _ok(fake.tree_gets >= 1, "a moved branch is walked again")
+        _is(_read(DECK.path_join("001/back.md")), "A1 from elsewhere", "the local deck follows the branch")
+        # A local edit speaks even against an unmoved branch.
+        _write(DECK.path_join("001/front.md"), "Q1 changed here")
+        fake.blob_posts = 0
+        var speaking: Dictionary = await sync.sync(DECK)
+        _ok(bool(speaking.get("ok", false)), "a sync with a local edit succeeds")
+        _ok(fake.blob_posts >= 1, "a local edit is uploaded, whatever the branch says")
+
 func _test_foreign_files_are_left_alone() -> void:
         _write_deck({"001": ["Q1", "A1"]})
         var fake := FakeGitHub.new()
         var sync := _make_sync(fake)
         await sync.sync(DECK)
         # The user's own repo files must never be touched.
-        fake.files["my-notes.md"] = {"sha": "note", "content": "mine".to_utf8_buffer()}
+        fake.commit_change("my-notes.md", "mine")
         await sync.sync(DECK)
         _ok(fake.files.has("my-notes.md"), "a foreign file is left in the repo")
         _ok(not FileAccess.file_exists(DECK.path_join("my-notes.md")), "a foreign file is not pulled into the deck")

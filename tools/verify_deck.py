@@ -10,6 +10,11 @@ assets/decks/quran:
                                ("Default" in the package -> the app's name)
                                and key order; the recorded source URL must
                                match the one the app ships
+  *-fa.mp3                     are the Persian translation recitations the
+                               app delivers beside the package's verses
+                               (tools/fetch_persian.py, from the CDN that
+                               deck.json's translation_audio records); they
+                               are additive, ignored here
   *.import                     are Godot editor metadata, ignored
   progress.json                is runtime state, ignored
   anything else                is a failure
@@ -46,6 +51,11 @@ PACKAGE_NAME = "Default"
 APP_NAME = "Quran"
 
 
+def is_translation(name: str) -> bool:
+    """The app's own Persian translation recitations, *-fa.mp3."""
+    return name.endswith("-fa.mp3")
+
+
 def compare_filesets(fresh: Path, shipped: Path) -> list[str]:
     problems: list[str] = []
 
@@ -56,6 +66,7 @@ def compare_filesets(fresh: Path, shipped: Path) -> list[str]:
         if p.is_file()
         and p.suffix != ".import"
         and p.name != "progress.json"
+        and not is_translation(p.name)
     }
 
     for rel in sorted(fresh_files - shipped_files):

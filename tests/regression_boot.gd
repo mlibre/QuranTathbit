@@ -32,6 +32,7 @@ func _init() -> void:
         await _check_settings(main)
         await _check_browse(main)
         _check_settings_round_trip()
+        _check_sync_retrying(main)
 
         if _failures > 0:
                 print("boot: %d FAILURE(S)" % _failures)
@@ -129,7 +130,7 @@ func _check_study_session(main: Node) -> void:
         _ok(view.get_child_count() >= 1, "the card's question is on screen")
         # The recitation's loudness lives in the header's free corner: a coin
         # beside the way back, and under it a rule the hand can drag.
-        var volume_coin: Button = study.get_node_or_null("Margin/Column/TopBar/Right/Volume")
+        var volume_coin: Button = study.get_node_or_null("Margin/Column/TopBar/Right/Pair/Volume")
         _ok(volume_coin != null, "the volume coin sits in the header's corner")
         var volume_popup: Control = study.get_node_or_null("VolumePopup")
         _ok(volume_popup != null, "the volume's own page waits under the coin")
@@ -182,9 +183,7 @@ func _check_study_session(main: Node) -> void:
                         texts.append((child as RichTextLabel).text)
         var joined := "\n".join(texts)
         _ok(joined.length() > 20, "the answer shows real content")
-        _ok(view.get_node("Body").get_children().any(func(c: Node) -> bool:
-                return c is Button and c.has_node("Center/Row/Icon") and "Listen" in c.get_node("Center/Row/Label").text
-        ), "audio is offered as a button")
+        _ok(_audio_buttons(view).size() >= 2, "audio is offered as buttons beside the verses")
         # The card's citation is a footer at the page's foot: a gentle rule
         # and the source beneath it, not a paragraph in the verses' column.
         var footer := view.get_node_or_null("Footer")
@@ -194,18 +193,46 @@ func _check_study_session(main: Node) -> void:
                         (footer.get_node("Citation") as RichTextLabel).text.contains("quran.makarem.ir"),
                         "the footer carries the deck's source"
                 )
-        # Scripture never leans: the deck's italic marks on a verse line are
-        # honoured upright, and a slanted bismillah never comes back.
+        # Scripture leans when its author asked it to: the deck's italic marks
+        # are honoured in every script, and the engine's forced tilt on the
+        # Quranic face is the emphasis the stars always meant. Stripping them
+        # instead made the bismillah's emphasis vanish, and the author noticed.
         var CardViewForType := load("res://scripts/ui/card_view.gd")
-        _is(CardViewForType._bbcode("*بِسمِ اللهِ*", "arabic"), "بِسمِ اللهِ", "an Arabic emphasis renders upright")
+        _is(CardViewForType._bbcode("*بِسمِ اللهِ*", "arabic"), "[i]بِسمِ اللهِ[/i]", "an Arabic emphasis keeps its lean")
         _is(CardViewForType._bbcode("*a note*", "plain"), "[i]a note[/i]", "a Latin emphasis keeps its lean")
+        _is(CardViewForType._bbcode("*بنام خداوند*", "persian"), "[i]بنام خداوند[/i]", "a Persian emphasis keeps its lean")
+        # The verse's Persian voice stands beside its Arabic one: the
+        # translation recitation, offered as its own pill, named for its
+        # language and the verse it speaks.
+        var audio := _audio_buttons(view)
+        var persian_button: Button = null
+        for pill in audio:
+                if (pill.get_node("Center/Row/Label") as Label).text.begins_with("Persian"):
+                        persian_button = pill
+                        break
+        _ok(persian_button != null, "the verse's Persian translation is offered beside it")
+        if persian_button != null:
+                _is(
+                        persian_button.get_meta("idle_text", ""),
+                        "Persian · 1:1",
+                        "the translation's button names its language and verse"
+                )
+                persian_button.pressed.emit()
+                await create_timer(0.25).timeout
+                _is(
+                        persian_button.get_node("Center/Row/Label").text,
+                        "Listening…",
+                        "pressing Persian speaks the translation"
+                )
+                study._view._on_audio_finished()
         # The recitation's button must hear the sound end: a verse that runs
         # out takes its button back to rest instead of saying "Listening…"
         # forever -- the very thing a finished signal is for.
         var listen_button: Button = null
-        for child in view.get_node("Body").get_children():
-                if child is Button and child.has_node("Center/Row/Icon"):
-                        listen_button = child
+        for pill in _audio_buttons(view):
+                if "Listen" in (pill.get_node("Center/Row/Label") as Label).text:
+                        listen_button = pill
+                        break
         if listen_button != null:
                 listen_button.pressed.emit()
                 await create_timer(0.3).timeout
@@ -223,6 +250,46 @@ func _check_study_session(main: Node) -> void:
                         listen_button.get_meta("idle_text", ""),
                         "the button rests the moment the sound runs out"
                 )
+
+        # The pencil: a card noticed mid-study is fixed mid-study. The
+        # editor opens over the session, holds the keyboard, and saves back
+        # to the very files the deck is.
+        var edit_coin: Button = study.get_node_or_null("Margin/Column/TopBar/Right/Pair/Edit")
+        _ok(edit_coin != null, "the pencil sits in the header's corner")
+        if edit_coin != null:
+                edit_coin.pressed.emit()
+                await create_timer(0.3).timeout
+                var editor: Control = study.get_node_or_null("Editor")
+                _ok(editor != null, "the pencil opens the card's own page")
+                if editor != null:
+                        var fields: Array = []
+                        for child in editor.get_node("Centre/Panel/Pad/Column").get_children():
+                                if child is TextEdit:
+                                        fields.append(child)
+                        _is(fields.size(), 2, "the editor carries the question and the answer (got %d)" % fields.size())
+                        if fields.size() == 2:
+                                var front_field: TextEdit = fields[0]
+                                var back_field: TextEdit = fields[1]
+                                var original: String = study._cards[0].front
+                                _is(front_field.text, original, "the editor opens with the card's own words")
+                                front_field.text = original + "\nedited on the spot"
+                                back_field.text = study._cards[0].back
+                                (editor.get_node("Centre/Panel/Pad/Column/Actions/Save") as Button).pressed.emit()
+                                await create_timer(0.3).timeout
+                                _ok(study.get_node_or_null("Editor") == null, "saving closes the editor")
+                                _is(
+                                        FileAccess.get_file_as_string("user://decks/quran/001/front.md"),
+                                        original + "\nedited on the spot\n",
+                                        "the edit lands in the card's own file"
+                                )
+                                _is(study._cards[0].front, original + "\nedited on the spot", "the card in memory carries the edit")
+                                _ok(main._deck_edited, "the deck knows an edit waits for the repo")
+                                # The suite leaves the deck as it found it.
+                                var restore := FileAccess.open("user://decks/quran/001/front.md", FileAccess.WRITE)
+                                restore.store_string(original + "\n")
+                                restore.close()
+                                study._cards[0].front = original
+                                main._deck_edited = false
 
         # Answer the card and check the state moves.
         study._answer("good")
@@ -280,8 +347,11 @@ func _check_settings(main: Node) -> void:
         _ok(main.get_node_or_null("Home") != null, "closing settings returns home")
 
 ## The library: every card in the deck, grouped by surah, each row opening
-## its own verses and recitation in place. Nothing is scheduled here and
-## nothing is written -- reading and listening are all it does.
+## its own verses and recitations in place. The search field keeps the
+## shelf to the cards that answer it -- by reference, by the verses' own
+## words, or by a verse's address, in whatever digits the hand prefers.
+## Nothing here schedules; reading, listening and the pencil are all it
+## does.
 func _check_browse(main: Node) -> void:
         main._on_browse_pressed()
         await create_timer(0.5).timeout
@@ -307,7 +377,43 @@ func _check_browse(main: Node) -> void:
                         headers += 1
         _is(rows, deck.cards.size(), "every card has its row in the library")
         _ok(headers >= 2, "the cards are gathered under their surahs' names")
-        # A row opens its card in place: the verses, the recitation, the
+        # The search field: a verse's address finds its card, in the hand's
+        # own digits, and the shelf keeps only what answers.
+        var search: LineEdit = browse.get_node_or_null("Margin/Column/Search")
+        _ok(search != null, "the library carries a search field")
+        if search != null:
+                search.text = "2:93"
+                browse._on_search_changed("2:93")
+                await create_timer(0.4).timeout
+                var matched := 0
+                for child in column.get_children():
+                        if child.name.begins_with("Entry"):
+                                matched += 1
+                _is(matched, 1, "an address finds exactly its card (got %d)" % matched)
+                _ok(
+                        (browse.get_node("Margin/Column/Summary") as Label).text.begins_with("1 of "),
+                        "the shelf says how many answered"
+                )
+                # Persian digits ask the same question.
+                browse._on_search_changed("۲:۹۳")
+                await create_timer(0.4).timeout
+                matched = 0
+                for child in column.get_children():
+                        if child.name.begins_with("Entry"):
+                                matched += 1
+                _is(matched, 1, "Persian digits ask the same question (got %d)" % matched)
+                # A question nothing answers says so, quietly.
+                browse._on_search_changed("nothing matches this")
+                await create_timer(0.4).timeout
+                _ok(browse.get_node_or_null("Margin/Column/Scroll/Wrap/Column/Empty") != null, "an empty search says so")
+                browse._on_search_changed("")
+                await create_timer(0.4).timeout
+                rows = 0
+                for child in column.get_children():
+                        if child.name.begins_with("Entry"):
+                                rows += 1
+                _is(rows, deck.cards.size(), "a cleared search brings the shelf back")
+        # A row opens its card in place: the verses, the recitations, the
         # citation at the foot -- and only one row is open at a time.
         var first_entry: VBoxContainer = null
         for child in column.get_children():
@@ -323,9 +429,15 @@ func _check_browse(main: Node) -> void:
         await create_timer(0.4).timeout
         var detail: VBoxContainer = first_entry.get_node("Detail")
         _ok(detail.visible, "a pressed row opens its card beneath it")
-        var view = detail.get_node("Pad/View")
+        var view = detail.get_node("Card/Pad/View")
         _ok(view.get_node("Body").get_child_count() >= 2, "the open card shows its verses")
         _ok(view.get_node_or_null("Footer") != null, "the open card carries its citation at the foot")
+        var persian_rows := 0
+        for pill in _audio_buttons(view):
+                if (pill.get_node("Center/Row/Label") as Label).text.begins_with("Persian"):
+                        persian_rows += 1
+        _ok(persian_rows >= 1, "the open card offers its Persian translation")
+        _ok(detail.get_node_or_null("Edit") != null, "the open card carries the pencil at its foot")
         var second_entry: VBoxContainer = null
         for child in column.get_children():
                 if child != first_entry and child.name.begins_with("Entry"):
@@ -338,6 +450,40 @@ func _check_browse(main: Node) -> void:
         browse.closed.emit()
         await create_timer(0.4).timeout
         _ok(main.get_node_or_null("Home") != null, "leaving the library returns home")
+
+
+## A sync the network interrupted is retried on the app's own, each retry
+## a resume; a token the repo refuses is not retried at all, because that
+## failure does not heal with time.
+func _check_sync_retrying(main: Node) -> void:
+        _ok(main._sync_retryable("head_failed"), "a network failure is worth retrying")
+        _ok(main._sync_retryable("blob_failed"), "a failed upload is worth retrying")
+        _ok(not main._sync_retryable("no_token"), "a missing token is not retried")
+        _ok(not main._sync_retryable("auth_failed"), "a refused token is not retried")
+        main._sync_attempts = 0
+        _ok(
+                main._maybe_schedule_sync_retry(true, {"ok": false, "error": "head_failed"}),
+                "a quiet failure schedules its own retry"
+        )
+        _ok(main._sync_retrying, "the app says it will try again")
+        _is(main._sync_attempts, 1, "the first retry is the first retry")
+        main._settings.token = "for-the-line"
+        _ok(
+                main._sync_line().contains("try again"),
+                "the home line says the app will try again by itself"
+        )
+        main._settings.token = ""
+        _ok(
+                not main._maybe_schedule_sync_retry(true, {"ok": false, "error": "auth_failed"}),
+                "a refused token schedules nothing"
+        )
+        _ok(
+                not main._maybe_schedule_sync_retry(false, {"ok": false, "error": "head_failed"}),
+                "a hand-pressed sync is not retried behind the hand's back"
+        )
+        main._sync_retrying = false
+        main._sync_attempts = 0
+        main._sync_generation += 1  # cancels the pending timer's run
 
 
 ## The app's own memory must survive its own handwriting: JSON writes
@@ -366,6 +512,17 @@ func _check_settings_round_trip() -> void:
         file.close()
         var healed = script.load_settings()
         _is(healed.last_sync, 1792000456, "a whole float reads back as the int it was saved as")
+
+## The pills a card view offers, gathered from the flows they sit in: a
+## verse's voices live side by side inside a flow, not directly on the page.
+func _audio_buttons(view: Node) -> Array:
+        var out: Array = []
+        for child in view.get_node("Body").get_children():
+                if child is HFlowContainer:
+                        for pill in child.get_children():
+                                if pill is Button and pill.has_node("Center/Row/Icon"):
+                                        out.append(pill)
+        return out
 
 func _remove_tree(path: String) -> void:
         if FileAccess.file_exists(path):

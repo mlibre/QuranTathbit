@@ -508,6 +508,34 @@ class AheadMark extends Control:
                 )
 
 
+## A pencil at a diagonal, tip down-left: the mark of the one action that
+## rewrites the page it stands on. Drawn like every other mark, because no
+## font in this app carries a pencil, and a drawn pencil keeps the app's own
+## weight of line.
+class PencilMark extends Control:
+        var color := INK
+
+        func _init(p_color: Color = INK) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(18, 18)
+
+        func _draw() -> void:
+                # The shaft, from the eraser end down to the tip.
+                draw_line(Vector2(5.6, 12.4), Vector2(12.2, 5.8), color, 3.0, true)
+                # The tip: a small triangle pointing to the page's corner.
+                draw_colored_polygon(
+                        PackedVector2Array([
+                                Vector2(3.0, 15.0), Vector2(6.6, 13.4), Vector2(4.6, 10.4),
+                        ]),
+                        color
+                )
+                # The eraser: a softer cap on the far end.
+                draw_line(
+                        Vector2(12.6, 5.4), Vector2(14.6, 7.4), Color(color.r, color.g, color.b, 0.55),
+                        3.0, true
+                )
+
+
 ## Two circular arrows, hand over hand: sync, in plain sight. While the
 ## work is actually running the mark turns, slowly -- the one motion the
 ## app allows itself for ongoing work, the recitation's bars being the
@@ -1098,6 +1126,26 @@ static func font_for(script: String, size: int, bold := false) -> Font:
                         return vazir(size, bold)
                 _:
                         return vazir(size, bold)
+
+
+## The lean an author's asterisks asked for: neither Amiri nor Vazirmatn
+## ships an italic, and RichTextLabel's [i] falls straight back to the
+## normal face -- emphasis that changes nothing at all, which is how the
+## deck's stars once vanished. A FontVariation sheared by hand is the
+## italic the marks meant, in every script the deck is written in.
+static var _lean_cache := {}
+
+static func leaning(base: Font) -> FontVariation:
+        var key := base.get_instance_id()
+        if _lean_cache.has(key):
+                return _lean_cache[key]
+        var lean := FontVariation.new()
+        lean.base_font = base
+        # A shear, not a rotation: the baseline keeps its place and the
+        # strokes lean the way italic type has always leaned.
+        lean.variation_transform = Transform2D(Vector2(1.0, 0.0), Vector2(0.24, 1.0), Vector2.ZERO)
+        _lean_cache[key] = lean
+        return lean
 
 
 # --- surfaces -------------------------------------------------------------------
