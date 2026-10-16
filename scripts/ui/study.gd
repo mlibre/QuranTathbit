@@ -117,9 +117,7 @@ func _key_hints() -> Control:
                 row.add_child(ThemeScript.key_chip(chip))
                 var label := Label.new()
                 label.text = what
-                label.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-                label.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-                label.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
+                ThemeScript.dress(label, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
                 row.add_child(label)
         hint.call("Space", "reveal")
         hint.call("1–4", "answer")
@@ -140,9 +138,7 @@ func _top_bar() -> Control:
         progress.name = "Progress"
         progress.size_flags_vertical = Control.SIZE_SHRINK_CENTER
         progress.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-        progress.add_theme_font_override("font", ThemeScript.vazir(15, true))
-        progress.add_theme_font_size_override("font_size", 15)
-        progress.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
+        ThemeScript.dress(progress, 15, ThemeScript.INK_SOFT, true)
         return row
 
 func _surface() -> Control:
@@ -375,9 +371,7 @@ func _answer_button(option: Dictionary, index: int) -> Control:
                 digit.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
                 digit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
                 digit.size_flags_vertical = Control.SIZE_EXPAND_FILL
-                digit.add_theme_font_override("font", ThemeScript.vazir(15, true))
-                digit.add_theme_font_size_override("font_size", 15)
-                digit.add_theme_color_override("font_color", grade)
+                ThemeScript.dress(digit, 15, grade, true)
                 chip.add_child(digit)
                 row.add_child(chip)
 
@@ -389,16 +383,12 @@ func _answer_button(option: Dictionary, index: int) -> Control:
         var word := Label.new()
         word.name = "Word"
         word.text = str(option.button).capitalize()
-        word.add_theme_font_override("font", ThemeScript.vazir(14, true))
-        word.add_theme_font_size_override("font_size", 14)
-        word.add_theme_color_override("font_color", grade)
+        ThemeScript.dress(word, 14, grade, true)
         stack.add_child(word)
         var wait := Label.new()
         wait.name = "Wait"
         wait.text = str(option.interval)
-        wait.add_theme_font_override("font", ThemeScript.vazir(22, true))
-        wait.add_theme_font_size_override("font_size", 22)
-        wait.add_theme_color_override("font_color", ThemeScript.INK)
+        ThemeScript.dress(wait, 22, ThemeScript.INK, true)
         stack.add_child(wait)
         return button
 
@@ -508,9 +498,7 @@ func _show_done() -> void:
         title.name = "Title"
         title.text = "Session complete"
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        title.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.TITLE, true))
-        title.add_theme_font_size_override("font_size", ThemeScript.TITLE)
-        title.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
+        ThemeScript.dress(title, ThemeScript.TITLE, ThemeScript.GREEN_DEEP, true)
         summary.add_child(title)
 
         var body := Label.new()
@@ -518,9 +506,7 @@ func _show_done() -> void:
         body.text = "You answered %d cards in %s. Everything is saved." % [_answered_count, _duration()]
         body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        body.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY))
-        body.add_theme_font_size_override("font_size", ThemeScript.BODY)
-        body.add_theme_color_override("font_color", ThemeScript.INK)
+        ThemeScript.dress(body, ThemeScript.BODY, ThemeScript.INK)
         summary.add_child(body)
 
         var grades_line := _grades_line()
@@ -548,9 +534,7 @@ func _show_done() -> void:
         rest.name = "Rest"
         rest.text = "Rest is part of learning."
         rest.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        rest.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-        rest.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        rest.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
+        ThemeScript.dress(rest, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
         summary.add_child(rest)
 
         ThemeScript.stagger_in(summary, 0.09, 0.3)

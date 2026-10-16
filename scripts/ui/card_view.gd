@@ -221,9 +221,7 @@ func _add_audio_button(name: String, path: String) -> void:
         var label := Label.new()
         label.name = "Label"
         label.text = idle_text
-        label.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-        label.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        label.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
+        ThemeScript.dress(label, ThemeScript.CAPTION, ThemeScript.GREEN_DEEP)
         row.add_child(label)
         add_child(button)
         _buttons.append(button)

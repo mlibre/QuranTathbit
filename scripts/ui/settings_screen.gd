@@ -109,9 +109,7 @@ func _section(title: String) -> Control:
         row.add_theme_constant_override("separation", 10)
         var label := Label.new()
         label.text = title
-        label.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION, true))
-        label.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        label.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP)
+        ThemeScript.dress(label, ThemeScript.CAPTION, ThemeScript.GOLD_DEEP, true)
         row.add_child(label)
         var rule := ThemeScript.hairline(ThemeScript.LINE)
         rule.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -182,10 +180,7 @@ func _card(card_name: String, box_name := "Box") -> Array:
 func _field_label(text: String) -> Label:
         var label := Label.new()
         label.text = text
-        label.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION, true))
-        label.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        label.add_theme_color_override("font_color", ThemeScript.INK)
-        return label
+        return ThemeScript.dress(label, ThemeScript.CAPTION, ThemeScript.INK, true)
 
 func _github_body() -> Control:
         var parts := _card("GitHub")

@@ -94,7 +94,7 @@ func _go_home() -> void:
         # Home is the way back: it arrives from above, the direction of
         # returning, the way going deeper arrives from below.
         _swap(home, true)
-        home.setup(_deck, SchedulerScript.counts(_deck, _now()), _sync_line(), _settings.has_token(), _sync_state())
+        _refresh_home()
         home.study_pressed.connect(_start_session)
         home.sync_pressed.connect(_on_sync_pressed)
         home.settings_pressed.connect(_on_settings_pressed)
@@ -133,9 +133,7 @@ func _on_settings_pressed() -> void:
 
 func _on_account_changed() -> void:
         _settings = SettingsScript.load_settings()
-        if _screen is HomeScript:
-                var home: HomeScript = _screen
-                home.setup(_deck, SchedulerScript.counts(_deck, _now()), _sync_line(), _settings.has_token(), _sync_state())
+        _refresh_home()
         # Connecting is itself the request for a first sync: the user just
         # chose to keep their deck on GitHub, so carry it there without
         # making them find the button and wonder whether anything happened.
@@ -186,10 +184,20 @@ func _run_sync() -> void:
                 line = "Sync could not finish (%s). Your cards are safe here." % str(result.get("error", "?"))
         if _screen is HomeScript:
                 var home: HomeScript = _screen
-                home.setup(_deck, SchedulerScript.counts(_deck, _now()), line, _settings.has_token(), _sync_state())
+                home.setup(_deck, SchedulerScript.counts(_deck, _now()), line, _sync_state())
         elif _screen is SettingsScreenScript:
                 var screen: SettingsScreenScript = _screen
                 screen.note_sync_result(line)
+
+
+## Home is told the same five things every time it is refreshed -- from its
+## first arrival, from an account changing, from a sync finishing -- so one
+## hand says them, and no door into the screen can drift from another.
+func _refresh_home() -> void:
+        if not _screen is HomeScript:
+                return
+        var home: HomeScript = _screen
+        home.setup(_deck, SchedulerScript.counts(_deck, _now()), _sync_line(), _sync_state())
 
 
 func _sync_line() -> String:

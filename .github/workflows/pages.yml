@@ -83,6 +83,29 @@ jobs:
           sed -i 's/"background_color":"#000000"/"background_color":"#faf5ed","theme_color":"#14513d"/' builds/web/index.manifest.json
           ls -la builds/web/index.wasm builds/web/index.wasm.gz
 
+      # Installable on a phone's home screen (a PWA): Chrome's install
+      # criteria ask for a 192px icon beside the 512px one and a short_name
+      # for the label under it. The exporter writes neither, so both are
+      # patched in here -- the icon from the same PNG the Android launcher
+      # uses, the label the app's own name.
+      - name: Make the app installable
+        run: |
+          cp assets/icons/icon_192.png builds/web/index.192x192.png
+          python3 - <<'PY'
+          import json
+          path = "builds/web/index.manifest.json"
+          manifest = json.load(open(path))
+          manifest["short_name"] = "QuranTathbit"
+          manifest["description"] = "A calm app for memorising the Qur'an."
+          manifest["icons"] = [{"sizes": "192x192", "src": "index.192x192.png", "type": "image/png"}] + [
+              i for i in manifest["icons"] if i.get("sizes") != "192x192"
+          ]
+          json.dump(manifest, open(path, "w"), separators=(",", ":"))
+          print("manifest:", open(path).read())
+          PY
+          test -f builds/web/index.192x192.png
+          grep -q "index.192x192.png" builds/web/index.manifest.json
+
       # The .pck must carry the deck's text and none of its audio -- a 13 MB
       # smaller download before the first card is even seen -- and the audio
       # the app will stream must be waiting beside it. Cards reference their

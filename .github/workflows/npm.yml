@@ -65,6 +65,22 @@ jobs:
       - name: Stage the npm package
         run: |
           sed -i 's/"background_color":"#000000"/"background_color":"#faf5ed","theme_color":"#14513d"/' builds/web/index.manifest.json
+          # Installable on a phone's home screen: the 192px icon and the
+          # short_name the exporter never writes, the same patch the Pages
+          # build carries.
+          cp assets/icons/icon_192.png builds/web/index.192x192.png
+          python3 - <<'PY'
+          import json
+          path = "builds/web/index.manifest.json"
+          manifest = json.load(open(path))
+          manifest["short_name"] = "QuranTathbit"
+          manifest["description"] = "A calm app for memorising the Qur'an."
+          manifest["icons"] = [{"sizes": "192x192", "src": "index.192x192.png", "type": "image/png"}] + [
+              i for i in manifest["icons"] if i.get("sizes") != "192x192"
+          ]
+          json.dump(manifest, open(path, "w"), separators=(",", ":"))
+          print("manifest:", open(path).read())
+          PY
           # The browser-shortcut gate (qt-browser-keys) must ride along: it is
           # part of the page's head, and the npm package serves that same page.
           grep -q "qt-browser-keys" builds/web/index.html
@@ -74,6 +90,7 @@ jobs:
           cp builds/web/index.html builds/web/index.js builds/web/index.wasm \
                 builds/web/index.pck builds/web/index.png \
                 builds/web/index.icon.png builds/web/index.apple-touch-icon.png \
+                builds/web/index.192x192.png \
                 builds/web/index.audio.worklet.js builds/web/index.audio.position.worklet.js \
                 builds/web/index.manifest.json builds/web/index.service.worker.js \
                 builds/web/index.offline.html \

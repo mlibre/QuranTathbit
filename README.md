@@ -31,6 +31,11 @@ Nothing to install, nothing to sign up for. Each recitation streams on
 demand, and the app caches itself — after the first visit it opens instantly
 and works offline, on any modern browser: desktop, tablet, or phone.
 
+Want it on your home screen like any other app? Your browser's menu offers
+**Install app** (Chrome, Edge) or **Add to Home Screen** (Safari, any
+phone): it then opens full-screen and offline, with its own icon — no store,
+no tab, no browser bars.
+
 > In a browser you sign in with a one-minute token: press **Connect GitHub**
 > and the app walks you through it. On desktop and Android the full
 > device-code sign-in works.
@@ -48,6 +53,8 @@ Grab a build from the [**Releases**](https://github.com/mlibre/QuranTathbit/rele
 No installer, no dependencies, no account: the download *is* the app.
 
 ## A study session
+
+![The app at work — home, a card, its answer, the next card](docs/media/app.gif)
 
 1. **Home** — today's waiting count and one big **Study** button.
 2. **Question** — the surah and āyāt in Arabic, set large in the middle of

@@ -91,6 +91,12 @@ godot --path . --script tests/capture_shots.gd -- /tmp/shots
 python3 tools/shot_qa.py /tmp/shots
 ```
 
+The same rig films the app continuously:
+`tests/capture_gif.gd` grabs a frame every tenth of a second through a
+first session, and `tools/make_gif.py` assembles the frames into the GIF
+the README carries (`python3 tools/make_gif.py /tmp/gifframes
+docs/media/app.gif`).
+
 ## Deck fidelity
 
 The deck ships from one source: `quran-cards-2026-10-14.apkg`, and nothing

@@ -12,7 +12,8 @@ Downloads the package and serves it at <http://localhost:8080>. Or serve
 the files yourself: everything here is static — `index.html`, the engine,
 the deck's `.pck`, and the `decks/quran/` folder the recitations stream
 from. Drop them on any static host (nginx, Caddy, an S3 bucket, GitHub
-Pages) and they just work.
+Pages) and they just work. From the browser's menu the page installs onto
+a phone's home screen like any app — full-screen, offline, its own icon.
 
 ## What's inside
 

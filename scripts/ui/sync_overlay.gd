@@ -70,17 +70,13 @@ func _ready() -> void:
         var title := Label.new()
         title.text = "Syncing"
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        title.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.TITLE, true))
-        title.add_theme_font_size_override("font_size", ThemeScript.TITLE)
-        title.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
+        ThemeScript.dress(title, ThemeScript.TITLE, ThemeScript.GREEN_DEEP, true)
         box.add_child(title)
 
         _phase = Label.new()
         _phase.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         _phase.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        _phase.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY))
-        _phase.add_theme_font_size_override("font_size", ThemeScript.BODY)
-        _phase.add_theme_color_override("font_color", ThemeScript.INK)
+        ThemeScript.dress(_phase, ThemeScript.BODY, ThemeScript.INK)
         # What it says before anything has reported: the first thing sync
         # actually does is sign in, so that is the first thing a person reads.
         _phase.text = str(PHRASES["signing in"]) + "…"
@@ -95,18 +91,14 @@ func _ready() -> void:
 
         _count = Label.new()
         _count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        _count.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-        _count.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        _count.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
+        ThemeScript.dress(_count, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
         box.add_child(_count)
 
         var reassurance := Label.new()
         reassurance.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         reassurance.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         reassurance.text = "Your cards stay on this device — sync only shares them."
-        reassurance.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-        reassurance.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
-        reassurance.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
+        ThemeScript.dress(reassurance, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
         box.add_child(reassurance)
 
         _start_sweep()

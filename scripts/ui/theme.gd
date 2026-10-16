@@ -88,26 +88,6 @@ class SoundMark extends Control:
                         draw_rect(Rect2(0.5 + i * 3.8, 8.5 - h / 2.0, 2.4, h), color)
 
 
-## A small status dot. Filled says "alive"; hollow says "off, by choice".
-## Sized to anchor a line of caption text beside it, not to float under
-## it: a dot too small reads as dirt on the page.
-class StatusDot extends Control:
-        var color := GREEN
-        var filled := true
-
-        func _init(p_color: Color = GREEN, p_filled := true) -> void:
-                color = p_color
-                filled = p_filled
-                custom_minimum_size = Vector2(12, 12)
-
-        func _draw() -> void:
-                var center := Vector2(6, 6)
-                if filled:
-                        draw_circle(center, 4.6, color)
-                else:
-                        draw_arc(center, 4.0, 0.0, TAU, 24, color, 2.0, true)
-
-
 ## A check inside a soft medal: the end-of-session mark, quiet as a stamp.
 class CheckMark extends Control:
         func _init() -> void:
@@ -124,6 +104,8 @@ class CheckMark extends Control:
 
 
 ## The tune mark: three rules and their knobs, for the place settings live.
+## The rules sit 6 px apart with slim knobs -- a mark this small reads as
+## one thing only when each rule keeps a clear breath of paper under it.
 class SlidersMark extends Control:
         var color := INK_SOFT
 
@@ -132,12 +114,12 @@ class SlidersMark extends Control:
                 custom_minimum_size = Vector2(18, 18)
 
         func _draw() -> void:
-                var ys := [4.5, 9.0, 13.5]
-                var xs := [12.0, 6.0, 13.0]
+                var ys := [3.0, 9.0, 15.0]
+                var xs := [12.5, 6.0, 13.5]
                 for i in 3:
-                        draw_line(Vector2(2, ys[i]), Vector2(16, ys[i]), color, 1.8, true)
+                        draw_line(Vector2(2, ys[i]), Vector2(16, ys[i]), color, 1.6, true)
                 for i in 3:
-                        draw_circle(Vector2(xs[i], ys[i]), 3.1, color)
+                        draw_circle(Vector2(xs[i], ys[i]), 2.9, color)
 
 
 ## A chevron pointing back the way the user came: the universal way out.
@@ -409,7 +391,10 @@ static func pressable(button: Button, press_scale := 0.965, hover_scale := 1.02)
 
 
 static func _scale_to(button: Button, to: float, duration: float) -> void:
-        var running: Variant = button.get_meta("_press_tween", null)
+        # has_meta, not get_meta's default: 4.7's get_meta prints an ERROR for
+        # a missing key even when a default is given, so a button's first
+        # hover would cry wolf in the console once apiece.
+        var running: Variant = button.get_meta("_press_tween") if button.has_meta("_press_tween") else null
         if running is Tween and (running as Tween).is_valid():
                 (running as Tween).kill()
         var tween := button.create_tween()
@@ -463,14 +448,17 @@ static func ghost_button(label_text: String, tone: Color, height := 46, radius :
         return button
 
 
-## The styleboxes of a quiet square icon button (back marks, corner gears):
-## nothing at rest, a wash while visited, a soft ring while focused.
-static func mark_button_styles(tone: Color = INK) -> Dictionary:
+## The styleboxes of a quiet square icon button (back marks, corner coins):
+## nothing at rest, a wash while visited, a soft ring while focused. With
+## `wash`, the coin is visible at rest too -- a tinted roundel in the
+## button's own tone, deepening when visited -- for the corner buttons a
+## first-time reader has to find.
+static func mark_button_styles(tone: Color = INK, wash := false) -> Dictionary:
         var rest := StyleBoxFlat.new()
-        rest.bg_color = Color(0, 0, 0, 0)
+        rest.bg_color = Color(tone.r, tone.g, tone.b, 0.08) if wash else Color(0, 0, 0, 0)
         rest.set_corner_radius_all(24)
         var hover := StyleBoxFlat.new()
-        hover.bg_color = Color(tone.r, tone.g, tone.b, 0.08)
+        hover.bg_color = Color(tone.r, tone.g, tone.b, 0.16) if wash else Color(tone.r, tone.g, tone.b, 0.08)
         hover.set_corner_radius_all(24)
         var focus := StyleBoxFlat.new()
         focus.bg_color = Color(0, 0, 0, 0)
@@ -478,6 +466,23 @@ static func mark_button_styles(tone: Color = INK) -> Dictionary:
         focus.set_border_width_all(2)
         focus.set_corner_radius_all(24)
         return {"normal": rest, "hover": hover, "pressed": hover, "focus": focus}
+
+
+## Apply a stylebox dictionary from mark_button_styles() to its button.
+static func apply_mark_styles(button: Button, styles: Dictionary) -> void:
+        button.add_theme_stylebox_override("normal", styles["normal"])
+        button.add_theme_stylebox_override("hover", styles["hover"])
+        button.add_theme_stylebox_override("pressed", styles["pressed"])
+        button.add_theme_stylebox_override("focus", styles["focus"])
+
+
+## One voice for every plain label: the face, the size, the colour, one
+## call -- so no screen's body text drifts from another's.
+static func dress(label: Label, size: int, color: Color, bold := false) -> Label:
+        label.add_theme_font_override("font", vazir(size, bold))
+        label.add_theme_font_size_override("font_size", size)
+        label.add_theme_color_override("font_color", color)
+        return label
 
 
 ## One shared header for the screens that sit on top of home: a back mark
@@ -492,11 +497,7 @@ static func top_bar(title_text: String) -> Dictionary:
         var back := Button.new()
         back.name = "Back"
         back.custom_minimum_size = Vector2(48, 48)
-        var styles := mark_button_styles()
-        back.add_theme_stylebox_override("normal", styles["normal"])
-        back.add_theme_stylebox_override("hover", styles["hover"])
-        back.add_theme_stylebox_override("pressed", styles["hover"])
-        back.add_theme_stylebox_override("focus", styles["focus"])
+        apply_mark_styles(back, mark_button_styles())
         back.add_child(_centered_mark(BackMark.new(INK)))
         pressable(back)
         row.add_child(back)
@@ -598,7 +599,7 @@ static func vanish(control: Control) -> void:
 static func settle_in(control: Control, delay := 0.0, duration := 0.22) -> void:
         if control == null:
                 return
-        var running: Variant = control.get_meta("_settle_tween", false)
+        var running: Variant = control.get_meta("_settle_tween") if control.has_meta("_settle_tween") else null
         if running is Tween and (running as Tween).is_valid():
                 (running as Tween).kill()
         control.modulate.a = 0.0
