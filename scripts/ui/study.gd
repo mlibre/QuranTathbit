@@ -38,7 +38,6 @@ var _view: CardViewScript
 var _options: Array = []
 var _bar_tween: Tween
 var volume := 1.0  # the recitation's own loudness, 0..1, set before the session starts
-var _volume_ticket := 0  # only the latest nudge of the slider commits a save
 
 func _ready() -> void:
         _player = AudioStreamPlayer.new()
@@ -243,84 +242,31 @@ func _footer() -> Control:
 
 # --- the recitation's volume -------------------------------------------------------
 
-## The volume's small page: a caption, a rule the hand can drag, and the
-## number it stands at. It opens under the coin that asked for it and closes
-## on any press outside itself, the way a popover behaves everywhere else.
+## The volume's small page, as the theme draws it everywhere a recitation
+## can be heard: a speaker that mutes, a rule the hand drags, the number it
+## stands at -- no title to read first. It opens under the coin that asked
+## for it and closes on any press outside itself, the way a popover behaves
+## everywhere else.
 func _volume_popup() -> Control:
-        var panel := PanelContainer.new()
-        panel.name = "VolumePopup"
-        panel.visible = false
-        panel.mouse_filter = Control.MOUSE_FILTER_STOP
-        panel.add_theme_stylebox_override("panel", ThemeScript.card_stylebox())
-
-        var pad := MarginContainer.new()
-        pad.name = "Pad"
-        pad.add_theme_constant_override("margin_left", 18)
-        pad.add_theme_constant_override("margin_right", 18)
-        pad.add_theme_constant_override("margin_top", 14)
-        pad.add_theme_constant_override("margin_bottom", 14)
-        panel.add_child(pad)
-
-        var box := VBoxContainer.new()
-        box.name = "Box"
-        box.add_theme_constant_override("separation", 10)
-        pad.add_child(box)
-
-        var title := Label.new()
-        title.name = "Title"
-        title.text = "Recitation volume"
-        ThemeScript.dress(title, 12, ThemeScript.GOLD_DEEP, true)
-        box.add_child(title)
-
-        var slider := HSlider.new()
-        slider.name = "Slider"
-        slider.min_value = 0.0
-        slider.max_value = 1.0
-        slider.step = 0.01
-        slider.custom_minimum_size = Vector2(190, 30)
-        var track := StyleBoxFlat.new()
-        track.bg_color = Color("#E6DFCE")
-        track.set_corner_radius_all(5)
-        track.content_margin_top = 5
-        track.content_margin_bottom = 5
-        var filled := StyleBoxFlat.new()
-        filled.bg_color = ThemeScript.GREEN
-        filled.set_corner_radius_all(5)
-        filled.content_margin_top = 5
-        filled.content_margin_bottom = 5
-        slider.add_theme_stylebox_override("slider", track)
-        slider.add_theme_stylebox_override("grabber_area", filled)
-        slider.add_theme_stylebox_override("grabber_area_highlight", filled)
-        slider.add_theme_icon_override("grabber", ThemeScript.circle_icon(18, ThemeScript.GREEN_DEEP))
-        slider.add_theme_icon_override("grabber_highlight", ThemeScript.circle_icon(22, ThemeScript.GREEN_DEEP))
-        slider.add_theme_icon_override("grabber_disabled", ThemeScript.circle_icon(18, Color("#9AA79E")))
-        slider.value_changed.connect(func(v: float) -> void:
-                _apply_volume(v)
-                _schedule_volume_commit()
-        )
-        box.add_child(slider)
-
-        var readout := Label.new()
-        readout.name = "Readout"
-        readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        readout.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        ThemeScript.dress(readout, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
-        box.add_child(readout)
-        return panel
+        var popup := ThemeScript.VolumePopover.new()
+        popup.changed.connect(_apply_volume)
+        popup.committed.connect(func(v: float) -> void: volume_changed.emit(v))
+        return popup
 
 
 func _toggle_volume_popup() -> void:
-        var popup: PanelContainer = get_node_or_null("VolumePopup")
+        var popup: ThemeScript.VolumePopover = get_node_or_null("VolumePopup")
         if popup == null:
                 return
         popup.visible = not popup.visible
         if popup.visible:
-                (popup.get_node("Pad/Box/Slider") as HSlider).value = volume
+                popup.set_volume(volume)
                 ThemeScript.settle_in(popup, 0.0, 0.16)
 
 
-## Loudness to the player, the coin's own face, and the number the slider
-## says -- one place, so they can never disagree.
+## Loudness to the player and the coin's own face -- one place, so they can
+## never disagree. The popover speaks for itself: its rule, its mark and its
+## number are the theme's own business, not this screen's.
 func _apply_volume(v: float) -> void:
         volume = clampf(v, 0.0, 1.0)
         # linear_to_db(0) is negative infinity; a true zero is its own quiet
@@ -332,20 +278,7 @@ func _apply_volume(v: float) -> void:
         if mark != null:
                 mark.muted = volume <= 0.005
                 mark.queue_redraw()
-        var readout: Label = get_node_or_null("VolumePopup/Pad/Box/Readout")
-        if readout != null:
-                readout.text = "Muted" if volume <= 0.005 else "%d%%" % int(round(volume * 100.0))
 
-
-## A save waits for the hand to stop moving: only the latest nudge of the
-## rule commits, so one drag is one write, not one per tick along it.
-func _schedule_volume_commit() -> void:
-        _volume_ticket += 1
-        var ticket := _volume_ticket
-        get_tree().create_timer(0.45).timeout.connect(func() -> void:
-                if ticket == _volume_ticket:
-                        volume_changed.emit(volume)
-        )
 
 func _layout() -> void:
         if size.x <= 0.0:
@@ -384,9 +317,11 @@ func _layout() -> void:
         var avail := minf(320.0, size.x - 48.0)
         (get_node("Margin/Column/Footer/ShowAnswer") as Button).custom_minimum_size = Vector2(avail, 58.0)
         (get_node("Margin/Column/Footer/Done") as Button).custom_minimum_size = Vector2(avail, 58.0)
-        # The volume's page hangs from its own corner, under the coin, never
-        # past the window's edge on a phone.
-        var popup: PanelContainer = get_node_or_null("VolumePopup")
+        # The volume's page hangs from its own corner, under the coin and
+        # below the session's own bar, never past the window's edge on a
+        # phone: the bar keeps its whole width in view while loudness is
+        # being asked for.
+        var popup: Control = get_node_or_null("VolumePopup")
         if popup != null:
                 var popup_w := popup.get_combined_minimum_size().x
                 var inset := ThemeScript.top_inset()
@@ -394,7 +329,7 @@ func _layout() -> void:
                 popup.anchor_right = 0.0
                 popup.anchor_top = 0.0
                 popup.offset_left = maxf(size.x - popup_w - 24.0, 16.0)
-                popup.offset_top = 24.0 + inset + 48.0 + 10.0
+                popup.offset_top = 24.0 + inset + 48.0 + 14.0 + 9.0 + 12.0
 
 func _layout_answers() -> void:
         var grid: GridContainer = get_node("Margin/Column/Answers")

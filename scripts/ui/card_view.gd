@@ -31,6 +31,7 @@ var _buttons: Array = []
 var _fetching := false
 var _playing_path := ""
 var _playing_button: Button = null
+var _body: VBoxContainer
 
 func _init(p_player: AudioStreamPlayer) -> void:
         _player = p_player
@@ -40,12 +41,22 @@ func _init(p_player: AudioStreamPlayer) -> void:
         # a natural finish does -- so a hand that stops the sound still has
         # its own say through _stop_audio().
         _player.finished.connect(_on_audio_finished)
-        add_theme_constant_override("separation", ThemeScript.GAP)
+        # The page's two halves: the verses, centred and breathing, and the
+        # card's own citation, pinned along the bottom edge -- a footer, the
+        # way a book's page names its chapter at its foot.
+        _body = VBoxContainer.new()
+        _body.name = "Body"
+        _body.alignment = BoxContainer.ALIGNMENT_CENTER
+        _body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        _body.add_theme_constant_override("separation", ThemeScript.GAP)
+        add_child(_body)
 
 ## Show one side of a card. `lead` is the question's own heading, set large;
 ## `ref_line` is that same heading repeated small above an answer, so the
 ## reader knows which verse they were asked for while they read it;
-## `stagger` settles each element in, a beat apart.
+## `stagger` settles each element in, a beat apart. A paragraph that is a
+## lone link is the card's citation: it leaves the verses and takes its
+## place at the page's foot, under a gentle rule, bottom-left.
 func show_text(text: String, folder: String, lead := false, ref_line := "", stagger := false) -> void:
         _clear()
         _folder = folder
@@ -56,9 +67,15 @@ func show_text(text: String, folder: String, lead := false, ref_line := "", stag
                         "media":
                                 _add_media(block.media)
                         _:
-                                _add_text(block.text, block.link, lead)
+                                if not block.link.is_empty():
+                                        _add_footer(block.text, block.link)
+                                else:
+                                        _add_text(block.text, block.link, lead)
         if stagger:
-                ThemeScript.stagger_in(self, 0.07, 0.26)
+                ThemeScript.stagger_in(_body, 0.07, 0.26)
+                var footer := get_node_or_null("Footer")
+                if footer != null:
+                        ThemeScript.settle_in(footer, 0.1, 0.26)
 
 ## The reference the question asked for, small and gold above the answer:
 ## the thread that ties what is being read to what was asked.
@@ -81,7 +98,7 @@ func _add_eyebrow(ref_line: String) -> void:
         label.add_theme_font_size_override("normal_font_size", 15 if script == "arabic" else 13)
         label.add_theme_color_override("default_color", ThemeScript.GOLD_DEEP)
         label.text = ref_line  # bbcode is off here, so brackets can render literally
-        add_child(label)
+        _body.add_child(label)
 
 func _add_text(markdown: String, link: String, lead := false) -> void:
         if markdown.strip_edges().is_empty():
@@ -126,7 +143,7 @@ func _add_text(markdown: String, link: String, lead := false) -> void:
                 label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         label.add_theme_font_override("normal_font", ThemeScript.font_for(script, ThemeScript.BODY))
         label.add_theme_font_size_override("normal_font_size", _size_for(script, lead))
-        label.text = _bbcode(markdown)
+        label.text = _bbcode(markdown, script)
         label.add_theme_color_override("default_color", ThemeScript.INK if script != "plain" else ThemeScript.INK_SOFT)
         # Scripture breathes between its lines; the lead, most of all.
         if script == "arabic":
@@ -138,9 +155,9 @@ func _add_text(markdown: String, link: String, lead := false) -> void:
         # so the translation below reads as the verse's own second voice
         # and never crowds it.
         if script == "arabic" and not lead:
-                add_child(_with_bottom_room(label, 22))
+                _body.add_child(_with_bottom_room(label, 22))
         else:
-                add_child(label)
+                _body.add_child(label)
 
 ## A margin wrapper for the few places that need spacing the uniform column
 ## cannot express: the pause between a verse and what follows it.
@@ -151,6 +168,33 @@ func _with_bottom_room(control: Control, room: int) -> MarginContainer:
         wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         wrap.add_child(control)
         return wrap
+
+## The card's citation, as a page's own footer: a gentle rule, then the
+## source at the bottom-left, quiet and clickable -- the place a book puts
+## the page's provenance, so the verses never have to share their room
+## with an address.
+func _add_footer(markdown: String, url: String) -> void:
+        var label_text := MarkdownScript.plain(markdown)
+        var box := VBoxContainer.new()
+        box.name = "Footer"
+        box.size_flags_vertical = Control.SIZE_SHRINK_END
+        box.add_theme_constant_override("separation", 8)
+        box.mouse_filter = Control.MOUSE_FILTER_PASS
+        add_child(box)
+        box.add_child(ThemeScript.hairline())
+        var line := RichTextLabel.new()
+        line.name = "Citation"
+        line.fit_content = true
+        line.scroll_active = false
+        line.selection_enabled = true
+        line.bbcode_enabled = true
+        var font := ThemeScript.vazir(12)
+        line.add_theme_font_override("normal_font", font)
+        line.add_theme_font_size_override("normal_font_size", 12)
+        line.add_theme_color_override("default_color", ThemeScript.INK_SOFT)
+        line.text = "[color=#8D6E24][url=%s]%s[/url][/color]" % [url, label_text]
+        line.meta_clicked.connect(_open_link)
+        box.add_child(line)
 
 func _add_media(name: String) -> void:
         var path := _folder.path_join(name)
@@ -231,7 +275,7 @@ func _add_audio_button(name: String, path: String) -> void:
         label.text = idle_text
         ThemeScript.dress(label, ThemeScript.CAPTION, ThemeScript.GREEN_DEEP)
         row.add_child(label)
-        add_child(button)
+        _body.add_child(button)
         _buttons.append(button)
 
 func _add_image(path: String) -> void:
@@ -246,7 +290,7 @@ func _add_image(path: String) -> void:
         rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
         rect.custom_minimum_size = Vector2(0, 180)
         rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-        add_child(rect)
+        _body.add_child(rect)
 
 ## One press speaks; a second press on the same button takes it back. The
 ## button that is speaking wears green, and only that one.
@@ -324,7 +368,10 @@ func _stream_from_site(path: String, button: Button) -> void:
                 return
         _fetching = true
         _set_button_state(button, "loading")
-        button.disabled = true
+        # The button is not disabled while it fetches: a disabled button
+        # wears the engine's grey, and a pill that flashes grey for a moment
+        # reads as broken. The fetch guard above already keeps a second
+        # press from starting a second fetch.
         var fetcher := HTTPRequest.new()
         add_child(fetcher)
         var err := fetcher.request(_site_url(path))
@@ -334,7 +381,6 @@ func _stream_from_site(path: String, button: Button) -> void:
                 if int(outcome[1]) == 200:
                         bytes = outcome[3]
         fetcher.queue_free()
-        button.disabled = false
         if bytes.is_empty():
                 _set_button_state(button, "missing")
         else:
@@ -393,11 +439,19 @@ func _size_for(script: String, lead := false) -> int:
                 _:
                         return ThemeScript.CAPTION
 
-static func _bbcode(markdown: String) -> String:
+static func _bbcode(markdown: String, script := "plain") -> String:
         var text := markdown
         text = _links(text)
         text = _bold(text)
-        text = _italic(text)
+        # A slanted letter is a Latin letter's own emphasis; the Quranic and
+        # Persian faces have no such voice, and the engine would tilt them
+        # by force -- the bismillah leaning like a sign in the wind. What the
+        # deck's author marked with asterisks on a scripture line was
+        # emphasis of meaning, not of slope: it is honoured upright.
+        if script == "plain":
+                text = _italic(text)
+        else:
+                text = text.replace("*", "")
         return text
 
 
@@ -417,9 +471,13 @@ static func _italic(text: String) -> String:
 
 func _clear() -> void:
         _stop_audio()
-        for child in get_children():
-                remove_child(child)
+        for child in _body.get_children():
+                _body.remove_child(child)
                 child.queue_free()
+        var footer := get_node_or_null("Footer")
+        if footer != null:
+                remove_child(footer)
+                footer.queue_free()
         _buttons.clear()
         _playing_button = null
         _playing_path = ""

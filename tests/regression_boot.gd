@@ -1,6 +1,7 @@
 extends SceneTree
 const DeckScript := preload("res://scripts/data/deck.gd")
 const CardScript := preload("res://scripts/data/card.gd")
+const ThemeScript := preload("res://scripts/ui/theme.gd")
 
 ## The app must boot cold, on any machine, with no warm editor cache: the
 ## deck installs itself into user://, the home screen shows the deck's real
@@ -29,6 +30,7 @@ func _init() -> void:
         await _check_home_numbers(home)
         await _check_study_session(main)
         await _check_settings(main)
+        await _check_browse(main)
         _check_settings_round_trip()
 
         if _failures > 0:
@@ -78,6 +80,22 @@ func _check_home_numbers(home: Control) -> void:
         var corner: Button = home.get_node("SettingsCorner")
         var at := corner.get_global_rect().get_center()
         _ok(_top_at(home, at) == corner, "the settings corner is on top of everything at its own centre")
+        # The browsing door stands under the day's work.
+        var browse_button: Button = home.get_node_or_null("Margin/Column/Browse")
+        _ok(browse_button != null, "the library's door stands under the study button")
+        # A turning sync mark stays inside its coin: the turn is about the
+        # mark's own centre, and a mark that swings out of its button is the
+        # mark that once left the outer circle.
+        var sync_mark: ThemeScript.SyncMark = home.get_node("SyncCoin/Mark/SyncMark")
+        sync_mark.set_working(true)
+        await process_frame
+        await process_frame
+        _ok(
+                absf(sync_mark.pivot_offset.x - sync_mark.size.x / 2.0) < 0.5
+                        and absf(sync_mark.pivot_offset.y - sync_mark.size.y / 2.0) < 0.5,
+                "the turning mark pivots at its own centre"
+        )
+        sync_mark.set_working(false)
 
 
 ## The engine's own hit test, walked by hand: deepest topmost control at a
@@ -119,11 +137,24 @@ func _check_study_session(main: Node) -> void:
                 volume_coin.pressed.emit()
                 await create_timer(0.1).timeout
                 _ok(volume_popup != null and volume_popup.visible, "pressing the coin opens the volume's page")
-                var slider: HSlider = volume_popup.get_node("Pad/Box/Slider")
+                var slider: HSlider = volume_popup.get_node("Pad/Row/Slider")
                 slider.value = 0.5
                 await create_timer(0.7).timeout
                 _is(study.volume, 0.5, "the rule sets the loudness it says")
                 _ok(absf(study._player.volume_db - linear_to_db(0.5)) < 0.01, "the player obeys the rule")
+                # The speaker in the page is the mute: one press for silence,
+                # one press back for the loudness silence replaced.
+                (volume_popup.get_node("Pad/Row/Mute") as Button).pressed.emit()
+                await create_timer(0.2).timeout
+                _is(study.volume, 0.0, "pressing the speaker mutes the recitation")
+                (volume_popup.get_node("Pad/Row/Mute") as Button).pressed.emit()
+                await create_timer(0.2).timeout
+                _is(study.volume, 0.5, "pressing it again unmutes to what was")
+                _is(
+                        (volume_popup.get_node("Pad/Row/Readout") as Label).text,
+                        "50%",
+                        "the number says the loudness inline"
+                )
                 volume_coin.pressed.emit()
                 await create_timer(0.1).timeout
                 _ok(not volume_popup.visible, "pressing the coin again closes the page")
@@ -142,23 +173,37 @@ func _check_study_session(main: Node) -> void:
         _ok(waits.all(func(w: String) -> bool: return not w.is_empty()), "every answer names its interval")
         # The answer side carries the question's own reference, small and gold,
         # so the verse is never read without knowing which one was asked for.
-        var eyebrow := view.get_node_or_null("Eyebrow")
+        var eyebrow := view.get_node_or_null("Body/Eyebrow")
         _ok(eyebrow != null and str(eyebrow.text).length() > 0, "the question rides along above the answer")
         # The back of the first card is Arabic plus Persian plus audio.
         var texts := []
-        for child in view.get_children():
+        for child in view.get_node("Body").get_children():
                 if child is RichTextLabel:
                         texts.append((child as RichTextLabel).text)
         var joined := "\n".join(texts)
         _ok(joined.length() > 20, "the answer shows real content")
-        _ok(view.get_children().any(func(c: Node) -> bool:
+        _ok(view.get_node("Body").get_children().any(func(c: Node) -> bool:
                 return c is Button and c.has_node("Center/Row/Icon") and "Listen" in c.get_node("Center/Row/Label").text
         ), "audio is offered as a button")
+        # The card's citation is a footer at the page's foot: a gentle rule
+        # and the source beneath it, not a paragraph in the verses' column.
+        var footer := view.get_node_or_null("Footer")
+        _ok(footer != null, "the source link stands at the card's foot")
+        if footer != null:
+                _ok(
+                        (footer.get_node("Citation") as RichTextLabel).text.contains("quran.makarem.ir"),
+                        "the footer carries the deck's source"
+                )
+        # Scripture never leans: the deck's italic marks on a verse line are
+        # honoured upright, and a slanted bismillah never comes back.
+        var CardViewForType := load("res://scripts/ui/card_view.gd")
+        _is(CardViewForType._bbcode("*بِسمِ اللهِ*", "arabic"), "بِسمِ اللهِ", "an Arabic emphasis renders upright")
+        _is(CardViewForType._bbcode("*a note*", "plain"), "[i]a note[/i]", "a Latin emphasis keeps its lean")
         # The recitation's button must hear the sound end: a verse that runs
         # out takes its button back to rest instead of saying "Listening…"
         # forever -- the very thing a finished signal is for.
         var listen_button: Button = null
-        for child in view.get_children():
+        for child in view.get_node("Body").get_children():
                 if child is Button and child.has_node("Center/Row/Icon"):
                         listen_button = child
         if listen_button != null:
@@ -169,6 +214,9 @@ func _check_study_session(main: Node) -> void:
                         "Listening…",
                         "pressing Listen starts the recitation"
                 )
+                # A pill that flashes grey reads as broken: the button never
+                # disables itself, not even while a browser fetch is afoot.
+                _ok(not listen_button.disabled, "the recitation's button never wears the engine's grey")
                 study._view._on_audio_finished()
                 _is(
                         listen_button.get_node("Center/Row/Label").text,
@@ -217,9 +265,80 @@ func _check_settings(main: Node) -> void:
         _ok(saved != null, "the save button stands beside it")
         var card_title: Label = settings.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/CardTitle")
         _ok(card_title != null and card_title.text.length() > 0, "the GitHub card carries its own title inside it")
+        # The quiet promise is a row of its own with a switch, not a caption
+        # with a dot after it: a first-time reader sees the choice they have.
+        var auto_row: Button = settings.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/AutoRow")
+        _ok(auto_row != null, "the auto-sync promise stands as its own row")
+        if auto_row != null:
+                _ok(auto_row.has_node("AutoPad/AutoLine/Switch"), "the promise row carries a switch")
+                _ok(auto_row.text.is_empty(), "the row's words live in it, not on it")
+                auto_row.set_pressed_no_signal(true)
+                auto_row.toggled.emit(true)
+                _ok(main._settings.auto_sync, "the row keeps the promise it says")
         settings.closed.emit()
         await create_timer(0.4).timeout
         _ok(main.get_node_or_null("Home") != null, "closing settings returns home")
+
+## The library: every card in the deck, grouped by surah, each row opening
+## its own verses and recitation in place. Nothing is scheduled here and
+## nothing is written -- reading and listening are all it does.
+func _check_browse(main: Node) -> void:
+        main._on_browse_pressed()
+        await create_timer(0.5).timeout
+        var browse: Control = main.get_node_or_null("Browse")
+        _ok(browse != null, "the library opens")
+        if browse == null:
+                return
+        var deck = load("res://scripts/data/deck.gd").load("user://decks/quran")
+        # The path is walked with a guard, not a bare get_node: a stale path
+        # errors silently and the suite calls the broken check a pass.
+        var column: VBoxContainer = browse.get_node_or_null("Margin/Column/Scroll/Wrap/Column")
+        if column == null:
+                _ok(false, "the library's column stands where it is built")
+                browse.closed.emit()
+                await create_timer(0.3).timeout
+                return
+        var rows := 0
+        var headers := 0
+        for child in column.get_children():
+                if child.name.begins_with("Entry"):
+                        rows += 1
+                elif child.name.begins_with("Header"):
+                        headers += 1
+        _is(rows, deck.cards.size(), "every card has its row in the library")
+        _ok(headers >= 2, "the cards are gathered under their surahs' names")
+        # A row opens its card in place: the verses, the recitation, the
+        # citation at the foot -- and only one row is open at a time.
+        var first_entry: VBoxContainer = null
+        for child in column.get_children():
+                if child.name.begins_with("Entry"):
+                        first_entry = child
+                        break
+        _ok(first_entry != null, "the library's first card stands in its row")
+        if first_entry == null:
+                browse.closed.emit()
+                await create_timer(0.3).timeout
+                return
+        (first_entry.get_node("Row") as Button).pressed.emit()
+        await create_timer(0.4).timeout
+        var detail: VBoxContainer = first_entry.get_node("Detail")
+        _ok(detail.visible, "a pressed row opens its card beneath it")
+        var view = detail.get_node("Pad/View")
+        _ok(view.get_node("Body").get_child_count() >= 2, "the open card shows its verses")
+        _ok(view.get_node_or_null("Footer") != null, "the open card carries its citation at the foot")
+        var second_entry: VBoxContainer = null
+        for child in column.get_children():
+                if child != first_entry and child.name.begins_with("Entry"):
+                        second_entry = child
+                        break
+        if second_entry != null:
+                (second_entry.get_node("Row") as Button).pressed.emit()
+                await create_timer(0.3).timeout
+                _ok(not detail.visible, "opening one row folds the last one away")
+        browse.closed.emit()
+        await create_timer(0.4).timeout
+        _ok(main.get_node_or_null("Home") != null, "leaving the library returns home")
+
 
 ## The app's own memory must survive its own handwriting: JSON writes
 ## every number as a float, and a loader that compared types strictly

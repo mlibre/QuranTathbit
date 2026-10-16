@@ -63,6 +63,13 @@ func _test_links_and_media() -> void:
 
 	var linked: Array = MarkdownScript.parse("[quran.makarem.ir](https://quran.makarem.ir/#1:1)")
 	_is(linked[0].link, "https://quran.makarem.ir/#1:1", "a lone link exposes its URL")
+	# A card's footer shows the link's own words: the brackets and the
+	# address are the parser's business, never the reader's.
+	_is(
+		MarkdownScript.plain(linked[0].text),
+		"quran.makarem.ir",
+		"the plain form of a link is its label, not its markdown"
+	)
 
 	var inline: Array = MarkdownScript.parse("see ![rec.mp3](rec.mp3) here")
 	_is(inline[0].kind, "text", "media beside other words stays text")

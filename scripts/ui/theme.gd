@@ -9,6 +9,12 @@ extends RefCounted
 ## wears Vazirmatn, whose calm sans keeps long translations restful; the
 ## interface wears Vazirmatn too, so the chrome and the content agree.
 
+## An inner class cannot call this file's own static functions by their bare
+## name -- the parser looks for them on the inner class and finds nothing. The
+## file pins itself the way every cross-file reference in this project does:
+## by path, so a machine with no editor class cache boots just the same.
+const THEME := preload("res://scripts/ui/theme.gd")
+
 const PAPER := Color("#FAF6ED")
 const CARD := Color("#FFFFFF")
 const INK := Color("#26302B")
@@ -258,6 +264,216 @@ class VolumeMark extends Control:
                 draw_arc(Vector2(11.0, 9.0), 8.5, -0.75, 0.75, 12, Color(color.r, color.g, color.b, 0.55), 1.8, true)
 
 
+## The volume's own small page: a speaker that mutes on press, a rule the
+## hand drags, and the number it stands at -- one quiet row, the size of the
+## thing it controls, with no title to read first. Both places that play a
+## recitation (a session and the browser) open the same page, so loudness is
+## one idea everywhere it can be changed.
+class VolumePopover extends PanelContainer:
+        ## Every nudge of the rule, live -- the hand hears the change as it
+        ## makes it.
+        signal changed(value: float)
+        ## The rule's final word, once the hand has stopped moving it: what a
+        ## screen persists.
+        signal committed(value: float)
+
+        var _slider: HSlider
+        var _mark: VolumeMark
+        var _readout: Label
+        var _ticket := 0  # only the latest nudge commits
+        var _loud := 1.0  # the last loudness above silence, for unmuting
+
+        func _init() -> void:
+                name = "VolumePopup"
+                visible = false
+                mouse_filter = Control.MOUSE_FILTER_STOP
+                add_theme_stylebox_override("panel", THEME.card_stylebox())
+
+                var pad := MarginContainer.new()
+                pad.name = "Pad"
+                pad.add_theme_constant_override("margin_left", 16)
+                pad.add_theme_constant_override("margin_right", 16)
+                pad.add_theme_constant_override("margin_top", 12)
+                pad.add_theme_constant_override("margin_bottom", 12)
+                add_child(pad)
+
+                var row := HBoxContainer.new()
+                row.name = "Row"
+                row.add_theme_constant_override("separation", 12)
+                pad.add_child(row)
+
+                # The speaker is also the mute: one press for silence, one
+                # press for the loudness silence replaced.
+                var mute := Button.new()
+                mute.name = "Mute"
+                mute.custom_minimum_size = Vector2(38, 38)
+                mute.tooltip_text = "Mute or unmute"
+                THEME.apply_mark_styles(mute, THEME.mark_button_styles(GREEN, true))
+                _mark = VolumeMark.new(GREEN_DEEP)
+                _mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                var mute_center := CenterContainer.new()
+                mute_center.name = "Centre"
+                mute_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+                mute_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                mute_center.add_child(_mark)
+                mute.add_child(mute_center)
+                THEME.pressable(mute)
+                mute.pressed.connect(_toggle_mute)
+                row.add_child(mute)
+
+                _slider = HSlider.new()
+                _slider.name = "Slider"
+                _slider.min_value = 0.0
+                _slider.max_value = 1.0
+                _slider.step = 0.01
+                _slider.custom_minimum_size = Vector2(170, 36)
+                _slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+                var track := StyleBoxFlat.new()
+                track.bg_color = Color("#E6DFCE")
+                track.set_corner_radius_all(4)
+                track.content_margin_top = 4
+                track.content_margin_bottom = 4
+                var filled := StyleBoxFlat.new()
+                filled.bg_color = GREEN
+                filled.set_corner_radius_all(4)
+                filled.content_margin_top = 4
+                filled.content_margin_bottom = 4
+                _slider.add_theme_stylebox_override("slider", track)
+                _slider.add_theme_stylebox_override("grabber_area", filled)
+                _slider.add_theme_stylebox_override("grabber_area_highlight", filled)
+                _slider.add_theme_icon_override("grabber", THEME.knob_icon(18, GREEN_DEEP))
+                _slider.add_theme_icon_override("grabber_highlight", THEME.knob_icon(22, GREEN_DEEP))
+                _slider.add_theme_icon_override("grabber_disabled", THEME.knob_icon(18, Color("#9AA79E")))
+                _slider.value_changed.connect(_on_dragged)
+                row.add_child(_slider)
+
+                _readout = Label.new()
+                _readout.name = "Readout"
+                _readout.custom_minimum_size = Vector2(46, 0)
+                _readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+                _readout.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+                THEME.dress(_readout, CAPTION, INK)
+                row.add_child(_readout)
+                _say(1.0)
+
+        ## Say a loudness without saying it out loud: the rule, the mark and
+        ## the number move to it, and no signal leaves -- for a screen
+        ## restating what it already knows.
+        func set_volume(v: float) -> void:
+                _slider.set_value_no_signal(clampf(v, 0.0, 1.0))
+                _say(_slider.value)
+
+        func _on_dragged(v: float) -> void:
+                _say(v)
+                changed.emit(v)
+                _commit_later()
+
+        func _toggle_mute() -> void:
+                var v := 0.0
+                if _slider.value <= 0.005:
+                        v = _loud if _loud > 0.005 else 1.0
+                _slider.set_value_no_signal(v)
+                _say(v)
+                changed.emit(v)
+                committed.emit(v)
+
+        ## What the page says about a loudness: the mark goes quiet at
+        ## silence, the number keeps the number's own place.
+        func _say(v: float) -> void:
+                if v > 0.005:
+                        _loud = v
+                _mark.muted = v <= 0.005
+                _mark.queue_redraw()
+                _readout.text = "%d%%" % int(round(v * 100.0))
+
+        ## A save waits for the hand to stop moving: only the latest nudge
+        ## commits, so one drag is one word, not one per tick along it.
+        func _commit_later() -> void:
+                _ticket += 1
+                var ticket := _ticket
+                var tree := (Engine.get_main_loop() as SceneTree)
+                if tree == null:
+                        return
+                tree.create_timer(0.45).timeout.connect(func() -> void:
+                        if ticket == _ticket:
+                                committed.emit(_slider.value)
+                )
+
+
+## A round grabber for a slider, drawn rather than typed: a white disc in a
+## coloured ring, at 4x and scaled down so its edge lands soft. The engine's
+## own grabber is a grey plastic bead from another app.
+static func knob_icon(diameter: int, ring_color: Color) -> ImageTexture:
+        var scale := 4
+        var side := diameter * scale
+        var image := Image.create(side, side, false, Image.FORMAT_RGBA8)
+        var c := Vector2(side, side) / 2.0
+        var r_outer := float(side) / 2.0 - float(scale)
+        var r_ring := r_outer - 2.4 * float(scale)
+        for y in side:
+                for x in side:
+                        var d := Vector2(x + 0.5, y + 0.5).distance_to(c)
+                        if d > r_outer:
+                                continue
+                        var col := Color(1, 1, 1, 1)
+                        if d > r_ring:
+                                col = ring_color
+                        image.set_pixel(x, y, col)
+        return ImageTexture.create_from_image(image)
+
+
+## The switch a promise is made with: a rounded rule and the knob that
+## crosses it, drawn -- on in the app's green, off in the page's own grey.
+## The engine's checkbox is a grey plastic bead beside a dot; a promise this
+## quiet deserves a switch that reads as one from across the room.
+class SwitchMark extends Control:
+        var on := false
+        var track_on := GREEN
+        var track_off := Color("#D8CFBC")
+
+        func _init(p_on := false) -> void:
+                on = p_on
+                custom_minimum_size = Vector2(40, 22)
+                mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+        func _draw() -> void:
+                var r := 10.0
+                draw_rect(Rect2(1, 1, 38, 20), track_on if on else track_off, true)
+                # A breath of light on the track's far side, so the knob has
+                # somewhere to have come from.
+                var knob := Vector2(30.0, 11.0) if on else Vector2(11.0, 11.0)
+                draw_circle(knob, 8.0, Color.WHITE)
+                draw_circle(knob, 8.0, Color(0, 0, 0, 0.06))
+
+        func set_on(p_on: bool) -> void:
+                on = p_on
+                queue_redraw()
+
+
+## The way a list opens: a chevron that has somewhere to point. Closed it
+## points onward, the direction of reading; open it points down, into what
+## it opened -- the same arrow, turned by hand-drawing rather than by
+## rotation, so it never swings outside its own box.
+class DisclosureMark extends Control:
+        var color := INK_SOFT
+        var open := false
+
+        func _init(p_color: Color = INK_SOFT) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(14, 14)
+                mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+        func _draw() -> void:
+                var head := Vector2(11, 5) if open else Vector2(5, 2)
+                var fall := Vector2(3, 8) if open else Vector2(11, 7)
+                draw_polyline(
+                        PackedVector2Array([head, Vector2(7, 10 if open else 7), fall]),
+                        color,
+                        2.2,
+                        true
+                )
+
+
 ## A chevron pointing back the way the user came: the universal way out.
 class BackMark extends Control:
         var color := INK
@@ -307,6 +523,11 @@ class SyncMark extends Control:
 
         func _process(delta: float) -> void:
                 if working:
+                        # The turn is about the mark's own centre: rotation
+                        # pivots at the top-left corner unless the pivot is
+                        # set, and a mark swinging out of its coin is a mark
+                        # that has left the button it lives in.
+                        pivot_offset = size / 2.0
                         rotation += delta * 1.5
 
         func _draw() -> void:

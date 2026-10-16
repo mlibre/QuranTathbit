@@ -6,9 +6,11 @@ One deck, studied one card at a time, kept as plain folders and files, synced
 through the user's own GitHub repository. Cross-platform (Android, Linux,
 Windows, web) in Godot 4.7 with GDScript only.
 
-- **One deck, no deck manager.** No deck browser, creation or card editor in
-  the app — cards are edited as files, anywhere; the app only studies and
-  syncs them. A feature that needs a second deck does not belong here.
+- **One deck, no deck manager.** No deck creation and no card editor in the
+  app — cards are edited as files, anywhere; the app studies, reads and
+  syncs them. A read-only card browser (the library) belongs here: a deck of
+  scripture is also a book to read through. A feature that needs a second
+  deck does not belong here.
 - **Anki's math, exactly.** The scheduler is Anki's SM-2 with Anki's
   parameters, not an approximation. No FSRS, no custom scheduler.
 - **Folders and files, no database.** The deck is folders and markdown; the

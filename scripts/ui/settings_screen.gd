@@ -301,7 +301,9 @@ func _github_body() -> Control:
         show.tooltip_text = "Show or hide what was typed"
         show.pressed.connect(_toggle_token_shown)
         token_row.add_child(show)
-        var save_token := ThemeScript.ghost_button("Save token", ThemeScript.GREEN, 44, 12)
+        # Keeping the token is the row's errand, so it is the row's one
+        # filled action; seeing is only a second thought beside it.
+        var save_token := ThemeScript.primary_button("Save token", 44)
         save_token.name = "SaveToken"
         save_token.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         save_token.pressed.connect(_save_token)
@@ -336,22 +338,57 @@ func _github_body() -> Control:
         repo.focus_exited.connect(func() -> void: _save_repo(repo.text))
 
         # The quiet promise, said plainly and changeable: after each session
-        # the deck tells GitHub on its own. A hand that would rather ask
-        # every time can switch that off here.
-        var auto_row := HBoxContainer.new()
+        # the deck tells GitHub on its own. A promise that matters is a row
+        # of its own -- a page's worth of surface with a switch that reads
+        # as a switch from across the room, and the whole row is the
+        # button, so a thumb cannot miss it the way it missed a caption
+        # with a dot after it.
+        var auto_row := Button.new()
         auto_row.name = "AutoRow"
-        auto_row.add_theme_constant_override("separation", 10)
-        var auto_label := _text("Sync quietly after each session", ThemeScript.INK, ThemeScript.CAPTION)
-        auto_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        auto_row.add_child(auto_label)
-        var auto := CheckButton.new()
-        auto.name = "AutoSync"
-        auto.tooltip_text = "Sync on its own after each session, and when the app opens"
-        auto.toggled.connect(func(on: bool) -> void:
+        auto_row.toggle_mode = true
+        auto_row.custom_minimum_size = Vector2(0, 62)
+        _dress_promise_row(auto_row, false)
+        ThemeScript.pressable(auto_row)
+        var auto_pad := MarginContainer.new()
+        auto_pad.name = "AutoPad"
+        auto_pad.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        auto_pad.add_theme_constant_override("margin_left", 16)
+        auto_pad.add_theme_constant_override("margin_right", 16)
+        auto_pad.add_theme_constant_override("margin_top", 10)
+        auto_pad.add_theme_constant_override("margin_bottom", 10)
+        auto_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        auto_row.add_child(auto_pad)
+        var auto_line := HBoxContainer.new()
+        auto_line.name = "AutoLine"
+        auto_line.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        auto_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        auto_line.add_theme_constant_override("separation", 12)
+        auto_pad.add_child(auto_line)
+        var auto_words := VBoxContainer.new()
+        auto_words.name = "Words"
+        auto_words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        auto_words.alignment = BoxContainer.ALIGNMENT_CENTER
+        auto_words.add_theme_constant_override("separation", 2)
+        auto_words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        auto_line.add_child(auto_words)
+        var auto_label := Label.new()
+        auto_label.name = "Label"
+        auto_label.text = "Sync quietly after each session"
+        ThemeScript.dress(auto_label, ThemeScript.BODY, ThemeScript.INK, true)
+        auto_words.add_child(auto_label)
+        var auto_sub := _text("after each session, and when the app opens", ThemeScript.INK_SOFT, 12)
+        auto_sub.name = "Sub"
+        auto_words.add_child(auto_sub)
+        var auto_switch := ThemeScript.SwitchMark.new(false)
+        auto_switch.name = "Switch"
+        auto_switch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+        auto_line.add_child(auto_switch)
+        auto_row.toggled.connect(func(on: bool) -> void:
                 _settings.auto_sync = on
                 _settings.save()
+                _dress_promise_row(auto_row, on)
+                auto_switch.set_on(on)
         )
-        auto_row.add_child(auto)
         box.add_child(auto_row)
 
         var sync := ThemeScript.primary_button("Sync now", 46)
@@ -450,6 +487,36 @@ func _about() -> Control:
         box.add_child(label)
         return box
 
+## The promise row's two faces: kept is the app's own green ground, a
+## decision already standing; unkept is the page's own paper, a decision
+## still waiting to be made. The border says the same thing more quietly.
+func _dress_promise_row(row: Button, on: bool) -> void:
+        var rest := ThemeScript.soft_stylebox(
+                Color(ThemeScript.GREEN.r, ThemeScript.GREEN.g, ThemeScript.GREEN.b, 0.10), 14
+        )
+        rest.border_color = Color(
+                ThemeScript.GREEN.r, ThemeScript.GREEN.g, ThemeScript.GREEN.b, 0.45 if on else 0.22
+        )
+        rest.set_border_width_all(1)
+        var held := ThemeScript.soft_stylebox(
+                Color(ThemeScript.GREEN.r, ThemeScript.GREEN.g, ThemeScript.GREEN.b, 0.16), 14
+        )
+        held.border_color = Color(
+                ThemeScript.GREEN.r, ThemeScript.GREEN.g, ThemeScript.GREEN.b, 0.6
+        )
+        held.set_border_width_all(1)
+        row.add_theme_stylebox_override("normal", rest)
+        row.add_theme_stylebox_override("hover", held)
+        row.add_theme_stylebox_override("pressed", held)
+        row.add_theme_stylebox_override("checked", rest)
+        row.add_theme_stylebox_override("checked_hover", held)
+        row.add_theme_stylebox_override("checked_pressed", held)
+        var focus := rest.duplicate() as StyleBoxFlat
+        focus.border_color = ThemeScript.GREEN
+        focus.set_border_width_all(2)
+        row.add_theme_stylebox_override("focus", focus)
+
+
 # --- state ---------------------------------------------------------------------
 
 ## The main screen reports how a sync went while Settings is the screen on
@@ -464,12 +531,14 @@ func _refresh() -> void:
         var connect: Button = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Buttons/Connect")
         var disconnect: Button = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Buttons/Disconnect")
         var repo: LineEdit = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Repo")
-        var auto: CheckButton = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/AutoRow/AutoSync")
+        var auto: Button = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/AutoRow")
         repo.text = _settings.repo
         # No signal: this is the settings being said, not the settings being
         # changed -- a refresh that toggled its own switch would overwrite
         # the file it is only reading.
         auto.set_pressed_no_signal(_settings.auto_sync)
+        _dress_promise_row(auto, _settings.auto_sync)
+        (auto.get_node("AutoPad/AutoLine/Switch") as ThemeScript.SwitchMark).set_on(_settings.auto_sync)
         if _settings.has_token() and not _settings.owner.is_empty():
                 state.text = "Connected as @%s" % _settings.owner
         elif _settings.has_token():

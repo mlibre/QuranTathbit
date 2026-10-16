@@ -15,6 +15,7 @@ signal study_pressed
 signal sync_pressed
 signal settings_pressed
 signal update_pressed
+signal browse_pressed
 
 var _counts := {"due": 0, "new": 0, "learned": 0}
 var _deck_of_last_setup: DeckScript
@@ -60,6 +61,8 @@ func _layout() -> void:
                 pill.custom_minimum_size = Vector2(pill_w, 74)
         var study: Button = get_node("Margin/Column/Study")
         study.custom_minimum_size = Vector2(minf(340.0, avail), 60.0)
+        var browse: Button = get_node("Margin/Column/Browse")
+        browse.custom_minimum_size = Vector2(minf(340.0, avail), 50.0)
         _fit_sync_line()
 
 func setup(deck: DeckScript, counts: Dictionary, sync_line: String, sync_state := "off") -> void:
@@ -215,6 +218,7 @@ func _build() -> void:
         column.add_child(_deck_card())
         column.add_child(_stats())
         column.add_child(_study_button())
+        column.add_child(_browse_button())
         column.add_child(_sync_line())
 
         # The corner coins go on last, not first: children added later sit
@@ -477,6 +481,18 @@ func _study_button() -> Control:
         button.custom_minimum_size = Vector2(340, 60)
         button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         button.pressed.connect(func() -> void: study_pressed.emit())
+        return button
+
+## The library's own door, under the day's work: the same width as the
+## session it sits under, a thought rather than an errand -- the outline
+## that says the deck is a book as well as a queue.
+func _browse_button() -> Control:
+        var button := ThemeScript.ghost_button("Browse the cards", ThemeScript.GREEN, 50)
+        button.name = "Browse"
+        button.custom_minimum_size = Vector2(340, 50)
+        button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        button.tooltip_text = "Read the whole deck, card by card"
+        button.pressed.connect(func() -> void: browse_pressed.emit())
         return button
 
 func refresh(counts: Dictionary) -> void:

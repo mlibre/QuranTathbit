@@ -14,7 +14,7 @@ extends SceneTree
 
 const MainScript := preload("res://scripts/main.gd")
 
-const SHOTS := 8
+const SHOTS := 11
 
 var _out := "/tmp/shots"
 var _saved := 0
@@ -63,6 +63,24 @@ func _init() -> void:
         main.get_node("Settings").closed.emit()
         await create_timer(0.6).timeout
         await _shot("home_again")
+        # The library: the deck as a book, a row opening its own page.
+        main._on_browse_pressed()
+        await create_timer(0.9).timeout
+        await _shot("browse")
+        var browse: Control = main.get_node("Browse")
+        var list: VBoxContainer = browse.get_node("Margin/Column/Scroll/Wrap/Column")
+        var first_entry: VBoxContainer = null
+        for child in list.get_children():
+                if child.name.begins_with("Entry"):
+                        first_entry = child
+                        break
+        if first_entry != null:
+                (first_entry.get_node("Row") as Button).pressed.emit()
+                await create_timer(0.7).timeout
+                await _shot("browse_open")
+        browse.closed.emit()
+        await create_timer(0.6).timeout
+        await _shot("home_third")
 
         print("captures: %d of %d shot(s) in %s" % [_saved, SHOTS, _out])
         quit(0 if _saved >= SHOTS else 1)

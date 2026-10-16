@@ -11,11 +11,13 @@ const ThemeScript := preload("res://scripts/ui/theme.gd")
 const HomeScript := preload("res://scripts/ui/home.gd")
 const StudyScript := preload("res://scripts/ui/study.gd")
 const SettingsScreenScript := preload("res://scripts/ui/settings_screen.gd")
+const BrowseScript := preload("res://scripts/ui/browse.gd")
 
 ## QuranTathbit: one deck, kept in folders and files, studied one card at a
 ## time. This root owns the small amount of state the app has -- settings,
-## the deck, the network clients, the session -- and moves between the three
-## screens. Nothing else exists: no deck manager, no card editor, no browser.
+## the deck, the network clients, the session -- and moves between its four
+## screens: home, the session, the library, settings. Nothing edits a card
+## in here: the deck is files, and the app reads them.
 
 const BUNDLED_DECK := "res://assets/decks/quran"
 const USER_DECK := "user://decks/quran"
@@ -112,6 +114,7 @@ func _go_home() -> void:
         home.sync_pressed.connect(_on_sync_pressed)
         home.settings_pressed.connect(_on_settings_pressed)
         home.update_pressed.connect(_apply_update)
+        home.browse_pressed.connect(_on_browse_pressed)
         if _update_waiting:
                 home.offer_update()
 
@@ -168,6 +171,20 @@ func _on_settings_pressed() -> void:
         screen.closed.connect(_go_home)
         screen.sync_requested.connect(_on_sync_pressed)
         screen.account_changed.connect(_on_account_changed)
+
+
+## The library: the whole deck, read and listened to, nothing scheduled.
+## It opens with the loudness the last session chose, and if the hand
+## changes it here, that choice is kept the same way.
+func _on_browse_pressed() -> void:
+        if _screen is BrowseScript:
+                return
+        var browse := BrowseScript.new()
+        browse.name = "Browse"
+        _swap(browse)
+        browse.setup(_deck, _settings.volume)
+        browse.closed.connect(_go_home)
+        browse.volume_changed.connect(_on_volume_changed)
 
 
 func _on_account_changed() -> void:
