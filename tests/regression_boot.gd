@@ -16,6 +16,11 @@ func _init() -> void:
         # A fresh install: nothing in the user folder yet.
         _fresh_install()
         var main = (load("res://scripts/main.gd") as GDScript).new()
+        # The scene file gives the root its full-rect anchors; match them here,
+        # or every screen lays out at zero size and any check that reads real
+        # geometry (a box holding its own words) measures a page that was
+        # never laid out.
+        main.set_anchors_preset(Control.PRESET_FULL_RECT)
         root.add_child(main)
         await main.ready
         # The home numbers count themselves in over half a second; read them
@@ -500,6 +505,25 @@ func _check_browse(main: Node) -> void:
                         headers += 1
         _is(rows, deck.cards.size(), "every card has its row in the library")
         _ok(headers >= 2, "the cards are gathered under their surahs' names")
+        # The chapter's opening: no thread under the name -- a partial green
+        # line reads as a line that failed to render -- and how many rest in
+        # review is said in the count's own words, never as a broken-looking
+        # rule.
+        var last_header: VBoxContainer = null
+        for child in column.get_children():
+                if child.name.begins_with("Header"):
+                        last_header = child
+        if last_header != null:
+                browse._set_header_count(column, 7, 2)
+                var folio: Label = last_header.get_node_or_null("Line/Count")
+                _ok(
+                        folio != null and folio.text == "7 cards · 2 in review",
+                        "the chapter's count says in words how many rest in review"
+                )
+                _ok(
+                        last_header.get_node_or_null("Rule") == null,
+                        "the chapter opens without a half-rendered thread"
+                )
         # The search field: a verse's address finds its card, in the hand's
         # own digits, and the shelf keeps only what answers.
         var search: LineEdit = browse.get_node_or_null("Margin/Column/Search")
@@ -552,7 +576,7 @@ func _check_browse(main: Node) -> void:
         # the mushaf cut, flush right the way the verse is read, at a size
         # its vowels survive -- the one place the app drew Amiri's harakat
         # small enough to misread.
-        var preview: Label = first_entry.get_node_or_null("Row/Line/Words/Preview")
+        var preview: Label = first_entry.get_node_or_null("Row/Pad/Line/Words/Preview")
         if preview != null:
                 _is(
                         preview.get_theme_font_size("font_size"),
@@ -567,11 +591,36 @@ func _check_browse(main: Node) -> void:
                         preview.horizontal_alignment == HORIZONTAL_ALIGNMENT_RIGHT,
                         "the verse stands flush right, the edge it is read from"
                 )
+        # The row's own box holds its whole line of words: the standing at
+        # the left, the address and the pointer at the right, all inside the
+        # rounded box the row wears while its page is open -- none of it
+        # hanging under the row's floor into the next verse.
+        var open_row: Button = first_entry.get_node("Row") as Button
+        var row_pad: MarginContainer = first_entry.get_node("Row/Pad") as MarginContainer
+        var meta_box: Control = first_entry.get_node_or_null("Row/Pad/Line/Words/Meta")
+        if meta_box != null and row_pad != null:
+                _ok(
+                        open_row.get_global_rect().encloses(meta_box.get_global_rect()),
+                        "the row's box holds its standing and its pointer inside it"
+                )
+                _ok(
+                        open_row.get_global_rect().size.y >= row_pad.get_combined_minimum_size().y - 0.5,
+                        "the row stands as tall as its own words"
+                )
+        var ref_label: Label = first_entry.get_node_or_null("Row/Pad/Line/Words/Meta/Ref")
+        if ref_label != null:
+                _ok(
+                        ref_label.get_combined_minimum_size().x > 10.0,
+                        "the row carries its address in gold, not clipped to nothing"
+                )
         (first_entry.get_node("Row") as Button).pressed.emit()
         await create_timer(0.4).timeout
         var detail: VBoxContainer = first_entry.get_node("Detail")
         _ok(detail.visible, "a pressed row opens its card beneath it")
-        var view = detail.get_node("Card/Pad/View")
+        var disclose = first_entry.get_node_or_null("Row/Pad/Line/Words/Meta/Disclose")
+        if disclose != null:
+                _ok(disclose.open, "the pointer turns into what it opened")
+        var view = detail.get_node("Card/Pad/Page/View")
         _ok(view.get_node("Body").get_child_count() >= 2, "the open card shows its verses")
         _ok(view.get_node_or_null("Footer") != null, "the open card carries its citation at the foot")
         var persian_rows := 0
@@ -579,7 +628,13 @@ func _check_browse(main: Node) -> void:
                 if (pill.get_node("Center/Row/Label") as Label).text.begins_with("Persian"):
                         persian_rows += 1
         _ok(persian_rows >= 1, "the open card offers its Persian translation")
-        _ok(detail.get_node_or_null("Edit") != null, "the open card carries the pencil at its foot")
+        var pencil: Button = detail.get_node_or_null("Card/Pad/Page/Edit")
+        _ok(pencil != null, "the open card carries the pencil at its foot")
+        if pencil != null:
+                _ok(
+                        detail.get_node("Card").get_global_rect().encloses(pencil.get_global_rect()),
+                        "the pencil lives inside the card, not on the desk below it"
+                )
         var second_entry: VBoxContainer = null
         for child in column.get_children():
                 if child != first_entry and child.name.begins_with("Entry"):
@@ -608,7 +663,9 @@ func _check_browse(main: Node) -> void:
                                 browse.get_node_or_null("Margin/Column/Scroll/Wrap/Column/Empty") != null,
                                 "an empty due list says so, warmly"
                         )
-                        due_pill.pressed.emit()
+                        due_pill = filters.get_node_or_null("PillDue")
+                        if due_pill != null:
+                                due_pill.pressed.emit()
                         await create_timer(0.4).timeout
                         var back_rows := 0
                         for child in column.get_children():

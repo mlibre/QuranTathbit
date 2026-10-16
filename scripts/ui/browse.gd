@@ -289,7 +289,16 @@ func _surface() -> Control:
         scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
         scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
         ThemeScript.style_scroll(scroll)
-        scroll.get_v_scroll_bar().value_changed.connect(func(_v: float) -> void: _update_sticky())
+        # The scrollbar answers a jump once, not frame after frame the way a
+        # drag does, and its one call lands before the container has carried
+        # the shelf to its new place -- the running head would read the
+        # positions the scroll just left and stay silent about a chapter the
+        # eye has already entered. Answer one frame later, when the shelf
+        # stands where the scroll put it; a drag asks every frame and is
+        # answered every frame.
+        scroll.get_v_scroll_bar().value_changed.connect(
+                func(_v: float) -> void: call_deferred("_update_sticky")
+        )
         var wrap := CenterContainer.new()
         wrap.name = "Wrap"
         wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -535,6 +544,10 @@ func _rebuild() -> void:
         # has moved on, and a shelf half-arrived reads as a shelf half-broken.
         if not asking:
                 ThemeScript.stagger_in(column, minf(0.015, 0.55 / maxf(column.get_child_count(), 1.0)), 0.18)
+        # The rows are sized by a pass that must see them laid out; see
+        # _fit_rows for why the number spoken at their building is not
+        # the number they stand by.
+        call_deferred("_fit_rows")
         _update_sticky()
 
 ## The shelf with nothing to say says it warmly: what was asked, why the
@@ -589,28 +602,28 @@ func _empty_under() -> String:
         return "A deck of folders and files, read from its own shelf."
 
 ## The count and the rest a surah's title carries, written into the header
-## that waits for them at the top of its own run of cards -- and drawn as a
-## thin green rule beneath the name, the fraction of the surah now resting
-## between reviews.
+## that waits for them at the top of its own run of cards. How many rest in
+## review is said in words beside the count -- a thread under the name
+## says it only as a line that looks broken until it is full, and a
+## chapter's opening should never look like a mistake.
 func _set_header_count(column: VBoxContainer, count: int, resting: int) -> void:
         var header: VBoxContainer = null
         for child in column.get_children():
                 if child.name.begins_with("Header"):
                         header = child
         if header != null:
-                (header.get_node("Line/Count") as Label).text = "%d card%s" % [
-                        count, "" if count == 1 else "s"
-                ]
-                var done := clampf(resting / float(count) if count > 0 else 0.0, 0.0, 1.0)
-                (header.get_node("Rule/Fill") as Control).size_flags_stretch_ratio = maxf(done, 0.02)
-                (header.get_node("Rule/Grow") as Control).size_flags_stretch_ratio = maxf(1.0 - done, 0.02)
+                var cards := "%d card%s" % [count, "" if count == 1 else "s"]
+                var line := cards
+                if resting > 0:
+                        line += " · %d in review" % resting
+                (header.get_node("Line/Count") as Label).text = line
 
 ## A surah's own opening: its name in the gold of citations at a
 ## chapter's own size, a small star before it the way a mushaf marks its
-## surahs, its count at the far end -- and beneath, a thin green rule of
-## how much of the chapter rests between reviews. A chapter opens with
-## the air of a page break, not with a banner: the name must be able to
-## stand beside the verses it governs without shouting over them.
+## surahs, its count at the far end saying in words how many of its cards
+## rest in review. A chapter opens with the air of a page break, not with
+## a banner: the name must be able to stand beside the verses it governs
+## without shouting over them.
 func _surah_header(surah: String, of_card: String) -> Control:
         var box := VBoxContainer.new()
         # One name per node: the engine renames a second "Header" into an
@@ -653,38 +666,7 @@ func _surah_header(surah: String, of_card: String) -> Control:
         ThemeScript.dress(count, 11, ThemeScript.INK_SOFT)
         line.add_child(count)
         box.add_child(line)
-        box.add_child(_progress_rule())
         return box
-
-## The chapter's own progress: a track the colour of the page's edges, with
-## as much of it green as the surah has cards resting between reviews --
-## thin as a sewing thread, far enough beneath the name to read as the
-## chapter's progress and not as a correction under a word.
-func _progress_rule() -> Control:
-        var rule := HBoxContainer.new()
-        rule.name = "Rule"
-        rule.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        rule.custom_minimum_size = Vector2(0, 2)
-        rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        rule.add_theme_constant_override("separation", 0)
-        rule.add_child(_rule_panel("Fill", ThemeScript.GREEN))
-        rule.add_child(_rule_panel("Grow", ThemeScript.LINE))
-        return rule
-
-func _rule_panel(panel_name: String, tone: Color) -> PanelContainer:
-        var panel := PanelContainer.new()
-        panel.name = panel_name
-        panel.custom_minimum_size = Vector2(6, 2)
-        panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        panel.size_flags_stretch_ratio = 0.5
-        panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        var box := ThemeScript.soft_stylebox(tone, 2)
-        box.content_margin_left = 0
-        box.content_margin_right = 0
-        box.content_margin_top = 0
-        box.content_margin_bottom = 0
-        panel.add_theme_stylebox_override("panel", box)
-        return panel
 
 ## One card in the library: its row, and the page that opens under it. The
 ## row is ink on the page's own paper -- no box, no border, the way a book's
@@ -808,7 +790,6 @@ func _entry(card: CardScript, reference: String) -> Control:
         ref_label.text = reference
         ref_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
         ref_label.text_direction = TextDirection.TEXT_DIRECTION_AUTO
-        ref_label.clip_text = true
         var script := ThemeScript.reference_script(reference)
         ref_label.add_theme_font_override("font", ThemeScript.font_for(script, 14, true))
         ref_label.add_theme_font_size_override("font_size", 14 if script == "arabic" else 12)
@@ -825,7 +806,15 @@ func _entry(card: CardScript, reference: String) -> Control:
         # shorter than its own verse -- the verse's vowels clipped into the
         # row above, the meta line buried under the card below. The row
         # says its own height instead: what its line of words needs, plus
-        # the padding that lets the verse breathe.
+        # the padding that lets the verse breathe. The number is spoken
+        # twice: this first word is only a guess, because a Label keeps
+        # its first account of itself -- the default face at its own size
+        # -- until a layout asks for better, so a shelf sized by this call
+        # alone stands shorter than its own words and the row's box cuts
+        # its meta line out under its floor. _fit_row says the number the
+        # pad stands by once the page has been laid out, and the pad's own
+        # signal covers every later change the same way.
+        pad.minimum_size_changed.connect(_fit_row.bind(row, pad))
         row.custom_minimum_size = Vector2(
                 0,
                 maxf(pad.get_combined_minimum_size().y, 92.0),
@@ -841,6 +830,37 @@ func _entry(card: CardScript, reference: String) -> Control:
         entry.add_child(detail)
         entry.add_child(_divider())
         return entry
+
+## The height of every row on the shelf, said once the page has been laid
+## out. The call that builds a row measures its pad before anything has
+## arranged it, and a Label holds its first account of itself -- the
+## default face at its own size -- until a layout asks for better, so a
+## shelf sized only at its building stands shorter than its own words: the
+## row's rounded box cuts the meta line out under its floor, and the
+## standing and the pointer hang outside the box they belong to. This
+## pass -- deferred to the end of the frame in which the shelf was built --
+## says the number the pad now stands by; the pad's own signal answers
+## every later change the same way.
+func _fit_rows() -> void:
+        var column: VBoxContainer = get_node_or_null("Margin/Column/Scroll/Wrap/Column")
+        if column == null:
+                return
+        for entry in column.get_children():
+                if not entry.name.begins_with("Entry"):
+                        continue
+                var row: Button = entry.get_node_or_null("Row")
+                var pad: MarginContainer = entry.get_node_or_null("Row/Pad")
+                if row != null and pad != null:
+                        _fit_row(row, pad)
+
+## One row says its own height: never below the least a row can breathe
+## (92), and never other than what its words cost -- a row taller than its
+## own line only pads the shelf with air.
+func _fit_row(row: Button, pad: MarginContainer) -> void:
+        var needed := maxf(pad.get_combined_minimum_size().y, 92.0)
+        if absf(row.custom_minimum_size.y - needed) < 0.5:
+                return
+        row.custom_minimum_size = Vector2(0, needed)
 
 ## The hairline after every verse, the last of a chapter included: a rule
 ## that appears and disappears reads as a rendering mistake, not a rhythm --
@@ -894,20 +914,70 @@ func _fill_detail(detail: VBoxContainer, card: CardScript) -> void:
         pad.add_theme_constant_override("margin_left", 24)
         pad.add_theme_constant_override("margin_right", 24)
         pad.add_theme_constant_override("margin_top", 22)
-        pad.add_theme_constant_override("margin_bottom", 22)
+        pad.add_theme_constant_override("margin_bottom", 20)
         panel.add_child(pad)
+        var page := VBoxContainer.new()
+        page.name = "Page"
+        page.add_theme_constant_override("separation", 14)
+        pad.add_child(page)
         var view := CardViewScript.new(_player)
         view.name = "View"
         view.show_text(card.back, card.folder)
-        pad.add_child(view)
-        var edit := ThemeScript.ghost_button("Edit card", ThemeScript.GOLD_DEEP, 44, 21)
+        page.add_child(view)
+        page.add_child(_pencil_row(card))
+
+## The pencil at the page's foot, inside the card the way a margin note is
+## kept inside its leaf -- not a pill cast on the desk below the page,
+## where it reads as a button that belongs to no card. One quiet line in
+## the gold of the citation above it: the drawn pencil, its words, and a
+## breath of gold while the hand is over them.
+func _pencil_row(card: CardScript) -> Control:
+        var edit := Button.new()
         edit.name = "Edit"
-        edit.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        edit.tooltip_text = "Edit this card"
+        edit.custom_minimum_size = Vector2(132, 40)
+        edit.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+        var rest := ThemeScript.soft_stylebox(Color(0, 0, 0, 0), 8)
+        var held := ThemeScript.soft_stylebox(
+                Color(ThemeScript.GOLD.r, ThemeScript.GOLD.g, ThemeScript.GOLD.b, 0.10), 8
+        )
+        edit.add_theme_stylebox_override("normal", rest)
+        edit.add_theme_stylebox_override("hover", held)
+        edit.add_theme_stylebox_override("pressed", held)
+        var ring := ThemeScript.soft_stylebox(Color(0, 0, 0, 0), 8)
+        ring.border_color = Color(ThemeScript.GOLD.r, ThemeScript.GOLD.g, ThemeScript.GOLD.b, 0.55)
+        ring.set_border_width_all(2)
+        edit.add_theme_stylebox_override("focus", ring)
+        ThemeScript.pressable(edit)
         edit.pressed.connect(_open_editor.bind(card))
-        detail.add_child(edit)
+        var inside := MarginContainer.new()
+        inside.name = "Pad"
+        inside.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        inside.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        inside.add_theme_constant_override("margin_left", 12)
+        inside.add_theme_constant_override("margin_right", 18)
+        var words := HBoxContainer.new()
+        words.name = "Row"
+        words.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+        words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+        words.add_theme_constant_override("separation", 9)
+        words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        inside.add_child(words)
+        var pencil := ThemeScript.PencilMark.new(ThemeScript.GOLD_DEEP)
+        pencil.name = "Pencil"
+        pencil.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+        words.add_child(pencil)
+        var label := Label.new()
+        label.name = "Words"
+        label.text = "Edit card"
+        label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+        ThemeScript.dress(label, 12, ThemeScript.GOLD_DEEP, true)
+        words.add_child(label)
+        edit.add_child(inside)
+        return edit
 
 func _set_row_open(row: Button, open: bool) -> void:
-        var mark: ThemeScript.DisclosureMark = row.get_node("Line/Words/Meta/Disclose")
+        var mark: ThemeScript.DisclosureMark = row.get_node("Pad/Line/Words/Meta/Disclose")
         mark.open = open
         mark.color = ThemeScript.GREEN_DEEP if open else ThemeScript.INK_SOFT
         mark.queue_redraw()
@@ -947,7 +1017,7 @@ func _on_editor_saved(card: CardScript) -> void:
         var entry: VBoxContainer = get_node_or_null("Margin/Column/Scroll/Wrap/Column/Entry" + card.id)
         if entry == null:
                 return
-        (entry.get_node("Row/Line/Words/Meta/Ref") as Label).text = _reference_of(card)
+        (entry.get_node("Row/Pad/Line/Words/Meta/Ref") as Label).text = _reference_of(card)
         var detail: VBoxContainer = entry.get_node("Detail")
         if detail.visible:
                 _fill_detail(detail, card)
