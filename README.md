@@ -10,18 +10,11 @@
 
 </div>
 
-A calm app for memorising the Qur'an. Open it, study the card in front
-of you, mark how well it went, come back tomorrow. That is the whole thing —
-no account on someone else's server, no cloud you cannot see, no deck to build
-or import. Your deck lives on your own machine.
+A friendly app for memorising the Quran. Study the cards the app has prepared for you, mark how well it went, and come back tomorrow.
 
-The deck ships with the app: 99 cards from Al-Fātiḥah and Al-Baqarah, each one
-a verse, its Persian translation, and a recitation — all from
-[quran.makarem.ir](https://quran.makarem.ir), and from nowhere else (see the
-[LICENSE](LICENSE) for the full attribution). Cards you found hard come back
-sooner, easy ones later — the well-known SM-2 schedule decides, so each day
-you sit down to exactly what is due that day. No streaks, no notifications:
-the app invites, it never pushes, and cards you miss simply wait.
+The deck ships with the app: cards from Al-Fātiḥah and Al-Baqarah, each one a verse, its Persian translation, and a recitation. Cards you found hard come back sooner, easy ones later — so each day you sit down to exactly what is due that day.
+
+No streaks, no notifications: the app invites, it never pushes, and cards you miss simply wait.
 
 ## ▶️ Play it in your browser
 
