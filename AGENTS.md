@@ -88,7 +88,30 @@ Windows, web) in Godot 4.7 with GDScript only.
   is right-to-left (`I18n.is_rtl()`), the page's root turns
   (`LAYOUT_DIRECTION_RTL`), every title, label, field and line stands at the
   right edge, and the way back points right from the right corner; a page
-  said again in another tongue says its own direction again.
+  said again in another tongue says its own direction again. The alignment
+  that puts a line there is `LEFT`, in both tongues — measured, not guessed:
+  under an RTL layout the engine reads `LEFT` as the reading's start (the
+  right edge) and `RIGHT` as the far end, so a `RIGHT` on an RTL page stands
+  the title at the left margin, exactly the corner a reader once reported it
+  stuck in. `LEFT` means "where the reading begins" on every page the app
+  speaks.
+- **The engine's own chrome still wears the app's hand.** A tooltip is
+  raised by the engine, dressed by the theme alone — and the engine's
+  default face carries no Arabic letters, so a Persian tooltip was a row of
+  empty boxes in no language at all. The window's theme
+  (`ThemeScript.tooltip_theme()`) carries a Vazirmatn `TooltipLabel` and the
+  page's own panel behind it, and says nothing about anything else: a Theme
+  holds only what it is given.
+- **A field's two layers wear one font.** The RTL field is an input engine
+  and a visible mirror, and every width the caret and the clicks are placed
+  by is read from the font — so both layers share one face, always. The
+  editor tells scripture from prose not by per-line faces (which would
+  desync the caret from the ink) but by fallback: the verses' chosen hand as
+  the base, its book twin behind it for what it does not draw (Amiri Quran
+  writes no پ), and prose's own face beneath that (`ThemeScript.editor_face()`).
+  And the field is opened on the words, never on the file's trailing
+  newline — a phantom blank line under every reference is where a reader's
+  eye goes first.
 - **The chrome speaks the reader's tongue; the deck never changes.** Every
   user-visible string of the interface goes through `scripts/ui/i18n.gd`'s
   `t()` (English is the key and the fallback), in English, فارسی and

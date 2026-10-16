@@ -1376,6 +1376,59 @@ static func noto_naskh(bold := false) -> Font:
         return load(NOTO_NASKH_BOLD if bold else NOTO_NASKH) as Font
 
 
+## The editor's own hand: the field is one font for both of its layers (the
+## input engine and the mirror must agree on every width or the caret and the
+## clicks land beside the words they mean), so scripture and prose are told
+## apart not by face but by fallback. The base is the hand the verses are read
+## in; whatever that hand does not draw -- Amiri Quran writes no پ and no
+## Latin -- is drawn by its own book twin, Amiri, and whatever Amiri itself
+## lacks falls to Vazirmatn. One font object, one set of metrics, every glyph
+## a reader can type: the ayeh reads as scripture and the caret still stands
+## where the finger expects it.
+static var _editor_face_cache := {}
+
+static func editor_face() -> Font:
+        var key := "face:" + ayah_face_key()
+        if _editor_face_cache.has(key):
+                return _editor_face_cache[key]
+        var variation := FontVariation.new()
+        variation.base_font = ayah_face()
+        variation.fallbacks = [amiri(15), vazir(15)]
+        _editor_face_cache[key] = variation
+        return variation
+
+
+## The plain field's hand: a front that is not a reference (or a plain note)
+## is prose, and prose in this app is Vazirmatn.
+static func editor_face_for(script: String) -> Font:
+        return editor_face() if script == "arabic" else vazir(15)
+
+
+## The app's one theme: the tooltips, and nothing else. Every control in the
+## app dresses its own fonts, but the tooltip the engine raises is dressed by
+## the theme alone -- and the engine's own default face carries no Arabic
+## letters at all, so a Persian tooltip was arriving as a row of empty boxes
+## in no language anyone reads. A Theme holds only what it is given, so this
+## one speaks for tooltips and stays silent about everything else.
+static func tooltip_theme() -> Theme:
+        var theme := Theme.new()
+        theme.set_font("font", "TooltipLabel", vazir(13))
+        theme.set_font_size("font_size", "TooltipLabel", 13)
+        theme.set_color("font_color", "TooltipLabel", INK)
+        theme.set_color("font_shadow_color", "TooltipLabel", Color(0, 0, 0, 0))
+        var panel := StyleBoxFlat.new()
+        panel.bg_color = CARD
+        panel.border_color = LINE
+        panel.set_border_width_all(1)
+        panel.set_corner_radius_all(10)
+        panel.content_margin_left = 10
+        panel.content_margin_right = 10
+        panel.content_margin_top = 6
+        panel.content_margin_bottom = 6
+        theme.set_stylebox("panel", "TooltipPanel", panel)
+        return theme
+
+
 ## How far a line's ink reaches past the box its font declares: the marks a
 ## verse stacks above its tallest letters -- Amiri's damma over a hamza'd
 ## alef in أُنزِلَ, Noto Naskh's over the same -- and the kasra that hangs

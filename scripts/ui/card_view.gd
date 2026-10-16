@@ -299,12 +299,12 @@ func _translation_path(name: String) -> String:
 func _make_audio_button(name: String, path: String, persian := false) -> Button:
         var button := Button.new()
         button.name = ("Translation:" if persian else "Audio:") + name
-        # The words the button carries: the verse's own address when the file
-        # name carries one, so two recitations on one card are never mistaken
-        # for each other.
-        var verse := _verse_label(name)
+        # The words the button carries: what will speak, and nothing more. A
+        # verse's own address stood here once, but the page already says it
+        # twice over -- the question asked for it and the eyebrow repeats it
+        # -- so a third telling on the button was only noise on the pill.
         var word := I18nScript.t("Persian") if persian else I18nScript.t("Listen")
-        var idle_text := word if verse.is_empty() else "%s · %s" % [word, verse]
+        var idle_text := word
         # A Button measures its own text, and this button's words live in
         # children it cannot see: the width is set by hand from the widest
         # line the button will ever carry, so the pill is a pill on arrival

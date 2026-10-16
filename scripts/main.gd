@@ -51,6 +51,12 @@ var _paste_callback: Variant = null  # the page's paste hook, kept alive for the
 
 
 func _ready() -> void:
+        # The engine's own tooltips arrive in the engine's own face, which
+        # carries no Arabic letters: a Persian tooltip was a row of empty
+        # boxes in no language at all. The window's theme dresses them in the
+        # app's own hand and says nothing about anything else -- every control
+        # that matters dresses itself.
+        get_window().theme = ThemeScript.tooltip_theme()
         _install_deck()
         _deliver_translations()
         _settings = SettingsScript.load_settings()

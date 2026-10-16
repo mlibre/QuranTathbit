@@ -15,7 +15,7 @@ extends SceneTree
 const MainScript := preload("res://scripts/main.gd")
 const DeckZipScript := preload("res://scripts/data/deck_zip.gd")
 
-const SHOTS := 23
+const SHOTS := 25
 
 var _out := "/tmp/shots"
 var _saved := 0
@@ -163,6 +163,16 @@ func _init() -> void:
         main._apply_language("fa")
         await create_timer(0.8).timeout
         await _shot("home_fa")
+        # The corner's own words, raised by the engine on a hover: a tooltip
+        # that arrives in the engine's default face arrives in no language at
+        # all -- this frame keeps the one the app now raises, in Vazirmatn.
+        var corner_fa: Button = main.get_node_or_null("Home/SettingsCorner")
+        if corner_fa != null:
+                Input.warp_mouse(corner_fa.get_global_rect().get_center())
+                await create_timer(1.4).timeout
+                await _shot("tooltip_fa")
+                Input.warp_mouse(Vector2(10, 700))
+                await create_timer(0.3).timeout
         main._start_session()
         await create_timer(0.8).timeout
         await _shot("study_fa")
@@ -171,6 +181,16 @@ func _init() -> void:
                 study_fa._reveal()
                 await create_timer(0.9).timeout
                 await _shot("study_fa_back")
+                # The card's own page, said in Persian: the boxes named at the
+                # right edge, the ayeh set in the verses' own hand, and no
+                # phantom blank line under the reference.
+                study_fa._open_editor()
+                await create_timer(0.8).timeout
+                await _shot("editor_fa")
+                var editor_fa: Control = study_fa.get_node_or_null("Editor")
+                if editor_fa != null:
+                        editor_fa.queue_free()
+                        await create_timer(0.3).timeout
                 study_fa.closed.emit()
                 await create_timer(0.7).timeout
         # The settings page said in Persian: laid out from the right, the

@@ -196,7 +196,7 @@ func _build_scroll() -> Control:
         _write_column.add_theme_constant_override("separation", 6)
         content.add_child(_write_column)
 
-        _write_column.add_child(_caption(I18nScript.t("QUESTION")))
+        _write_column.add_child(_caption(I18nScript.t("QUESTION"), "QuestionCaption"))
         _front = RtlFieldScript.new()
         _front.name = "Front"
         _front.one_line = true
@@ -204,10 +204,21 @@ func _build_scroll() -> Control:
         _front.text_changed.connect(_on_front_changed)
         _front.advance_requested.connect(func() -> void: _back.take_focus())
         _write_column.add_child(_front)
-        _front.set_text(_card.front)
+        # The file on disk ends with the newline every text file carries; the
+        # field's words do not. Reading it in whole painted a phantom blank
+        # line under every reference, so the page is opened on the words
+        # themselves and the newline goes back on only when the file is
+        # written again. Saving compares stripped to stripped either way, so
+        # opening a card and closing it is still not an edit.
+        _front.set_text(_card.front.strip_edges())
+        # The question is a reference, and a reference is Arabic by
+        # construction: the field writes in the verses' own hand.
+        _front.set_face(ThemeScript.editor_face_for(
+                ThemeScript.reference_script(_reference_of_text(_card.front))
+        ))
 
         _write_column.add_child(_spacer(8))
-        _write_column.add_child(_caption(I18nScript.t("ANSWER")))
+        _write_column.add_child(_caption(I18nScript.t("ANSWER"), "AnswerCaption"))
         _back = RtlFieldScript.new()
         _back.name = "Back"
         _back.custom_minimum_size = Vector2(0, 180)
@@ -216,7 +227,13 @@ func _build_scroll() -> Control:
         _back.caret_moved.connect(_follow_caret)
         _front.caret_moved.connect(_follow_caret)
         _write_column.add_child(_back)
-        _back.set_text(_card.back)
+        _back.set_text(_card.back.strip_edges())
+        # The answer is scripture first: the verses are written in the hand
+        # the reader chose for them, and whatever that hand does not draw --
+        # Amiri Quran writes no پ -- falls to its book twin behind it. One
+        # face for the whole field keeps the caret and the clicks honest:
+        # the mirror and the engine beneath it measure the same widths.
+        _back.set_face(ThemeScript.editor_face())
 
         _write_column.add_child(_spacer(10))
         _write_column.add_child(_hint_row())
@@ -235,10 +252,17 @@ func _spacer(height: int) -> Control:
         room.mouse_filter = Control.MOUSE_FILTER_IGNORE
         return room
 
-func _caption(text: String) -> Label:
+func _caption(text: String, node_name := "Caption") -> Label:
         var label := Label.new()
+        label.name = node_name
         label.text = text
         label.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
+        # A page read from the right names its boxes at the right edge; this
+        # page's own layout stays left-to-right, so RIGHT is simply the right
+        # edge here (under an RTL layout the meaning flips -- see the
+        # settings page's _card_header for that law).
+        if I18nScript.is_rtl():
+                label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
         ThemeScript.dress(label, 12, ThemeScript.INK_SOFT, true)
         return label
 
@@ -362,6 +386,14 @@ func _preview_card(text: String, ref_line: String, lead: bool) -> Control:
 func _on_front_changed() -> void:
         _reference.text = _reference_of_front()
         _clear_warning()
+        # A hand follows the words: a reference rewritten in another script
+        # is rewritten in that script's own face, and only then -- the face
+        # is not re-said on every keystroke, just when its reason changes.
+        var wanted := ThemeScript.editor_face_for(
+                ThemeScript.reference_script(_reference_of_front())
+        )
+        if _front.face() != wanted:
+                _front.set_face(wanted)
 
 func _reference_of_front() -> String:
         return _reference_of_text(_front.get_text())

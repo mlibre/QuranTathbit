@@ -146,8 +146,8 @@ func _search_field() -> Control:
         field.custom_minimum_size = Vector2(0, 44)
         field.clear_button_enabled = true
         field.text_direction = TextDirection.TEXT_DIRECTION_LTR
-        field.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-        field.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+        field.add_theme_font_override("font", ThemeScript.vazir(15))
+        field.add_theme_font_size_override("font_size", 15)
         field.add_theme_color_override("font_color", ThemeScript.INK)
         field.add_theme_color_override("font_placeholder_color", ThemeScript.INK_SOFT)
         field.add_theme_color_override("caret_color", ThemeScript.GREEN_DEEP)
@@ -261,8 +261,8 @@ func _dress_pill(pill: Button, on: bool) -> void:
         pill.add_theme_stylebox_override("pressed", wash)
         pill.add_theme_stylebox_override("focus", wash)
         pill.add_theme_stylebox_override("disabled", rest)
-        pill.add_theme_font_override("font", ThemeScript.vazir(13, on))
-        pill.add_theme_font_size_override("font_size", 13)
+        pill.add_theme_font_override("font", ThemeScript.vazir(14, on))
+        pill.add_theme_font_size_override("font_size", 14)
         var tone := ThemeScript.GREEN_DEEP if on else ThemeScript.INK_SOFT
         pill.add_theme_color_override("font_color", tone)
         pill.add_theme_color_override("font_hover_color", ThemeScript.GREEN_DEEP if on else ThemeScript.INK)
@@ -277,7 +277,7 @@ func _summary_line() -> Control:
         var label := Label.new()
         label.name = "Summary"
         label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        ThemeScript.dress(label, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
+        ThemeScript.dress(label, 15, ThemeScript.INK_SOFT)
         return label
 
 ## The line where the page's questions end and the book itself begins: one
@@ -353,14 +353,14 @@ func _build_sticky() -> Control:
         _sticky_name = Label.new()
         _sticky_name.name = "Name"
         _sticky_name.text_direction = TextDirection.TEXT_DIRECTION_AUTO
-        _sticky_name.add_theme_font_override("font", ThemeScript.font_for("arabic", 16, true))
-        _sticky_name.add_theme_font_size_override("font_size", 16)
+        _sticky_name.add_theme_font_override("font", ThemeScript.font_for("arabic", 17, true))
+        _sticky_name.add_theme_font_size_override("font_size", 17)
         _sticky_name.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP)
         row.add_child(_sticky_name)
         _sticky_count = Label.new()
         _sticky_count.name = "Count"
         _sticky_count.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-        ThemeScript.dress(_sticky_count, 12, ThemeScript.INK_SOFT)
+        ThemeScript.dress(_sticky_count, 13, ThemeScript.INK_SOFT)
         row.add_child(_sticky_count)
         return _sticky
 
@@ -547,13 +547,13 @@ func _empty_state() -> Control:
         var lead := Label.new()
         lead.name = "Lead"
         lead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        ThemeScript.dress(lead, ThemeScript.BODY, ThemeScript.INK)
+        ThemeScript.dress(lead, ThemeScript.BODY + 1, ThemeScript.INK)
         lead.text = _empty_lead()
         box.add_child(lead)
         var under := Label.new()
         under.name = "Under"
         under.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        ThemeScript.dress(under, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
+        ThemeScript.dress(under, 15, ThemeScript.INK_SOFT)
         under.text = _empty_under()
         box.add_child(under)
         return box
@@ -637,9 +637,9 @@ func _surah_header(surah: String, of_card: String) -> Control:
         label.text_direction = TextDirection.TEXT_DIRECTION_AUTO
         label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         label.add_theme_font_override("font", ThemeScript.font_for(
-                ThemeScript.reference_script(surah), 22, true
+                ThemeScript.reference_script(surah), 23, true
         ))
-        label.add_theme_font_size_override("font_size", 22)
+        label.add_theme_font_size_override("font_size", 23)
         label.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP)
         line.add_child(label)
         var count := Label.new()
@@ -648,7 +648,7 @@ func _surah_header(surah: String, of_card: String) -> Control:
         count.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
         # A folio number: small, quiet, ink -- the way a book numbers its
         # leaves at a chapter's opening.
-        ThemeScript.dress(count, 11, ThemeScript.INK_SOFT)
+        ThemeScript.dress(count, 12, ThemeScript.INK_SOFT)
         line.add_child(count)
         box.add_child(line)
         return box
@@ -731,7 +731,7 @@ func _entry(card: CardScript, reference: String) -> Control:
                 preview.clip_text = true
                 var preview_script := ThemeScript.script_of(preview_text)
                 var preview_face: Font = ThemeScript.verse_face(preview_script)
-                var preview_size := 26 if preview_script == "arabic" else 14
+                var preview_size := 27 if preview_script == "arabic" else 15
                 preview.add_theme_font_override("font", preview_face)
                 preview.add_theme_font_size_override("font_size", preview_size)
                 preview.add_theme_color_override("font_color", ThemeScript.INK)
@@ -764,7 +764,7 @@ func _entry(card: CardScript, reference: String) -> Control:
                 status.name = "Status"
                 status.text = str(standing["text"])
                 status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-                ThemeScript.dress(status, 12, standing["color"], true)
+                ThemeScript.dress(status, 13, standing["color"], true)
                 chip.add_child(status)
                 meta.add_child(chip)
 
@@ -780,8 +780,8 @@ func _entry(card: CardScript, reference: String) -> Control:
         ref_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
         ref_label.text_direction = TextDirection.TEXT_DIRECTION_AUTO
         var script := ThemeScript.reference_script(reference)
-        ref_label.add_theme_font_override("font", ThemeScript.font_for(script, 14, true))
-        ref_label.add_theme_font_size_override("font_size", 14 if script == "arabic" else 12)
+        ref_label.add_theme_font_override("font", ThemeScript.font_for(script, 15, true))
+        ref_label.add_theme_font_size_override("font_size", 15 if script == "arabic" else 13)
         ref_label.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP)
         meta.add_child(ref_label)
 
@@ -960,7 +960,7 @@ func _pencil_row(card: CardScript) -> Control:
         label.name = "Words"
         label.text = I18nScript.t("Edit card")
         label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-        ThemeScript.dress(label, 12, ThemeScript.GOLD_DEEP, true)
+        ThemeScript.dress(label, 13, ThemeScript.GOLD_DEEP, true)
         words.add_child(label)
         edit.add_child(inside)
         return edit

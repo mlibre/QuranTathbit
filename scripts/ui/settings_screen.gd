@@ -167,14 +167,17 @@ func _layout() -> void:
 ## so each card reads as its own page with a running title -- not a label
 ## floating between cards, where the margin swallows it. The word stands at
 ## the edge the page reads from.
+##
+## The alignment is LEFT on purpose, in both directions. Under an RTL layout
+## the engine reads LEFT as the reading's start -- the right edge -- and
+## RIGHT as its far end, so a RIGHT here would stand a Persian title at the
+## page's LEFT margin: exactly the corner the reader reported it stuck in.
+## LEFT means "where the reading begins" on every page this app speaks.
 func _card_header(box: VBoxContainer, title: String) -> void:
         var label := Label.new()
         label.name = "CardTitle"
         label.text = title
-        label.horizontal_alignment = (
-                HORIZONTAL_ALIGNMENT_RIGHT if I18nScript.is_rtl()
-                else HORIZONTAL_ALIGNMENT_LEFT
-        )
+        label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
         ThemeScript.dress(label, 12, ThemeScript.GOLD_DEEP, true)
         box.add_child(label)
         box.add_child(ThemeScript.hairline(ThemeScript.LINE))
@@ -193,11 +196,9 @@ func _text(what: String, color: Color, size: int, center := false, bold := false
         if center:
                 label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         else:
-                # A line stands at the edge its page reads from.
-                label.horizontal_alignment = (
-                        HORIZONTAL_ALIGNMENT_RIGHT if I18nScript.is_rtl()
-                        else HORIZONTAL_ALIGNMENT_LEFT
-                )
+                # A line stands at the edge its page reads from: LEFT is the
+                # reading's start under either layout (see _card_header).
+                label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
         label.add_theme_font_override("normal_font", ThemeScript.vazir(size, bold))
         label.add_theme_font_size_override("normal_font_size", size)
         label.add_theme_color_override("default_color", color)
@@ -252,10 +253,8 @@ func _field_label(text: String) -> Label:
         var label := Label.new()
         label.name = "FieldLabel"
         label.text = text
-        label.horizontal_alignment = (
-                HORIZONTAL_ALIGNMENT_RIGHT if I18nScript.is_rtl()
-                else HORIZONTAL_ALIGNMENT_LEFT
-        )
+        # LEFT is the reading's start under either layout (see _card_header).
+        label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
         return ThemeScript.dress(label, ThemeScript.CAPTION, ThemeScript.INK, true)
 
 func _github_body() -> Control:
@@ -357,12 +356,10 @@ func _github_body() -> Control:
         token.secret = true
         token.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         token.custom_minimum_size = Vector2(0, 48)
-        # A field on a right-reading page meets its reader at the right edge;
+        # A field on a right-reading page meets its reader at the reading's
+        # start: LEFT is that edge under either layout (see _card_header), and
         # what is typed stays as it is written, Latin or otherwise.
-        token.alignment = (
-                HORIZONTAL_ALIGNMENT_RIGHT if I18nScript.is_rtl()
-                else HORIZONTAL_ALIGNMENT_LEFT
-        )
+        token.alignment = HORIZONTAL_ALIGNMENT_LEFT
         token.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
         token.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
         _style_field(token)
@@ -401,10 +398,8 @@ func _github_body() -> Control:
         repo.name = "Repo"
         repo.placeholder_text = I18nScript.t("Repository name")
         repo.custom_minimum_size = Vector2(0, 44)
-        repo.alignment = (
-                HORIZONTAL_ALIGNMENT_RIGHT if I18nScript.is_rtl()
-                else HORIZONTAL_ALIGNMENT_LEFT
-        )
+        # The reading's own edge, under either layout (see _card_header).
+        repo.alignment = HORIZONTAL_ALIGNMENT_LEFT
         repo.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY))
         repo.add_theme_font_size_override("font_size", ThemeScript.BODY)
         _style_field(repo)
@@ -457,10 +452,8 @@ func _github_body() -> Control:
         var auto_label := Label.new()
         auto_label.name = "Label"
         auto_label.text = I18nScript.t("Sync quietly after each session")
-        auto_label.horizontal_alignment = (
-                HORIZONTAL_ALIGNMENT_RIGHT if I18nScript.is_rtl()
-                else HORIZONTAL_ALIGNMENT_LEFT
-        )
+        # LEFT is the reading's start under either layout (see _card_header).
+        auto_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
         ThemeScript.dress(auto_label, ThemeScript.BODY, ThemeScript.INK, true)
         auto_words.add_child(auto_label)
         var auto_switch := ThemeScript.SwitchMark.new(false)
@@ -492,20 +485,13 @@ func _deck_body() -> Control:
         var box: VBoxContainer = parts[1]
         box.add_theme_constant_override("separation", 8)
 
-        var name := _text("", ThemeScript.INK, ThemeScript.BODY, false, true)
-        name.name = "Name"
-        box.add_child(name)
-
-        var note := _text(I18nScript.t("Cards are folders on your disk. Edit them anywhere; sync carries them."), ThemeScript.INK_SOFT, ThemeScript.CAPTION)
-        note.name = "Note"
-        box.add_child(note)
-
         # The day's own offer: how many unseen cards a session may bring. The
         # number is the reader's pace, not the algorithm's -- Anki's deck
         # default of 20 is only where it starts -- so it lives here, beside
         # the deck it paces, as the one arithmetic the reader is asked to own.
-        box.add_child(ThemeScript.hairline())
-        box.add_child(_field_label(I18nScript.t("New cards each day")))
+        # The card's name line and its storage note are gone: a reader opening
+        # Settings wants to turn a knob, not to be told what a folder is.
+        _card_header(box, I18nScript.t("New cards each day"))
         var stepper := HBoxContainer.new()
         stepper.name = "NewPerDay"
         stepper.add_theme_constant_override("separation", 10)
@@ -910,10 +896,8 @@ func _source_body() -> Control:
         what.scroll_active = false
         what.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         what.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        what.horizontal_alignment = (
-                HORIZONTAL_ALIGNMENT_RIGHT if I18nScript.is_rtl()
-                else HORIZONTAL_ALIGNMENT_LEFT
-        )
+        # LEFT is the reading's start under either layout (see _card_header).
+        what.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
         what.text = I18nScript.t(
                 "The deck's verses, Persian translation and recitations come from [url=https://quran.makarem.ir/]quran.makarem.ir[/url], carried unchanged from the deck package."
         )
@@ -1028,8 +1012,6 @@ func _refresh() -> void:
                 state.text = I18nScript.t("Not connected. Sync keeps your progress on your own GitHub repo.")
         connect.visible = not _settings.has_token()
         disconnect.visible = _settings.has_token()
-        var name: RichTextLabel = get_node("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/Name")
-        name.text = I18nScript.f("%s — %d cards", [_deck.name, _deck.cards.size()])
         # The day's offer is said here too, not only on a press: a reader
         # returning to this page reads their pace off the chip.
         var pace_value: Label = get_node("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/NewPerDay/Chip/StepValue")

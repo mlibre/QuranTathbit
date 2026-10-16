@@ -71,17 +71,7 @@ func setup(deck: DeckScript, counts: Dictionary, sync_line: String, sync_state :
                 await ready
         _deck_of_last_setup = deck
         var title: Label = get_node("Margin/Column/DeckCard/Pad/Box/Title")
-        var caption: Label = get_node("Margin/Column/DeckCard/Pad/Box/Caption")
         title.text = deck.name
-        var waiting: int = counts["due"] + counts["new"]
-        caption.text = (
-                I18nScript.f("%d cards · %d learned · nothing waiting", [deck.cards.size(), counts["learned"]])
-                if waiting == 0
-                else I18nScript.f(
-                        "%d cards · %d learned · %d waiting",
-                        [deck.cards.size(), counts["learned"], waiting]
-                )
-        )
 
         _apply_counts(counts)
         _set_sync_state(sync_line, sync_state)
@@ -114,6 +104,7 @@ func _apply_counts(counts: Dictionary) -> void:
         ThemeScript.count_up(due_pill, int(counts["due"]))
         ThemeScript.count_up(new_pill, int(counts["new"]))
         ThemeScript.count_up(learned_pill, int(counts["learned"]))
+        _apply_deck_chips(counts)
         var study: Button = get_node("Margin/Column/Study")
         if counts["due"] + counts["new"] == 0:
                 study.text = I18nScript.t("All caught up")
@@ -129,6 +120,58 @@ func _apply_counts(counts: Dictionary) -> void:
         else:
                 study.text = I18nScript.t("Study") if counts["due"] > 0 else I18nScript.t("Learn new cards")
                 study.disabled = false
+
+## The deck's own account, said as figures rather than a sentence: the whole
+## holding, what is already learned, and what waits for today -- each as its
+## own small chip, the number bold in its own colour and the word quiet
+## beside it, the way the pills below already speak. A line of prose made a
+## reader parse it; three chips let them glance it. The chips stand in the
+## reading's own order, so a Persian page counts from the right.
+func _apply_deck_chips(counts: Dictionary) -> void:
+        var row: HBoxContainer = get_node_or_null("Margin/Column/DeckCard/Pad/Box/Chips")
+        if row == null:
+                return
+        for child in row.get_children():
+                row.remove_child(child)
+                child.queue_free()
+        var waiting: int = int(counts["due"]) + int(counts["new"])
+        var figures := [
+                [I18nScript.num(_deck_of_last_setup.cards.size()) if _deck_of_last_setup != null else "…", I18nScript.t("cards"), ThemeScript.INK, ThemeScript.INK_SOFT],
+                [I18nScript.num(int(counts["learned"])), I18nScript.t("Learned"), ThemeScript.GREEN_DEEP, ThemeScript.GREEN_SOFT],
+        ]
+        if waiting > 0:
+                figures.append([
+                        I18nScript.num(waiting), I18nScript.t("waiting"), ThemeScript.GOLD_DEEP, ThemeScript.GOLD_SOFT,
+                ])
+        if I18nScript.is_rtl():
+                figures.reverse()
+        for figure in figures:
+                row.add_child(_deck_chip(str(figure[0]), str(figure[1]), figure[2], figure[3]))
+
+## One figure, one chip: a soft pill of its own colour with the number bold
+## inside it and the word after it, said in one breath of bbcode so the two
+## share a baseline and a direction whatever tongue the page speaks.
+func _deck_chip(number: String, word: String, tone: Color, wash: Color) -> Control:
+        var chip := PanelContainer.new()
+        chip.add_theme_stylebox_override("panel", ThemeScript.pill_stylebox(wash, Color(wash.r, wash.g, wash.b, 0.0)))
+        var pad := MarginContainer.new()
+        pad.add_theme_constant_override("margin_left", 10)
+        pad.add_theme_constant_override("margin_right", 10)
+        pad.add_theme_constant_override("margin_top", 4)
+        pad.add_theme_constant_override("margin_bottom", 4)
+        chip.add_child(pad)
+        var label := RichTextLabel.new()
+        label.bbcode_enabled = true
+        label.fit_content = true
+        label.scroll_active = false
+        label.autowrap_mode = TextServer.AUTOWRAP_OFF
+        label.text_direction = TextDirection.TEXT_DIRECTION_AUTO
+        label.add_theme_font_override("normal_font", ThemeScript.vazir(13))
+        label.add_theme_font_size_override("normal_font_size", 13)
+        label.add_theme_color_override("default_color", ThemeScript.INK_SOFT)
+        label.text = "[b][color=#%s]%s[/color][/b] %s" % [tone.to_html(false), number, word]
+        pad.add_child(label)
+        return chip
 
 ## The sync coin says the state before any words do: a green coin when the
 ## deck and the repo last agreed, a gold coin while answers still wait to
@@ -356,11 +399,12 @@ func _deck_card() -> Control:
         ThemeScript.dress(title, 30, ThemeScript.INK, true)
         box.add_child(title)
 
-        var caption := Label.new()
-        caption.name = "Caption"
-        caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        ThemeScript.dress(caption, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
-        box.add_child(caption)
+        # The deck's own account as small figures, each in its own chip.
+        var chips := HBoxContainer.new()
+        chips.name = "Chips"
+        chips.alignment = BoxContainer.ALIGNMENT_CENTER
+        chips.add_theme_constant_override("separation", 8)
+        box.add_child(chips)
 
         # The card's lower half is an editor's block: a hairline, an eyebrow
         # that says what is coming, and the reference itself in its own script.

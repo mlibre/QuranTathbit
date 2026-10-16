@@ -57,8 +57,9 @@ No installer, no dependencies. The download *is* the app.
 A few quiet extras:
 
 - **Edit anything, anywhere.** The pencil on a card opens a simple editor;
-  the words are saved as plain files. Spotted a typo mid-session? Fix it
-  mid-session.
+  the words are saved as plain files, and scripture is written in the
+  verses' own hand — the ayeh never set in a Persian UI face. Spotted a
+  typo mid-session? Fix it mid-session.
 - **Browse the whole deck like a book.** Every verse on the page, flush
   right the way the Quran is read, with search (`2:93` or `۲:۹۳` — either
   digits work) and filters for what is due, new, or resting.
@@ -73,9 +74,10 @@ A few quiet extras:
   العربية — asked once the first time you open the app, changeable anytime
   in Settings. Numbers come in the language's own digits (۱ ۲ ۳, not 1 2 3),
   and waits are spoken in words — ۱ روز, not 1d. When the tongue reads from
-  the right, Settings is laid out from the right too — titles, labels,
-  fields and the way back all standing where the reading starts. The verses
-  and their Persian translation always stay exactly as they are.
+  the right, the pages are laid out from the right too — titles, labels,
+  fields, the tooltips a hover raises and the way back all standing where
+  the reading starts. The verses and their Persian translation always stay
+  exactly as they are.
 - **Every mark is drawn, whole.** The vowels a verse stacks above its
   tallest letters reach past the box a font declares for itself, and a
   renderer that clips at that box would draw them nowhere at all. The app

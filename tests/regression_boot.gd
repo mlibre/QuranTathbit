@@ -121,6 +121,25 @@ func _check_home_numbers(home: Control) -> void:
         _ok(not study.disabled, "study is ready")
         _ok(study.text == "Learn new cards", "the button names what the session is")
 
+        # The deck's own account arrives as figures, not a sentence: each
+        # number in its own chip with its word beside it, and the plain-text
+        # caption that once said the whole thing in one line is gone.
+        _ok(
+                home.get_node_or_null("Margin/Column/DeckCard/Pad/Box/Caption") == null,
+                "the deck card no longer says its account as a line of prose"
+        )
+        var chips: HBoxContainer = home.get_node_or_null("Margin/Column/DeckCard/Pad/Box/Chips")
+        _ok(chips != null and chips.get_child_count() == 3, "the deck card holds a chip each for the holding, the learned and the waiting")
+        if chips != null and chips.get_child_count() >= 1:
+                var first_text: String = ""
+                var label_node: RichTextLabel = chips.get_child(0).find_children("*", "RichTextLabel", true, false)[0] if chips.get_child(0).find_children("*", "RichTextLabel", true, false).size() > 0 else null
+                if label_node != null:
+                        first_text = label_node.text
+                _ok(
+                        first_text.contains("99") or first_text.contains("۹۹"),
+                        "the first chip carries the deck's whole holding"
+                )
+
         # The settings corner once sat under a full-rect container added after
         # it, and no click could reach it. The engine's hit test -- deepest
         # topmost control, children in reverse order -- is the part that
@@ -322,9 +341,9 @@ func _check_study_session(main: Node) -> void:
 
         # A tongue says its numbers in its own script: the session's count
         # in Persian reads ۱ از ۹۹, the answer buttons name their waits in
-        # Persian words, and the recitation's own address on its button
-        # wears the reader's digits -- never a Latin number standing among
-        # Persian words.
+        # Persian words with the word and the wait centred on one axis, and
+        # the recitation's button says only what it does -- the verse's own
+        # address is already said by the page, twice.
         var i18n := load("res://scripts/ui/i18n.gd")
         i18n.set_lang("fa")
         study._show_front()
@@ -337,12 +356,21 @@ func _check_study_session(main: Node) -> void:
         study._reveal()
         await create_timer(0.4).timeout
         var fa_waits := []
+        var centered_pairs := true
         for button in study.get_node("Margin/Column/Answers").get_children():
                 fa_waits.append(button.get_node("Center/Row/Stack/Wait").text)
+                var word_label: Label = button.get_node("Center/Row/Stack/Word")
+                var wait_label: Label = button.get_node("Center/Row/Stack/Wait")
+                if (
+                        word_label.horizontal_alignment != HORIZONTAL_ALIGNMENT_CENTER
+                        or wait_label.horizontal_alignment != HORIZONTAL_ALIGNMENT_CENTER
+                ):
+                        centered_pairs = false
         _ok(
                 fa_waits.any(func(w: String) -> bool: return w.contains("دقیقه")),
                 "the answer buttons name their waits in Persian words"
         )
+        _ok(centered_pairs, "each grade's word and wait stand centred on one axis")
         var audio_meta := ""
         for found in view.find_children("*", "Button", true, false):
                 # The engine sanitizes node names: "Audio:001003.mp3" is
@@ -350,10 +378,7 @@ func _check_study_session(main: Node) -> void:
                 if str(found.name).begins_with("Audio"):
                         audio_meta = str(found.get_meta("idle_text", ""))
                         break
-        _ok(
-                not audio_meta.is_empty() and audio_meta.contains("۱") and not audio_meta.contains("1:"),
-                "the recitation's address is written in the reader's own digits"
-        )
+        _is(audio_meta, "شنیدن", "the recitation's button says only what it does")
         i18n.set_lang("en")
         study._show_front()
         await create_timer(0.1).timeout
@@ -457,8 +482,8 @@ func _check_study_session(main: Node) -> void:
         if persian_button != null:
                 _is(
                         persian_button.get_meta("idle_text", ""),
-                        "Persian · 1:1",
-                        "the translation's button names its language and verse"
+                        "Persian",
+                        "the translation's button names its language, and nothing more"
                 )
                 persian_button.pressed.emit()
                 await create_timer(0.25).timeout
@@ -514,7 +539,34 @@ func _check_study_session(main: Node) -> void:
                         _ok(front_field != null and back_field != null, "the page carries the question and the answer")
                         if front_field != null and back_field != null:
                                 var original: String = study._cards[0].front
-                                _is(front_field.get_text(), original, "the editor opens with the card's own words")
+                                _is(
+                                        front_field.get_text(),
+                                        original.strip_edges(),
+                                        "the editor opens with the card's own words"
+                                )
+                                # The file on disk ends with a newline; the field's
+                                # words do not. A phantom blank line under every
+                                # reference was the newline showing through.
+                                _ok(
+                                        not front_field.get_text().ends_with("\n")
+                                                and not back_field.get_text().ends_with("\n"),
+                                        "no phantom blank line rides in from the file's trailing newline"
+                                )
+                                # The question is a reference, and a reference is
+                                # Arabic by construction: the field writes in the
+                                # verses' own hand, the same face the card reads in.
+                                _ok(
+                                        front_field.face() == ThemeScript.editor_face_for("arabic"),
+                                        "the question field writes in the verses' own hand"
+                                )
+                                _ok(
+                                        back_field.face() == ThemeScript.editor_face(),
+                                        "the answer field writes in the verses' own hand"
+                                )
+                                _ok(
+                                        back_field.face().has_char(0x067E),
+                                        "the answer field's hand still draws پ, by its book twin if it must"
+                                )
                                 # The page writes the way its words are read: the mirror's
                                 # lines stand flush right, and the input engine beneath them
                                 # resolves each line's own direction.
@@ -531,16 +583,16 @@ func _check_study_session(main: Node) -> void:
                                         source != null and source.text_direction == Control.TEXT_DIRECTION_AUTO,
                                         "the input engine reads each line's own direction"
                                 )
-                                front_field.set_text(original + "\nedited on the spot")
+                                front_field.set_text(original.strip_edges() + "\nedited on the spot")
                                 (editor.get_node("Margin/Column/Footer/Actions/Save") as Button).pressed.emit()
                                 await create_timer(0.4).timeout
                                 _ok(study.get_node_or_null("Editor") == null, "saving closes the editor")
                                 _is(
                                         FileAccess.get_file_as_string("user://decks/quran/001/front.md"),
-                                        original + "\nedited on the spot\n",
+                                        original.strip_edges() + "\nedited on the spot\n",
                                         "the edit lands in the card's own file"
                                 )
-                                _is(study._cards[0].front, original + "\nedited on the spot", "the card in memory carries the edit")
+                                _is(study._cards[0].front, original.strip_edges() + "\nedited on the spot", "the card in memory carries the edit")
                                 _ok(main._deck_edited, "the deck knows an edit waits for the repo")
                                 # The suite leaves the deck as it found it.
                                 var restore := FileAccess.open("user://decks/quran/001/front.md", FileAccess.WRITE)
@@ -653,12 +705,23 @@ func _check_settings(main: Node) -> void:
                 "Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/Folder"
         )
         _ok(folder_line == null, "the deck's card no longer shows its raw storage path")
+        # The deck's name line and its storage note are gone entirely: the
+        # card that holds the day's pace offers the pace, not a lecture on
+        # folders -- the name is already on the home page it came from.
         var deck_line: RichTextLabel = settings.get_node_or_null(
                 "Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/Name"
         )
+        _ok(deck_line == null, "the deck's card no longer repeats its name and folder story")
+        var deck_note: RichTextLabel = settings.get_node_or_null(
+                "Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/Note"
+        )
+        _ok(deck_note == null, "the folder note is gone with it")
+        var pace_title: Label = settings.get_node_or_null(
+                "Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/CardTitle"
+        )
         _ok(
-                deck_line != null and deck_line.text.contains("cards"),
-                "the deck's card still says what it holds, in the reader's own words"
+                pace_title != null and pace_title.text.length() > 0,
+                "the pace card carries its own running title"
         )
         # The quiet promise is a row of its own with a switch, not a caption
         # with a dot after it: a first-time reader sees the choice they have.
@@ -957,7 +1020,7 @@ func _check_browse(main: Node) -> void:
         if preview != null:
                 _is(
                         preview.get_theme_font_size("font_size"),
-                        26,
+                        27,
                         "the shelf's verse preview reads at the mushaf's size"
                 )
                 _ok(
@@ -1147,7 +1210,7 @@ func _check_marks_and_rtl(main: Node) -> void:
                                 var preview: Label = entry.get_node_or_null("Row/Pad/Line/Words/Preview")
                                 if preview != null and preview.text.contains("نزِلَ"):
                                         var face: Font = ThemeScript.ayah_face_for("amiri")
-                                        found_room = preview.get_combined_minimum_size().y > face.get_height(26)
+                                        found_room = preview.get_combined_minimum_size().y > face.get_height(27)
                                         break
                 _ok(found_room, "the shelf's preview stands taller than its font's own box for a tall stack")
                 browse.closed.emit()
@@ -1183,6 +1246,10 @@ func _check_marks_and_rtl(main: Node) -> void:
         # A page said in Persian is laid out from the right: the root turns,
         # the titles and labels stand at the reading's edge, and the way back
         # points the way it goes. Said again in English, everything returns.
+        # The alignments are LEFT on purpose in both tongues: under an RTL
+        # layout the engine reads LEFT as the reading's start (the right
+        # edge) and RIGHT as the far end, so a RIGHT would stand a Persian
+        # title at the LEFT margin -- the corner it was reported stuck in.
         main._apply_language("fa")
         main._on_settings_pressed()
         await create_timer(0.5).timeout
@@ -1191,14 +1258,14 @@ func _check_marks_and_rtl(main: Node) -> void:
                 _ok(settings_fa.layout_direction == Control.LAYOUT_DIRECTION_RTL,
                         "a Persian settings page is laid out from the right")
                 var title_fa: Label = settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/CardTitle")
-                _ok(title_fa != null and title_fa.horizontal_alignment == HORIZONTAL_ALIGNMENT_RIGHT,
-                        "a Persian card title stands at the right edge")
-                var pace_label_fa: Label = settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/FieldLabel")
-                _ok(pace_label_fa != null and pace_label_fa.horizontal_alignment == HORIZONTAL_ALIGNMENT_RIGHT,
-                        "the Persian pace label stands at the right edge")
+                _ok(title_fa != null and title_fa.horizontal_alignment == HORIZONTAL_ALIGNMENT_LEFT,
+                        "a Persian card title stands at the right edge (LEFT is the reading's start under RTL)")
+                var pace_label_fa: Label = settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/CardTitle")
+                _ok(pace_label_fa != null and pace_label_fa.horizontal_alignment == HORIZONTAL_ALIGNMENT_LEFT,
+                        "the Persian pace title stands at the right edge")
                 var repo_field: LineEdit = settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Repo")
-                _ok(repo_field != null and repo_field.alignment == HORIZONTAL_ALIGNMENT_RIGHT,
-                        "a Persian page's field meets its reader at the right edge")
+                _ok(repo_field != null and repo_field.alignment == HORIZONTAL_ALIGNMENT_LEFT,
+                        "a Persian page's field meets its reader at the reading's start")
                 _ok(settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/AutoRow/AutoPad/AutoLine/Words/Sub") == null,
                         "the quiet promise carries no explainer beneath it")
                 var source_fa: RichTextLabel = settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/DataSource/Padding/Box/What")
@@ -1209,6 +1276,46 @@ func _check_marks_and_rtl(main: Node) -> void:
                         "the way back stands at the reading's start, the right")
                 settings_fa.closed.emit()
                 await create_timer(0.3).timeout
+        # The editor said in Persian: the boxes are named at the right edge,
+        # and both fields write in the verses' own hand -- the ayeh is never
+        # set in the Persian face again.
+        main._start_session()
+        await create_timer(0.6).timeout
+        var study_fa: Control = main.get_node_or_null("Study")
+        if study_fa != null:
+                study_fa._open_editor()
+                await create_timer(0.5).timeout
+                var editor_fa: Control = study_fa.get_node_or_null("Editor")
+                _ok(editor_fa != null, "the pencil opens the card's own page in Persian too")
+                if editor_fa != null:
+                        var asked: Label = editor_fa.get_node_or_null("Margin/Column/Scroll/Wrap/Content/Write/QuestionCaption")
+                        var answered: Label = editor_fa.get_node_or_null("Margin/Column/Scroll/Wrap/Content/Write/AnswerCaption")
+                        _ok(
+                                asked != null and asked.horizontal_alignment == HORIZONTAL_ALIGNMENT_RIGHT
+                                        and answered != null and answered.horizontal_alignment == HORIZONTAL_ALIGNMENT_RIGHT,
+                                "the Persian editor names its boxes at the right edge"
+                        )
+                        var front_fa: Control = editor_fa.get_node_or_null("Margin/Column/Scroll/Wrap/Content/Write/Front")
+                        var back_fa_field: Control = editor_fa.get_node_or_null("Margin/Column/Scroll/Wrap/Content/Write/Back")
+                        _ok(
+                                front_fa != null and front_fa.face() == ThemeScript.editor_face_for("arabic")
+                                        and back_fa_field != null and back_fa_field.face() == ThemeScript.editor_face(),
+                                "the Persian editor writes scripture in the verses' own hand"
+                        )
+                if editor_fa != null:
+                        editor_fa.queue_free()
+                        await create_timer(0.2).timeout
+                study_fa.closed.emit()
+                await create_timer(0.5).timeout
+        # The engine's own tooltips arrive in the app's own hand: the window's
+        # theme carries a Vazirmatn TooltipLabel, so a Persian tooltip is
+        # never a row of empty boxes in no language at all.
+        var tooltip_font: Font = main.get_window().theme.get_font("font", "TooltipLabel")
+        _ok(
+                tooltip_font != null and str(tooltip_font.resource_path).ends_with("Vazirmatn-Regular.ttf"),
+                "tooltips speak in a face that carries the reader's letters"
+        )
+        _is(i18n.t("Browse the cards"), "همهٔ کارت‌ها", "the library's door says all the cards")
         main._apply_language("en")
         main._on_settings_pressed()
         await create_timer(0.5).timeout

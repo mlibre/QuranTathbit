@@ -129,7 +129,7 @@ const STRINGS := {
         "Study": {"fa": "مطالعه", "ar": "دراسة"},
         "Learn new cards": {"fa": "یادگیری کارت‌های تازه", "ar": "تعلّم البطاقات الجديدة"},
         "All caught up": {"fa": "امروز کاری نمانده است", "ar": "لا شيء بانتظارك اليوم"},
-        "Browse the cards": {"fa": "خواندن کارت‌ها", "ar": "تصفّح البطاقات"},
+        "Browse the cards": {"fa": "همهٔ کارت‌ها", "ar": "تصفّح البطاقات"},
         "Read the whole deck, card by card": {
                 "fa": "خواندن کل مجموعه، کارت به کارت",
                 "ar": "اقرأ المجموعة كلها، بطاقةً بطاقة",
@@ -145,14 +145,8 @@ const STRINGS := {
                 "fa": "نسخهٔ تازه آماده است — دکمهٔ طلایی بالا آن را نصب می‌کند.",
                 "ar": "الإصدار الجديد جاهز — الزر الذهبي في الأعلى يثبّته.",
         },
-        "%d cards · %d learned · nothing waiting": {
-                "fa": "%d کارت · %d آموخته · چیزی در انتظار نیست",
-                "ar": "%d بطاقة · %d محفوظة · لا شيء بانتظارك",
-        },
-        "%d cards · %d learned · %d waiting": {
-                "fa": "%d کارت · %d آموخته · %d در انتظار",
-                "ar": "%d بطاقة · %d محفوظة · %d بانتظارك",
-        },
+        "cards": {"fa": "کارت", "ar": "بطاقة"},
+        "waiting": {"fa": "در انتظار", "ar": "بانتظارك"},
         # --- the sync's own words, on home and under Settings ---------------------
         "Syncing…": {"fa": "همگام‌سازی…", "ar": "مزامنة…"},
         "Not connected — your deck lives on this device only": {
@@ -292,7 +286,6 @@ const STRINGS := {
         "%d card": {"fa": "%d کارت", "ar": "بطاقة واحدة"},
         "%d cards": {"fa": "%d کارت", "ar": "%d بطاقة"},
         "%d in review": {"fa": "%d در مرور", "ar": "%d في المراجعة"},
-        "%s — %d cards": {"fa": "%s — %d کارت", "ar": "%s — %d بطاقة"},
         "Edit card": {"fa": "ویرایش کارت", "ar": "تعديل البطاقة"},
         "due now": {"fa": "الان", "ar": "الآن"},
         "due today": {"fa": "امروز", "ar": "اليوم"},
@@ -397,10 +390,6 @@ const STRINGS := {
         },
         "Sync now": {"fa": "همگام‌سازی", "ar": "زامِن الآن"},
         "Sync with GitHub": {"fa": "همگام‌سازی با GitHub", "ar": "المزامنة مع GitHub"},
-        "Cards are folders on your disk. Edit them anywhere; sync carries them.": {
-                "fa": "کارت‌ها پوشه‌هایی روی دیسک شما هستند. هر جا خواستید ویرایششان کنید؛ همگام‌سازی حملشان می‌کند.",
-                "ar": "البطاقات مجلدات على قرصك. حرّرها حيث شئت؛ المزامنة تحملها.",
-        },
         "New cards each day": {"fa": "کارت‌های تازه در روز", "ar": "بطاقات جديدة كل يوم"},
         "Offer one fewer new card a day": {
                 "fa": "یک کارت تازه کمتر در روز",

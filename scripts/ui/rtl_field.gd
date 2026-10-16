@@ -41,6 +41,14 @@ const PITCH := 4  # the engine's line spacing and the mirror's, kept equal
 
 var one_line := false  # a reference is one line; Enter hands the keyboard on
 
+# The hand the field writes in. Both layers must wear the same one -- the
+# input engine's invisible lines and the mirror's visible words -- or every
+# width the caret and the clicks are placed by drifts away from the ink.
+# The editor hands each field its own face (the verses' hand for the
+# reference, the verses' hand with a book twin behind it for the answer),
+# and the default is the page's own prose face.
+var _face: Font = null
+
 # The room the mirror's ink needs above and below each line: marks stacked
 # past the font's own box would be drawn nowhere (a RichTextLabel clips at
 # its rect), so every line label carries this much margin inside itself.
@@ -64,6 +72,19 @@ var _rebuild_pending := false  # one rebuild a frame, however many reasons
 func _init() -> void:
         custom_minimum_size = Vector2(0, 58)
         clip_contents = true
+
+## The hand the field writes in, said once for both layers. Changing it
+## lays the words out again in the new hand, because the mirror's widths
+## and the engine's must be the same widths or the caret lies.
+func set_face(face: Font) -> void:
+        _face = face
+        if _editor == null:
+                return
+        _editor.add_theme_font_override("font", face)
+        _rebuild()
+
+func face() -> Font:
+        return _face if _face != null else ThemeScript.vazir(SIZE)
 
 func _ready() -> void:
         var wash := ThemeScript.SELECT
@@ -97,7 +118,7 @@ func _ready() -> void:
         _editor.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
         _editor.text_direction = Control.TEXT_DIRECTION_AUTO
         _editor.scroll_fit_content_height = true
-        _editor.add_theme_font_override("font", ThemeScript.vazir(SIZE))
+        _editor.add_theme_font_override("font", face())
         _editor.add_theme_font_size_override("font_size", SIZE)
         _editor.add_theme_color_override("font_color", Color(0, 0, 0, 0))
         _editor.add_theme_color_override("caret_color", Color(0, 0, 0, 0))
@@ -258,7 +279,7 @@ func _rebuild() -> void:
                 if line >= line_count:
                         continue
                 for part in _editor.get_line_wrapped_text(line):
-                        var part_room := ThemeScript.ink_room(part, ThemeScript.vazir(SIZE), SIZE)
+                        var part_room := ThemeScript.ink_room(part, face(), SIZE)
                         _room = maxi(_room, maxi(part_room.x, part_room.y))
         _lines.add_theme_constant_override("separation", PITCH - 2 * _room)
         for line in maxi(line_count, 1):
@@ -291,7 +312,7 @@ func _line_label(part: String, start: int, line: int, from_line: int, from_col: 
         label.text_direction = Control.TEXT_DIRECTION_AUTO
         label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
         label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        label.add_theme_font_override("normal_font", ThemeScript.vazir(SIZE))
+        label.add_theme_font_override("normal_font", face())
         label.add_theme_font_size_override("normal_font_size", SIZE)
         # The room each line carries inside itself, so the marks that stand
         # past the font's box are drawn -- and the separation above gives it

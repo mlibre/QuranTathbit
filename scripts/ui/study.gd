@@ -509,11 +509,16 @@ func _answer_button(option: Dictionary, index: int) -> Control:
         var word := Label.new()
         word.name = "Word"
         word.text = I18nScript.t(str(option.button).capitalize())
+        # The word and its wait stand on one axis, the pair of them centred
+        # together: a left-flush word inside a stack as wide as its bigger
+        # neighbour reads as a dent, not a decision.
+        word.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         ThemeScript.dress(word, 14, grade, true)
         stack.add_child(word)
         var wait := Label.new()
         wait.name = "Wait"
         wait.text = I18nScript.wait(int(option.interval_secs))
+        wait.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         ThemeScript.dress(wait, 22, ThemeScript.INK, true)
         stack.add_child(wait)
         return button
