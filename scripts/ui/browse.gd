@@ -37,6 +37,7 @@ signal edited(card: CardScript)
 
 var volume := 1.0  # the recitation's loudness here, as the last session left it
 var _player: AudioStreamPlayer
+var _rig: ThemeScript.VolumeRig  # the popup, its coin and the player, one shared thing
 var _open_row: Button = null
 var _deck: DeckScript
 var _due := 0
@@ -51,6 +52,7 @@ func _ready() -> void:
         _player = AudioStreamPlayer.new()
         _player.name = "Player"
         add_child(_player)
+        _rig = ThemeScript.VolumeRig.new(self, _player)
         _build()
         resized.connect(_layout)
         call_deferred("_layout")
@@ -63,7 +65,7 @@ func _exit_tree() -> void:
 ## recitation heard here already speaks at the remembered loudness.
 func setup(deck: DeckScript, p_volume: float) -> void:
         volume = p_volume
-        _apply_volume(volume)
+        _rig.apply(volume)
         _deck = deck
         _due = SchedulerScript.counts(deck, int(Time.get_unix_time_from_system()))["due"]
         if not is_node_ready():
@@ -102,7 +104,7 @@ func _build() -> void:
         # The running head: a surah's title that stays while its cards scroll.
         # It rides above the shelf, a sibling drawn after it, quiet and still.
         add_child(_build_sticky())
-        add_child(_volume_popup())
+        add_child(_rig.popup())
 
 func _top_bar() -> Control:
         var bar: Dictionary = ThemeScript.top_bar("Browse")
@@ -128,7 +130,7 @@ func _top_bar() -> Control:
         coin.add_child(center)
         coin.tooltip_text = "Recitation volume"
         ThemeScript.pressable(coin)
-        coin.pressed.connect(_toggle_volume_popup)
+        coin.pressed.connect(_rig.toggle)
         right.add_child(coin)
         return row
 
@@ -204,7 +206,7 @@ func _rebuild_filters() -> void:
                 var pill := Button.new()
                 pill.name = "Pill" + key.capitalize()
                 pill.text = "%s %d" % [_pill_word(key), counts[key]]
-                pill.custom_minimum_size = Vector2(0, 34)
+                pill.custom_minimum_size = Vector2(0, 36)
                 pill.tooltip_text = _pill_tooltip(key)
                 ThemeScript.pressable(pill, 0.97, 1.0)
                 _dress_pill(pill, key == _filter)
@@ -238,9 +240,16 @@ func _pill_tooltip(key: String) -> String:
 ## A pill at rest is nothing at all -- words on the paper; the pill that
 ## is chosen takes the page's own green wash, the colour of the deck's
 ## progress, with no outline anywhere: the way a book's folios are marked,
-## not the way a web form's checkboxes are.
+## not the way a web form's checkboxes are. A pill sizes itself by its own
+## words, so the words must bring their own air with them: without a
+## margin of their own they stand on the very edge of the shape, and the
+## count reads as though it were escaping the pill it belongs to.
 func _dress_pill(pill: Button, on: bool) -> void:
         var rest := ThemeScript.soft_stylebox(Color(0, 0, 0, 0), 18)
+        rest.content_margin_left = 14
+        rest.content_margin_right = 14
+        rest.content_margin_top = 7
+        rest.content_margin_bottom = 7
         if on:
                 rest.bg_color = ThemeScript.GREEN_SOFT
         var wash := rest.duplicate() as StyleBoxFlat
@@ -251,8 +260,8 @@ func _dress_pill(pill: Button, on: bool) -> void:
         pill.add_theme_stylebox_override("pressed", wash)
         pill.add_theme_stylebox_override("focus", wash)
         pill.add_theme_stylebox_override("disabled", rest)
-        pill.add_theme_font_override("font", ThemeScript.vazir(12, on))
-        pill.add_theme_font_size_override("font_size", 12)
+        pill.add_theme_font_override("font", ThemeScript.vazir(13, on))
+        pill.add_theme_font_size_override("font_size", 13)
         var tone := ThemeScript.GREEN_DEEP if on else ThemeScript.INK_SOFT
         pill.add_theme_color_override("font_color", tone)
         pill.add_theme_color_override("font_hover_color", ThemeScript.GREEN_DEEP if on else ThemeScript.INK)
@@ -384,35 +393,6 @@ func _update_sticky() -> void:
         elif not _sticky.visible:
                 _sticky.visible = true
                 ThemeScript.settle_in(_sticky, 0.0, 0.16)
-
-# --- the volume, the same page everywhere a recitation can be heard ------------------
-
-func _volume_popup() -> Control:
-        var popup := ThemeScript.VolumePopover.new()
-        popup.changed.connect(_apply_volume)
-        popup.committed.connect(func(v: float) -> void: volume_changed.emit(v))
-        return popup
-
-
-func _toggle_volume_popup() -> void:
-        var popup: ThemeScript.VolumePopover = get_node_or_null("VolumePopup")
-        if popup == null:
-                return
-        popup.visible = not popup.visible
-        if popup.visible:
-                popup.set_volume(volume)
-                ThemeScript.settle_in(popup, 0.0, 0.16)
-
-
-func _apply_volume(v: float) -> void:
-        volume = clampf(v, 0.0, 1.0)
-        _player.volume_db = linear_to_db(maxf(volume, 0.0001))
-        var mark: ThemeScript.VolumeMark = get_node_or_null(
-                "Margin/Column/TopBar/Right/Volume/Mark/VolumeMark"
-        )
-        if mark != null:
-                mark.muted = volume <= 0.005
-                mark.queue_redraw()
 
 # --- the search ----------------------------------------------------------------------
 

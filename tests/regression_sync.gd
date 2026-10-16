@@ -23,6 +23,7 @@ func _init() -> void:
         await _test_local_edit_wins()
         await _test_progress_merges()
         await _test_local_progress_pushes()
+        await _test_pace_travels_with_progress()
         await _test_quiet_sync_transfers_nothing()
         await _test_quiet_sync_asks_for_nothing()
         await _test_failed_push_retries()
@@ -228,6 +229,11 @@ func _write_bytes(path: String, data: PackedByteArray) -> void:
 func _write_progress(entries: Dictionary) -> void:
         _write(DECK.path_join("progress.json"), JSON.stringify({"format": 1, "cards": entries}) + "\n")
 
+## A whole progress document, pace included -- the file as the app itself
+## writes it, not just its cards.
+func _write_progress_doc(doc: Dictionary) -> void:
+        _write(DECK.path_join("progress.json"), JSON.stringify(doc) + "\n")
+
 func _read(path: String) -> String:
         return FileAccess.get_file_as_string(path)
 
@@ -324,6 +330,42 @@ func _test_local_progress_pushes() -> void:
         var remote_state: Variant = JSON.parse_string(fake.files["progress.json"].content.get_string_from_utf8())
         var state_after: Variant = {} if typeof(remote_state) != TYPE_DICTIONARY else (remote_state as Dictionary).get("cards", {}).get("001", {})
         _ok(typeof(state_after) == TYPE_DICTIONARY and int((state_after as Dictionary).get("reps", 0)) == 7, "the repo follows the deeper local study")
+
+## The reader's own pace -- how many new cards a day offers -- rides the
+## progress file through every door it has: chosen here, it reaches the repo;
+## chosen later on another device, it arrives here; chosen earlier there, it
+## never overwrites the newer word this deck already holds.
+func _test_pace_travels_with_progress() -> void:
+        _write_deck({"001": ["Q1", "A1"]})
+        var fake := FakeGitHub.new()
+        var sync := _make_sync(fake)
+        await sync.sync(DECK)
+        _write_progress_doc({"format": 1, "cards": {}, "new_per_day": 12, "new_per_day_mod": 5000})
+        var result: Dictionary = await sync.sync(DECK)
+        _ok(bool(result.get("ok", false)), "a sync after a pace choice succeeds (%s)" % str(result.get("error", "")))
+        var arrived: Variant = JSON.parse_string(fake.files["progress.json"].content.get_string_from_utf8())
+        _ok(
+                typeof(arrived) == TYPE_DICTIONARY and int((arrived as Dictionary).get("new_per_day", -1)) == 12,
+                "the chosen pace reaches the repo"
+        )
+        # Another device chooses a later pace; it arrives here.
+        fake.commit_change(
+                "progress.json",
+                JSON.stringify({"format": 1, "cards": {}, "new_per_day": 30, "new_per_day_mod": 9000}) + "\n"
+        )
+        var later: Dictionary = await sync.sync(DECK)
+        _ok(bool(later.get("ok", false)), "a sync with a later remote pace succeeds")
+        var local: Variant = JSON.parse_string(_read(DECK.path_join("progress.json")))
+        _is(int((local as Dictionary).get("new_per_day", -1)), 30, "the later pace becomes this device's own")
+        # An older remote choice never wins.
+        fake.commit_change(
+                "progress.json",
+                JSON.stringify({"format": 1, "cards": {}, "new_per_day": 5, "new_per_day_mod": 7000}) + "\n"
+        )
+        var older: Dictionary = await sync.sync(DECK)
+        _ok(bool(older.get("ok", false)), "a sync with an older remote pace succeeds")
+        var kept: Variant = JSON.parse_string(_read(DECK.path_join("progress.json")))
+        _is(int((kept as Dictionary).get("new_per_day", -1)), 30, "the newer local pace is kept")
 
 ## A sync where nothing changed anywhere must move nothing: the checksums
 ## agree, so no file is sent and none is pulled, and no commit is made.

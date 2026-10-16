@@ -50,10 +50,10 @@ func _init() -> void:
         await _shot("study_two")
         # The recitation's own control, open under its coin: the popover is
         # part of the page a person sees, so the film keeps a frame of it.
-        study._toggle_volume_popup()
+        study._rig.toggle()
         await create_timer(0.5).timeout
         await _shot("volume")
-        study._toggle_volume_popup()
+        study._rig.toggle()
         await create_timer(0.3).timeout
         # The pencil: a card noticed mid-study is fixed mid-study, on the
         # card's own page over the session.

@@ -16,6 +16,9 @@ const VersionScript := preload("res://scripts/data/version.gd")
 signal closed
 signal account_changed
 signal sync_requested
+## A pace choice has settled: the progress file carries it, and the repo
+## should hear it without the user having to ask.
+signal pace_push_requested
 
 var _http: HttpClientScript
 var _auth: GitHubAuthScript
@@ -23,11 +26,20 @@ var _settings: SettingsScript
 var _deck: DeckScript
 var _polling := false
 var _flow_uri := ""  # where "Open GitHub" sends the user while a flow is live
+var _pace_push: Timer  # one ask, once the hand stops stepping
 
 func _ready() -> void:
         _build()
         resized.connect(_layout)
         call_deferred("_layout")
+        # A pace choice is one word, however many times the hand steps to say
+        # it: the ask waits for the stepping to stop, then speaks once.
+        _pace_push = Timer.new()
+        _pace_push.name = "PacePush"
+        _pace_push.one_shot = true
+        _pace_push.wait_time = 1.4
+        _pace_push.timeout.connect(func() -> void: pace_push_requested.emit())
+        add_child(_pace_push)
         # The cards arrive one after another, a beat apart: a page that
         # assembles itself reads as composed, not stamped.
         var column: VBoxContainer = get_node("Margin/Scroll/Wrap/Column")
@@ -458,7 +470,7 @@ func _deck_body() -> Control:
         more.pressed.connect(_step_new_per_day.bind(1))
         stepper.add_child(more)
         var pace := _text(
-                "How many unseen cards a day offers — 0 studies only reviews. Anki's default is 20.",
+                "How many unseen cards a day offers — 0 studies only reviews. Carried\nwith your deck, so every device paces the day the same.",
                 ThemeScript.INK_SOFT, 12
         )
         pace.name = "Pace"
@@ -466,14 +478,24 @@ func _deck_body() -> Control:
         return card
 
 ## A press on the stepper is the reader choosing their own pace: the number
-## moves at once, the file is written at once, and the chip says what the
-## next session will bring. The bounds keep the choice sane -- 0 is a day of
-## reviews only, and no day needs more new cards than this.
+## moves at once, the settings file is written at once, and the deck's own
+## progress file is stamped with it -- where it travels to every device the
+## deck reaches, and where the repo hears it at the next sync. The bounds
+## keep the choice sane -- 0 is a day of reviews only, and no day needs more
+## new cards than this.
 func _step_new_per_day(delta: int) -> void:
         _settings.new_per_day = clampi(_settings.new_per_day + delta, 0, 200)
         _settings.save()
+        if _deck != null:
+                _deck.new_per_day = _settings.new_per_day
+                _deck.new_per_day_mod = int(Time.get_unix_time_from_system())
+                _deck.save_progress()
         var value: Label = get_node("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/NewPerDay/Chip/StepValue")
         value.text = str(_settings.new_per_day)
+        if _pace_push != null:
+                # The engine's Timer has no restart(); a stopped start is one.
+                _pace_push.stop()
+                _pace_push.start()
 
 func _source_body() -> Control:
         var parts := _card("DataSource")

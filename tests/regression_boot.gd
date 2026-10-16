@@ -465,6 +465,16 @@ func _check_settings(main: Node) -> void:
                 if step_less != null:
                         step_less.pressed.emit()
                         _is(main._settings.new_per_day, 20, "a press on less offers one fewer")
+                # The choice is the deck's own to carry: the pace lands in the
+                # progress file, where sync reads it to every other device.
+                var paced: Variant = JSON.parse_string(
+                        FileAccess.get_file_as_string("user://decks/quran/progress.json")
+                )
+                _ok(
+                        typeof(paced) == TYPE_DICTIONARY
+                                and int((paced as Dictionary).get("new_per_day", -1)) == 20,
+                        "a chosen pace is stamped into the deck's own progress file"
+                )
         # The home page answers the offer the same hour it changes: counts
         # carry the cap, and a smaller day is a smaller new count.
         var counts_now: Dictionary = SchedulerScript.counts(main._deck, int(Time.get_unix_time_from_system()), 3)
@@ -648,6 +658,21 @@ func _check_browse(main: Node) -> void:
         # story -- what is due, what has never been started, what rests.
         var filters: HFlowContainer = browse.get_node_or_null("Margin/Column/Filters")
         _ok(filters != null and filters.get_child_count() == 4, "the shelf carries its four pills")
+        # A pill sizes itself by its own words, so the words must carry their
+        # own air: a pill whose text stands on the edge of its shape reads as
+        # text escaping the button it belongs to. The margin belongs to the
+        # stylebox, so the pill's own least width says it is there.
+        if filters != null:
+                for pill in filters.get_children():
+                        var face := (pill as Button).get_theme_font("font")
+                        var size := (pill as Button).get_theme_font_size("font_size")
+                        var words := face.get_string_size(
+                                (pill as Button).text, HORIZONTAL_ALIGNMENT_LEFT, -1, size
+                        ).x if face != null else 0.0
+                        _ok(
+                                (pill as Button).get_combined_minimum_size().x >= words + 20.0,
+                                "%s keeps air on both sides of its words" % (pill as Button).name
+                        )
         if filters != null and filters.get_child_count() == 4:
                 var due_pill: Button = filters.get_node_or_null("PillDue")
                 _ok(due_pill != null, "the due pill stands with its count")

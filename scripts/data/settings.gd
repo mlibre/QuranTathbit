@@ -20,8 +20,9 @@ var volume := 1.0  # recitation loudness, 0 (silent) to 1 (full); remembered bet
 ## How many unseen cards a day offers. Anki's deck default (20 a day) is the
 ## starting point, not a law: a reader pacing their own memorisation chooses
 ## their own number in Settings, and the scheduler asks this before it fills
-## the day's queue. Per device, like volume -- it is how a person reads, not
-## what they have read.
+## the day's queue. The choice travels with the deck's own progress.json, so
+## every device the deck reaches paces itself the same -- this copy is the
+## device's working memory of it, adopted from the deck at boot.
 var new_per_day := SchedulerScript.NEW_PER_DAY
 
 

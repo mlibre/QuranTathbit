@@ -18,6 +18,7 @@ func _init() -> void:
         _test_load()
         _test_progress_round_trip()
         _test_progress_bytes_are_stable()
+        _test_pace_round_trip()
         _test_broken_progress()
         _test_script_classification()
         _teardown()
@@ -109,6 +110,27 @@ func _test_progress_bytes_are_stable() -> void:
         var raw := FileAccess.get_file_as_string(ROOT.path_join("progress.json"))
         _ok(not raw.contains(".0"), "whole numbers are written as ints, never as floats")
         _ok(raw.contains("\"ease\": 2.5"), "a true fraction keeps its decimals")
+
+## The reader's own pace rides the progress file, where sync carries it to
+## every device the deck reaches: a deck whose file never said one says
+## none (-1), a chosen one round-trips with its moment, and nonsense never
+## passes for a number.
+func _test_pace_round_trip() -> void:
+        var deck: DeckScript = DeckScript.load(ROOT)
+        _is(deck.new_per_day, -1, "a deck whose progress never said a pace says none")
+        deck.new_per_day = 12
+        deck.new_per_day_mod = 1792000200
+        _ok(deck.save_progress(), "progress saves with the pace")
+        var reloaded: DeckScript = DeckScript.load(ROOT)
+        _is(reloaded.new_per_day, 12, "the chosen pace rides the progress file")
+        _is(reloaded.new_per_day_mod, 1792000200, "and so does the moment it was chosen")
+        var raw := FileAccess.get_file_as_string(ROOT.path_join("progress.json"))
+        _ok(raw.contains("\"new_per_day\": 12"), "the pace is written where sync reads it")
+        _write(ROOT.path_join("progress.json"), JSON.stringify({
+                "format": 1, "cards": {}, "new_per_day": "twenty",
+        }) + "\n")
+        var broken: DeckScript = DeckScript.load(ROOT)
+        _is(broken.new_per_day, -1, "a pace that is not a number is not a pace")
 
 func _test_broken_progress() -> void:
         _write(ROOT.path_join("progress.json"), "{ not json at all")

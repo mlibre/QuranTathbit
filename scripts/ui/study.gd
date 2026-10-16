@@ -40,13 +40,14 @@ var _view: CardViewScript
 var _options: Array = []
 var _bar_tween: Tween
 var volume := 1.0  # the recitation's own loudness, 0..1, set before the session starts
+var _rig: ThemeScript.VolumeRig  # the popup, its coin and the player, one shared thing
 
 func _ready() -> void:
         _player = AudioStreamPlayer.new()
         _player.name = "Player"
         add_child(_player)
+        _rig = ThemeScript.VolumeRig.new(self, _player)
         _build()
-        _apply_volume(volume)
         resized.connect(_layout)
         call_deferred("_layout")
 
@@ -95,7 +96,7 @@ func _build() -> void:
         column.add_child(_footer())
         # The volume's own small page floats above everything, last so it
         # draws last, waiting in its corner until the hand asks for it.
-        add_child(_volume_popup())
+        add_child(_rig.popup())
 
 ## The session's own quiet progress: a thin bar under the top row that fills
 ## as cards are answered. The count label above it stays for the exact number;
@@ -204,7 +205,7 @@ func _top_bar() -> Control:
         coin.add_child(center)
         coin.tooltip_text = "Recitation volume"
         ThemeScript.pressable(coin)
-        coin.pressed.connect(_toggle_volume_popup)
+        coin.pressed.connect(_rig.toggle)
         pair.add_child(coin)
         return row
 
@@ -279,46 +280,6 @@ func _footer() -> Control:
         done.pressed.connect(func() -> void: closed.emit())
         row.add_child(done)
         return row
-
-# --- the recitation's volume -------------------------------------------------------
-
-## The volume's small page, as the theme draws it everywhere a recitation
-## can be heard: a speaker that mutes, a rule the hand drags, the number it
-## stands at -- no title to read first. It opens under the coin that asked
-## for it and closes on any press outside itself, the way a popover behaves
-## everywhere else.
-func _volume_popup() -> Control:
-        var popup := ThemeScript.VolumePopover.new()
-        popup.changed.connect(_apply_volume)
-        popup.committed.connect(func(v: float) -> void: volume_changed.emit(v))
-        return popup
-
-
-func _toggle_volume_popup() -> void:
-        var popup: ThemeScript.VolumePopover = get_node_or_null("VolumePopup")
-        if popup == null:
-                return
-        popup.visible = not popup.visible
-        if popup.visible:
-                popup.set_volume(volume)
-                ThemeScript.settle_in(popup, 0.0, 0.16)
-
-
-## Loudness to the player and the coin's own face -- one place, so they can
-## never disagree. The popover speaks for itself: its rule, its mark and its
-## number are the theme's own business, not this screen's.
-func _apply_volume(v: float) -> void:
-        volume = clampf(v, 0.0, 1.0)
-        # linear_to_db(0) is negative infinity; a true zero is its own quiet
-        # floor instead, silence for the ear and a number for the maths.
-        _player.volume_db = linear_to_db(maxf(volume, 0.0001))
-        var mark: ThemeScript.VolumeMark = get_node_or_null(
-                "Margin/Column/TopBar/Right/Pair/Volume/Mark/VolumeMark"
-        )
-        if mark != null:
-                mark.muted = volume <= 0.005
-                mark.queue_redraw()
-
 
 func _layout() -> void:
         if size.x <= 0.0:

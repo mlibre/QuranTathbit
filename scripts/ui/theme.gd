@@ -416,6 +416,77 @@ class VolumePopover extends PanelContainer:
                 )
 
 
+## The volume's own small rig, as one thing every screen that can play a
+## recitation shares: the popup under the coin, its opening and closing, and
+## the loudness said once to the player and the coin's face -- so no screen's
+## copy of the plumbing can drift from another's. The screen keeps its own
+## `volume` and its own `volume_changed` signal (the one place a remembered
+## loudness is read and the one place it is spoken); the rig reads and writes
+## the number through the screen, and finds the coin's face wherever the
+## screen's own bar hid it.
+class VolumeRig extends RefCounted:
+        var _screen: Control
+        var _player: AudioStreamPlayer
+        var _popup: VolumePopover
+
+        func _init(screen: Control, player: AudioStreamPlayer) -> void:
+                _screen = screen
+                _player = player
+                apply(float(screen.get("volume")))
+
+        ## The popup itself, wired and named, ready to be added as the last
+        ## child of the screen it speaks for.
+        func popup() -> Control:
+                var node := VolumePopover.new()
+                node.changed.connect(apply)
+                node.committed.connect(func(v: float) -> void:
+                        (_screen as Object).emit_signal("volume_changed", v)
+                )
+                _popup = node
+                return node
+
+        func toggle() -> void:
+                if _popup == null or not is_instance_valid(_popup) or not _popup.is_inside_tree():
+                        return
+                _popup.visible = not _popup.visible
+                if _popup.visible:
+                        _popup.set_volume(float(_screen.get("volume")))
+                        THEME.settle_in(_popup, 0.0, 0.16)
+
+        ## Loudness to the screen's own word, the player and the coin's face
+        ## -- one place, so they can never disagree. linear_to_db(0) is
+        ## negative infinity; a true zero is its own quiet floor instead,
+        ## silence for the ear and a number for the maths.
+        func apply(v: float) -> void:
+                var loud := clampf(v, 0.0, 1.0)
+                (_screen as Object).set("volume", loud)
+                if _player != null and is_instance_valid(_player):
+                        _player.volume_db = linear_to_db(maxf(loud, 0.0001))
+                var mark := _coin_mark()
+                if mark != null:
+                        mark.muted = loud <= 0.005
+                        mark.queue_redraw()
+
+        ## The coin's own face, found under the top bar wherever the bar put
+        ## it -- one screen tucks its coin under a Pair, another leaves it
+        ## bare. Only the bar is searched, so the popup's own speaker never
+        ## answers for the coin.
+        func _coin_mark() -> VolumeMark:
+                var bar := _screen.get_node_or_null("Margin/Column/TopBar")
+                if bar == null:
+                        return null
+                return _find_mark(bar)
+
+        func _find_mark(node: Node) -> VolumeMark:
+                if node is VolumeMark:
+                        return node
+                for child in node.get_children():
+                        var found := _find_mark(child)
+                        if found != null:
+                                return found
+                return null
+
+
 ## A round grabber for a slider, drawn rather than typed: a white disc in a
 ## coloured ring, at 4x and scaled down so its edge lands soft. The engine's
 ## own grabber is a grey plastic bead from another app.

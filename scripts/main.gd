@@ -57,6 +57,7 @@ func _ready() -> void:
                 push_error("QuranTathbit: the deck could not be read from %s" % USER_DECK)
                 get_tree().quit(1)
                 return
+        _adopt_deck_pace()
 
         _http = HttpClientScript.new()
         _http.name = "HttpClient"
@@ -233,7 +234,35 @@ func _on_settings_pressed() -> void:
         screen.setup(_http, _auth, _settings, _deck)
         screen.closed.connect(_go_home)
         screen.sync_requested.connect(_on_sync_pressed)
+        screen.pace_push_requested.connect(_on_pace_push_requested)
         screen.account_changed.connect(_on_account_changed)
+
+
+## The reader's own pace travels with the deck, so a choice made on another
+## device arrives with the deck's own sync: the number this device wakes with
+## is the number the deck last heard. It is asked for quietly, under whatever
+## screen stands -- the same door every quiet sync uses.
+func _on_pace_push_requested() -> void:
+        if _settings.has_token() and _settings.auto_sync:
+                _run_sync(true)
+
+
+## The deck's own word about the day's pace, said once at every arrival: a
+## deck that has never carried one adopts this device's setting as its own
+## (the first save writes it into progress.json), and a deck that has one
+## becomes the setting -- so every device the deck reaches paces the day the
+## same, and "New cards each day" in Settings is the deck's number, not the
+## phone's.
+func _adopt_deck_pace() -> void:
+        if _deck == null:
+                return
+        if _deck.new_per_day < 0:
+                _deck.new_per_day = _settings.new_per_day
+                _deck.new_per_day_mod = _now()
+                return
+        if _deck.new_per_day != _settings.new_per_day:
+                _settings.new_per_day = _deck.new_per_day
+                _settings.save()
 
 
 ## The library: the whole deck, read and listened to, nothing scheduled.
@@ -312,10 +341,12 @@ func _run_sync(quiet := false) -> void:
                 _sync_failed = true
                 _maybe_schedule_sync_retry(quiet, result)
 
-        # Progress may have merged in from another device; read the deck back.
+        # Progress may have merged in from another device -- the cards and the
+        # day's own pace alike; read the deck back.
         var reloaded: DeckScript = DeckScript.load(USER_DECK)
         if reloaded != null:
                 _deck = reloaded
+                _adopt_deck_pace()
                 _sync = GitHubSyncScript.new(_http, _auth)
 
         var line := ""
@@ -394,7 +425,11 @@ func _sync_line() -> String:
                 return "Connection trouble — the app will try again by itself"
         var waiting := _pending_answers()
         if waiting > 0:
-                return "%d %s waiting to sync" % [waiting, "answer" if waiting == 1 else "answers"]
+                if _answers_waiting > 0:
+                        return "%d %s waiting to sync" % [waiting, "answer" if waiting == 1 else "answers"]
+                # Progress moved without a session -- the day's own pace was
+                # chosen here -- and the number of "answers" would be a lie.
+                return "Changes waiting to sync"
         if _settings.last_sync > 0:
                 return "Last synced %s" % _ago(_now() - _settings.last_sync)
         return "Connected — not synced yet"

@@ -17,7 +17,9 @@ const SchedulerScript := preload("res://scripts/data/scheduler.gd")
 ## front.md and back.md hold plain markdown; media is any other file in the
 ## card folder, referenced as ![name](name) and resolved next to the markdown.
 ## Progress lives in progress.json beside deck.json -- one entry per card id,
-## so two devices that reviewed different cards merge cleanly.
+## so two devices that reviewed different cards merge cleanly. The reader's
+## own pace rides the same file: how many new cards a day offers, and when
+## that choice was last made, so it reaches every device the deck does.
 ##
 ## Decks load from res://assets (the bundled deck, copied into place on first
 ## run) and from user:// (the synced, writable copy). Saving writes only
@@ -33,6 +35,11 @@ var source := ""  # where the deck's content comes from, when it says
 var cards: Array[CardScript] = []
 var progress_path := ""
 var dirty := false
+## The reader's own pace: how many unseen cards a day offers. -1 while the
+## progress file has never said one -- the very first save stamps this
+## device's setting into the file and it becomes the deck's own number.
+var new_per_day := -1
+var new_per_day_mod := 0  # when the pace was last chosen, unix seconds
 
 static func load(path: String):
         var deck = (load("res://scripts/data/deck.gd") as GDScript).new()
@@ -106,6 +113,13 @@ func _load_progress() -> void:
                 push_warning("Deck: progress.json unreadable; starting fresh")
                 return
         var entries: Dictionary = (data as Dictionary).get("cards", {})
+        var pace: Variant = (data as Dictionary).get("new_per_day", null)
+        if typeof(pace) == TYPE_INT or typeof(pace) == TYPE_FLOAT:
+                new_per_day = int(pace)
+                var mod: Variant = (data as Dictionary).get("new_per_day_mod", 0)
+                new_per_day_mod = int(mod) if (
+                        typeof(mod) == TYPE_INT or typeof(mod) == TYPE_FLOAT
+                ) else 0
         for card in cards:
                 var saved: Variant = entries.get(card.id)
                 if typeof(saved) != TYPE_DICTIONARY:
@@ -130,7 +144,11 @@ func save_progress() -> bool:
         if file == null:
                 push_error("Deck.save_progress: cannot write %s (%s)" % [progress_path, error_string(FileAccess.get_open_error())])
                 return false
-        file.store_string(JSON.stringify({"format": FORMAT, "cards": entries}, "\t") + "\n")
+        var doc := {"format": FORMAT, "cards": entries}
+        if new_per_day >= 0:
+                doc["new_per_day"] = new_per_day
+                doc["new_per_day_mod"] = new_per_day_mod
+        file.store_string(JSON.stringify(doc, "\t") + "\n")
         file.close()
         dirty = false
         return true
