@@ -15,6 +15,11 @@
 
 </div>
 
+A calm app for memorising the Qur'an. Open it, study the card in front
+of you, mark how well it went, come back tomorrow. That is the whole thing —
+no account on someone else's server, no cloud you cannot see, no deck to build
+or import. Your deck lives on your own machine.
+
 The verses, the Persian translation, and the recitation of every card come
 from [quran.makarem.ir](https://quran.makarem.ir) — and from nowhere else.
 See the credits and the [LICENSE](LICENSE) for the full attribution.
@@ -42,11 +47,11 @@ Runs on any modern browser — desktop, laptop, tablet, or phone.
 Grab a build from the
 [**Releases**](https://github.com/mlibre/QuranTathbit/releases) page:
 
-| Platform | File | How to run |
-| --- | --- | --- |
-| **Windows** | `QuranTathbit-Windows.zip` → `QuranTathbit.exe` | unzip anywhere, double-click |
-| **Linux** | `QuranTathbit-Linux.zip` → `QuranTathbit.x86_64` | `chmod +x`, then run |
-| **Android** | `QuranTathbit-Android.apk` | sideload; allow installs from this source when asked |
+| Platform    | File                                             | How to run                                           |
+| ----------- | ------------------------------------------------ | ---------------------------------------------------- |
+| **Windows** | `QuranTathbit-Windows.zip` → `QuranTathbit.exe`  | unzip anywhere, double-click                         |
+| **Linux**   | `QuranTathbit-Linux.zip` → `QuranTathbit.x86_64` | `chmod +x`, then run                                 |
+| **Android** | `QuranTathbit-Android.apk`                       | sideload; allow installs from this source when asked |
 
 No installer, no dependencies, no account: the download *is* the app.
 
@@ -145,11 +150,11 @@ the github.com form is written out in [docs/OAUTH_SETUP.md](docs/OAUTH_SETUP.md)
 
 ## Keyboard shortcuts
 
-| Key | What it does |
-| --- | --- |
-| **Space** / **Enter** | show the answer, then answer **Good** |
-| **1** – **4** | answer **Again**, **Hard**, **Good**, **Easy** |
-| **Esc** | close the session |
+| Key                   | What it does                                   |
+| --------------------- | ---------------------------------------------- |
+| **Space** / **Enter** | show the answer, then answer **Good**          |
+| **1** – **4**         | answer **Again**, **Hard**, **Good**, **Easy** |
+| **Esc**               | close the session                              |
 
 In the browser, the tab still belongs to the browser: **F5** / **Ctrl+F5**
 (reload), **F11** (fullscreen), **F12** / **Ctrl+Shift+I** (dev tools),
@@ -171,12 +176,14 @@ and hands everything the browser owns straight back to it.
   sans, for the translations and the interface), each under its SIL OFL
   license in `assets/fonts/`.
 
-## 🇵🇸 In support of Palestine
+## 🇵🇸 In Support of Palestine
 
-This project stands with Palestine. If you are able, please consider donating
-to [UNRWA](https://www.unrwa.org) or a trusted aid organization of your
-choice.
+This project supports Palestine. If you can, donate to [UNRWA](https://www.unrwa.org).
 
 The people of Palestine endure daily suffering and loss, too often unseen and
 unhelped. They are asking for support — and we can give our voice, our care,
-and our help. Even a small act can matter. 🤲
+and our help. Even a small act can matter. Please do what you can. 🤲
+
+And if you ever doubt what is right and what is wrong, remember: when someone
+kills a baby to loot baby’s belongings, he is the devil — and he stands on the
+wrong side. ✊
