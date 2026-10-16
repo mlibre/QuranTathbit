@@ -264,12 +264,39 @@ func _on_settings_pressed() -> void:
         screen.sync_requested.connect(_on_sync_pressed)
         screen.choice_push_requested.connect(_on_choice_push_requested)
         screen.account_changed.connect(_on_account_changed)
+        screen.deck_imported.connect(_on_deck_imported)
 
 
 ## A travelling choice has settled -- the day's pace, the verses' face, the
 ## app's tongue -- and the repo should hear it without the user having to
 ## ask, under whatever screen stands: the same door every quiet sync uses.
 func _on_choice_push_requested() -> void:
+        if _settings.has_token() and _settings.auto_sync:
+                _run_sync(true)
+
+
+## A backup has been joined to the deck on disk: the deck in memory is
+## behind what the folder now holds, so it is read back the same way a
+## finished sync reads it -- adopting whatever travelling choices arrived
+## (a tongue the backup carried is spoken at once, and the page it landed
+## on is said again in it) -- and the re-read deck is handed back to the
+## page that asked. What arrived should reach the repo on its own too, the
+## same quiet way every arrival does, so the next device to sync finds it
+## already there.
+func _on_deck_imported() -> void:
+        var reloaded: DeckScript = DeckScript.load(USER_DECK)
+        if reloaded == null:
+                return
+        _deck = reloaded
+        _adopt_deck_choices()
+        if not _settings.ui_lang.is_empty() and _settings.ui_lang != I18nScript.lang():
+                _apply_language(_settings.ui_lang)
+        else:
+                ThemeScript.set_ayah_face(_settings.ayah_font)
+        if _screen is SettingsScreenScript:
+                (_screen as SettingsScreenScript).deck_reloaded(_deck)
+        elif _screen is HomeScript:
+                _refresh_home()
         if _settings.has_token() and _settings.auto_sync:
                 _run_sync(true)
 

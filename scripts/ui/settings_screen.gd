@@ -5,6 +5,8 @@ const HttpClientScript := preload("res://scripts/net/http_client.gd")
 const GitHubAuthScript := preload("res://scripts/net/github_auth.gd")
 const SettingsScript := preload("res://scripts/data/settings.gd")
 const DeckScript := preload("res://scripts/data/deck.gd")
+const DeckZipScript := preload("res://scripts/data/deck_zip.gd")
+const BackupPickerScript := preload("res://scripts/ui/backup_picker.gd")
 const VersionScript := preload("res://scripts/data/version.gd")
 const I18nScript := preload("res://scripts/ui/i18n.gd")
 
@@ -21,6 +23,11 @@ signal sync_requested
 ## app's tongue): the progress file carries it, and the repo should hear
 ## it without the user having to ask.
 signal choice_push_requested
+## A backup has been joined to the deck: the deck on disk is now more than
+## the one in memory, and whoever owns the deck (the app's root) should
+## read it back -- adopting whatever choices arrived with it and speaking
+## a tongue that changed underneath this page.
+signal deck_imported
 
 var _http: HttpClientScript
 var _auth: GitHubAuthScript
@@ -29,6 +36,7 @@ var _deck: DeckScript
 var _polling := false
 var _flow_uri := ""  # where "Open GitHub" sends the user while a flow is live
 var _choice_push: Timer  # one ask, once the hand stops choosing
+var _zip_callback: Variant = null  # the page's backup hook, held while this screen stands
 
 func _ready() -> void:
         _build()
@@ -42,6 +50,11 @@ func _ready() -> void:
         _choice_push.wait_time = 1.4
         _choice_push.timeout.connect(func() -> void: choice_push_requested.emit())
         add_child(_choice_push)
+        # In a browser the backup's two halves live in the page -- the way
+        # out is a download, the way in is a file input -- so the hook that
+        # carries them is installed the moment this page stands.
+        if OS.has_feature("web"):
+                _install_zip_bridge()
         # The cards arrive one after another, a beat apart: a page that
         # assembles itself reads as composed, not stamped.
         var column: VBoxContainer = get_node("Margin/Scroll/Wrap/Column")
@@ -113,6 +126,7 @@ func _build() -> void:
         column.add_child(bar["row"])
 
         column.add_child(_deck_body())
+        column.add_child(_backup_body())
         column.add_child(_reading_body())
         column.add_child(_github_body())
         column.add_child(_source_body())
@@ -707,6 +721,144 @@ func _ask_deck_push() -> void:
                 _choice_push.stop()
                 _choice_push.start()
 
+# --- the deck as one file ----------------------------------------------------------
+
+## The whole deck as one zip: everything a reader would grieve to lose,
+## packed where a person keeps their files. The bringing-back joins rather
+## than replaces -- the same card-by-card merge sync speaks -- so an old
+## backup can never take a review away, and the note under the buttons
+## only ever says what arrived.
+func _backup_body() -> Control:
+        var parts := _card("Backup")
+        var card: PanelContainer = parts[0]
+        var box: VBoxContainer = parts[1]
+        _card_header(box, I18nScript.t("Backup"))
+
+        box.add_child(_caption_line(I18nScript.t(
+                "The whole deck — verses, recitations and your progress — in one zip file. Import joins a backup to this deck; nothing is removed."
+        )))
+
+        var row := HBoxContainer.new()
+        row.name = "Buttons"
+        row.add_theme_constant_override("separation", 10)
+        box.add_child(row)
+        var export_button := ThemeScript.primary_button(I18nScript.t("Export"), 46)
+        export_button.name = "Export"
+        export_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        export_button.tooltip_text = I18nScript.t("Pack the whole deck, with its progress, into one zip")
+        export_button.pressed.connect(_on_export_pressed)
+        row.add_child(export_button)
+        var import_button := ThemeScript.ghost_button(I18nScript.t("Import"), ThemeScript.GREEN, 46)
+        import_button.name = "Import"
+        import_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        import_button.tooltip_text = I18nScript.t("Choose a backup zip; its learning joins this deck")
+        import_button.pressed.connect(_on_import_pressed)
+        row.add_child(import_button)
+
+        var note := _text("", ThemeScript.INK_SOFT, ThemeScript.CAPTION, true)
+        note.name = "BackupNote"
+        box.add_child(note)
+        return card
+
+
+func _backup_note(what: String) -> void:
+        var note: RichTextLabel = get_node_or_null("Margin/Scroll/Wrap/Column/Backup/Padding/Box/BackupNote")
+        if note != null:
+                note.text = what
+
+
+## One press, one file: the deck packs itself into a zip that tries the
+## shared Downloads folder first, then the app's own storage wherever the
+## shared one is not this machine's to write, and the note says exactly
+## where the file landed -- a place, not a promise. The path is said as it
+## is, digits and all: it is the name of a real file, and dressing it in
+## another script's digits would name a file that does not exist.
+func _on_export_pressed() -> void:
+        if _deck == null:
+                return
+        var file_name := DeckZipScript.backup_name()
+        if OS.has_feature("web"):
+                _export_web(file_name)
+                return
+        for place in DeckZipScript.destination_dirs():
+                var dir := str(place["path"])
+                DirAccess.make_dir_recursive_absolute(dir)
+                var result: Dictionary = DeckZipScript.export_deck(_deck.folder, dir.path_join(file_name))
+                if bool(result.get("ok", false)):
+                        _backup_note(I18nScript.t("Backup saved — %s") % str(result.get("path", "")))
+                        return
+        _backup_note(I18nScript.t("The backup could not be written — your deck is safe here."))
+
+
+## The way in depends on the world: in a browser the page owns the
+## filesystem, so it opens its own picker and hands the bytes over;
+## anywhere else the app's own page of found backups stands over this one.
+func _on_import_pressed() -> void:
+        if get_node_or_null("BackupPicker") != null:
+                return
+        if OS.has_feature("web"):
+                var bridge := _zip_bridge()
+                if bridge == null:
+                        _backup_note(I18nScript.t("This build cannot open a file picker."))
+                        return
+                bridge.call("eval", "window.__qtZipPick && window.__qtZipPick()")
+                return
+        var picker := BackupPickerScript.new()
+        picker.name = "BackupPicker"
+        picker.setup(DeckZipScript.find_backups())
+        add_child(picker)
+        picker.picked.connect(_run_import)
+
+
+## The file's word, joined to this deck: progress merges card by card, the
+## travelling choices by their own moments, and files land only where the
+## deck lacks them -- so the note counts arrivals and never losses. What
+## arrived is the app's to adopt: the root owns the deck and hears it
+## here, then hands the re-read deck back to this page.
+func _run_import(zip_path: String) -> void:
+        if _deck == null:
+                return
+        var result: Dictionary = DeckZipScript.import_deck(_deck.folder, zip_path)
+        if not bool(result.get("ok", false)):
+                if str(result.get("error", "")) == "not_a_deck":
+                        _backup_note(I18nScript.t("That file is not a QuranTathbit backup."))
+                else:
+                        _backup_note(I18nScript.t("The backup could not be read."))
+                return
+        var new_cards := int(result.get("cards_new", 0))
+        var merged := int(result.get("merged", 0))
+        var added := int(result.get("added", 0))
+        var parts: Array = []
+        if new_cards > 0:
+                parts.append(I18nScript.f(
+                        "%d new card" if new_cards == 1 else "%d new cards", [new_cards]
+                ))
+        if merged > 0:
+                parts.append(I18nScript.f(
+                        "%d card's progress arrived" if merged == 1 else "%d cards' progress arrived", [merged]
+                ))
+        if added > 0:
+                parts.append(I18nScript.f(
+                        "%d file added" if added == 1 else "%d files added", [added]
+                ))
+        if parts.is_empty():
+                _backup_note(I18nScript.t("This deck already holds everything the backup has."))
+        else:
+                _backup_note(" · ".join(parts))
+        deck_imported.emit()
+
+
+## The deck, re-read after a backup joined it: this page says the new
+## count, and a tongue that arrived with the backup re-says the page in
+## its own words -- the choice was made somewhere else, but this is the
+## page the change lands on, so this is the page that answers it.
+func deck_reloaded(deck: DeckScript) -> void:
+        _deck = deck
+        if not _settings.ui_lang.is_empty() and I18nScript.lang() != _settings.ui_lang:
+                _rebuild()
+        else:
+                _refresh()
+
 func _source_body() -> Control:
         var parts := _card("DataSource")
         var card: PanelContainer = parts[0]
@@ -1091,3 +1243,94 @@ func _disconnect() -> void:
         _polling = false
         _refresh()
         account_changed.emit()
+
+# --- the backup, in a browser -------------------------------------------------------
+
+## The page's bridge to the engine, read at runtime rather than by name: on
+## every other platform there is none, and the same line then reads as "not
+## here" instead of refusing to load.
+func _zip_bridge() -> Object:
+        if not OS.has_feature("web"):
+                return null
+        return Engine.get_singleton("JavaScriptBridge")
+
+## In a browser the engine cannot write where a person keeps their files,
+## and cannot open the machine's own picker either -- both belong to the
+## page. The page's head script offers a hook for each direction (the same
+## hand-off the paste bridge uses); this installs the engine's side of it,
+## a callback the page calls with what the reader chose. The callback is
+## reference-counted and held for as long as this screen stands, and a
+## rebuilt page installs a fresh one over it.
+func _install_zip_bridge() -> void:
+        var bridge := _zip_bridge()
+        if bridge == null:
+                return
+        _zip_callback = bridge.call("create_callback", _on_web_zip)
+        var installer: Variant = bridge.call("get_interface", "__qtZipInstall")
+        if installer != null:
+                installer.install(_zip_callback)
+
+## The page handed us a file. It arrives as one word -- "import", the file's
+## name, and the whole archive as base64 -- and is written to a staging
+## corner of the app's own storage, where it goes through exactly the same
+## import door a native file does, then tidied away.
+func _on_web_zip(args: Array) -> void:
+        if args.is_empty() or _deck == null:
+                return
+        var word := str(args[0])
+        if not word.begins_with("import:"):
+                return
+        var body := word.substr(7)
+        var cut := body.find(":")
+        if cut < 1:
+                return
+        var archive := body.substr(cut + 1)
+        if archive.is_empty():
+                return
+        DirAccess.make_dir_recursive_absolute("user://backups")
+        var staging := "user://backups".path_join("incoming.zip")
+        var file := FileAccess.open(staging, FileAccess.WRITE)
+        if file == null:
+                _backup_note(I18nScript.t("The backup could not be read."))
+                return
+        file.store_buffer(Marshalls.base64_to_raw(archive))
+        file.close()
+        _run_import(staging)
+        DirAccess.remove_absolute(staging)
+
+## The browser's way out: the zip is staged in the app's own storage, read
+## back, and handed to the page in base64 pieces -- a page-sized string at
+## a time, never the whole archive in one eval -- where the head script
+## gathers them into a Blob and offers it as a download under the backup's
+## own name. The staging file is removed afterwards: the download is the
+## reader's copy.
+func _export_web(file_name: String) -> void:
+        DirAccess.make_dir_recursive_absolute("user://backups")
+        var staging := "user://backups".path_join(file_name)
+        var result: Dictionary = DeckZipScript.export_deck(_deck.folder, staging)
+        if not bool(result.get("ok", false)):
+                _backup_note(I18nScript.t("The backup could not be written — your deck is safe here."))
+                return
+        var bridge := _zip_bridge()
+        if bridge == null:
+                _backup_note(I18nScript.t(
+                        "This build cannot download files — the backup is saved inside the app's storage."
+                ))
+                return
+        var archive := Marshalls.raw_to_base64(FileAccess.get_file_as_bytes(staging))
+        bridge.call("eval", "window.__qtZipChunks=[]")
+        var step := 393216
+        for start in range(0, archive.length(), step):
+                bridge.call(
+                        "eval", "window.__qtZipChunks.push(atob('%s'))" % archive.substr(start, step)
+                )
+        bridge.call(
+                "eval",
+                "(function(){var b=new Blob(window.__qtZipChunks,{type:'application/zip'});"
+                        + "window.__qtZipChunks=null;var u=URL.createObjectURL(b);"
+                        + "var a=document.createElement('a');a.href=u;a.download='" + file_name + "';"
+                        + "document.body.appendChild(a);a.click();a.remove();"
+                        + "setTimeout(function(){URL.revokeObjectURL(u)},4000)})()"
+        )
+        DirAccess.remove_absolute(staging)
+        _backup_note(I18nScript.t("Backup downloaded — it is in your browser's downloads."))

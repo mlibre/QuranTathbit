@@ -2,6 +2,7 @@ extends SceneTree
 const DeckScript := preload("res://scripts/data/deck.gd")
 const CardScript := preload("res://scripts/data/card.gd")
 const SchedulerScript := preload("res://scripts/data/scheduler.gd")
+const DeckZipScript := preload("res://scripts/data/deck_zip.gd")
 const ThemeScript := preload("res://scripts/ui/theme.gd")
 
 ## The app must boot cold, on any machine, with no warm editor cache: the
@@ -700,6 +701,89 @@ func _check_settings(main: Node) -> void:
                                 and int((paced as Dictionary).get("new_per_day", -1)) == 20,
                         "a chosen pace is stamped into the deck's own progress file"
                 )
+        # The deck as one file: the backup card stands in Settings, the two
+        # doors out of it are wired, and the whole journey -- the real deck
+        # packed, joined back, its picker pressed -- runs against the real
+        # user deck, all inside the app's own storage (a test never writes
+        # into a person's real Downloads folder).
+        var backup_card: Control = settings.get_node_or_null("Margin/Scroll/Wrap/Column/Backup")
+        _ok(backup_card != null, "the backup card stands beside the deck's own")
+        var export_button: Button = settings.get_node_or_null(
+                "Margin/Scroll/Wrap/Column/Backup/Padding/Box/Buttons/Export"
+        )
+        var import_button: Button = settings.get_node_or_null(
+                "Margin/Scroll/Wrap/Column/Backup/Padding/Box/Buttons/Import"
+        )
+        _ok(export_button != null and export_button.text == "Export", "the way out is offered in words")
+        _ok(import_button != null and import_button.text == "Import", "and the way back beside it")
+        if export_button != null:
+                var wired := false
+                for link in export_button.pressed.get_connections():
+                        if str(link["callable"]).contains("_on_export_pressed"):
+                                wired = true
+                _ok(wired, "the way out is wired to the packer")
+        var roundtrip := "user://backups".path_join("boot-roundtrip.zip")
+        DirAccess.make_dir_recursive_absolute("user://backups")
+        var packed: Dictionary = DeckZipScript.export_deck("user://decks/quran", roundtrip)
+        _ok(bool(packed.get("ok", false)), "the real deck packs into one file")
+        _ok(
+                int(packed.get("files", 0)) >= 390,
+                "every card's words and media ride along (got %d)" % int(packed.get("files", 0))
+        )
+        var archive := ZIPReader.new()
+        var opened := archive.open(roundtrip)
+        _ok(opened == OK, "the file is a zip a reader can open")
+        if opened == OK:
+                _ok(archive.file_exists("deck.json"), "the deck's own word rides")
+                _ok(archive.file_exists("progress.json"), "the learning rides")
+                _ok(archive.file_exists("001/front.md"), "the cards ride")
+                archive.close()
+        var before_progress := FileAccess.get_file_as_bytes("user://decks/quran/progress.json")
+        var joined: Dictionary = DeckZipScript.import_deck("user://decks/quran", roundtrip)
+        _ok(bool(joined.get("ok", false)), "and joins back into the same deck")
+        _is(int(joined.get("merged", 0)), 0, "a deck meeting its own backup moves no learning")
+        _is(int(joined.get("added", 0)), 0, "and adds no files")
+        _ok(
+                before_progress == FileAccess.get_file_as_bytes("user://decks/quran/progress.json"),
+                "an unmoved progress file is not even rewritten"
+        )
+        # The way back runs through the picker: a press on Import stands the
+        # page of found backups over Settings, a press on a row joins it, and
+        # the note under the buttons says what arrived -- nothing, here.
+        if import_button != null:
+                import_button.pressed.emit()
+                await create_timer(0.3).timeout
+                var picker: Control = settings.get_node_or_null("BackupPicker")
+                _ok(picker != null, "the way in opens the page of found backups")
+                if picker != null:
+                        var row: Button = picker.get_node_or_null("Centre/Card/Pad/Box/Rows/Row0")
+                        _ok(row != null, "the backup this test made is offered as a row")
+                        if row != null:
+                                row.pressed.emit()
+                                await create_timer(0.4).timeout
+                                var note: RichTextLabel = settings.get_node_or_null(
+                                        "Margin/Scroll/Wrap/Column/Backup/Padding/Box/BackupNote"
+                                )
+                                _ok(
+                                        note != null and note.text == "This deck already holds everything the backup has.",
+                                        "the note says what arrived, in the reader's own words"
+                                )
+                                _is(main._deck.cards.size(), 99, "the deck re-reads whole after the join")
+                        _ok(settings.get_node_or_null("BackupPicker") == null, "the page puts itself away")
+                import_button.pressed.emit()
+                await create_timer(0.3).timeout
+                var picker_again: Control = settings.get_node_or_null("BackupPicker")
+                if picker_again != null:
+                        var cancel: Button = picker_again.get_node_or_null("Centre/Card/Pad/Box/Cancel")
+                        _ok(cancel != null, "the page can be put away by hand too")
+                        if cancel != null:
+                                cancel.pressed.emit()
+                                await create_timer(0.3).timeout
+                                _ok(
+                                        settings.get_node_or_null("BackupPicker") == null,
+                                        "cancel puts the page away"
+                                )
+        DirAccess.remove_absolute(roundtrip)
         # The reading card: the verses' own face and the app's own tongue,
         # both the reader's to choose, both shown as what they are, and both
         # carried with the deck the way the pace is.

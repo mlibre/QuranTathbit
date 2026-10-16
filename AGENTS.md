@@ -23,6 +23,16 @@ Windows, web) in Godot 4.7 with GDScript only.
   writes the card's own `front.md`/`back.md`; and the installer may deliver
   bundled media a deck does not yet have (the Persian translation
   recitations) — additively, never overwriting what is already there.
+- **The backup joins; it never takes away.** A zip of the deck is the same
+  deck in one file, and bringing one back is a merge, not a restore:
+  progress card by card (the better-informed entry wins), the travelling
+  choices by their own moments, files only where the deck lacks them —
+  the sync engine's own rules, so every door into the deck agrees on what
+  a merge means. An export carries deck content only: editor metadata
+  never rides, and the app's settings never ride (the token among them is
+  a secret). The backup's filename is a literal, not chrome — it is said
+  as written, digits and all, because dressing it would name a file that
+  does not exist.
 - **Local first.** The deck is fully usable offline, forever. Sync never
   blocks study and never loses work: a failed transfer is reported and
   retried, and progress merges card by card so two offline devices both keep

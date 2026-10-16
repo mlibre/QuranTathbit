@@ -74,6 +74,11 @@ A few quiet extras:
   in Settings. Numbers come in the language's own digits (۱ ۲ ۳, not 1 2 3),
   and waits are spoken in words — ۱ روز, not 1d. The verses and their
   Persian translation always stay exactly as they are.
+- **Keep the deck as one file.** Settings → *Backup* packs the whole deck —
+  verses, recitations, and all your progress — into a single zip that lands
+  in your Downloads folder (in a browser, it downloads). Import joins a
+  backup to this deck the same way sync does — card by card, choices by
+  their moment — so bringing one back can never take a review away.
 - **Copy any verse or translation** — drag or long-press, and paste it
   anywhere.
 
@@ -84,7 +89,8 @@ yours. Press **Connect GitHub** in Settings, follow the short sign-in, and
 the app keeps everything in step: study on your phone, and the same deck
 waits on your computer. If two devices study apart from each other, both
 keep their work when they meet again. Not interested? Everything also
-works fully offline, forever, on one device.
+works fully offline, forever, on one device — and the *Backup* card keeps
+the whole deck as one file you can carry by hand.
 
 ## Keyboard shortcuts
 

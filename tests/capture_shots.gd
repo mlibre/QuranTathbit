@@ -13,8 +13,9 @@ extends SceneTree
 ## the same first run.
 
 const MainScript := preload("res://scripts/main.gd")
+const DeckZipScript := preload("res://scripts/data/deck_zip.gd")
 
-const SHOTS := 20
+const SHOTS := 22
 
 var _out := "/tmp/shots"
 var _saved := 0
@@ -83,13 +84,43 @@ func _init() -> void:
         main._on_settings_pressed()
         await create_timer(0.8).timeout
         await _shot("settings")
+        var settings_screen: Control = main.get_node("Settings")
+        var scroll: ScrollContainer = settings_screen.get_node("Margin/Scroll")
+        # The deck as one file: the backup card, and over it the page of
+        # found backups -- offered with a real row, made by a real export
+        # into the app's own corner (the capture machine names no Downloads
+        # folder, so the app's corner is where backups land here).
+        var backup: Control = settings_screen.get_node_or_null("Margin/Scroll/Wrap/Column/Backup")
+        if backup != null:
+                DirAccess.make_dir_recursive_absolute("user://backups")
+                var packed: Dictionary = DeckZipScript.export_deck(
+                        "user://decks/quran", "user://backups".path_join("capture-deck.zip")
+                )
+                if bool(packed.get("ok", false)):
+                        scroll.scroll_vertical = int(
+                                maxf(0.0, backup.get_global_rect().position.y - scroll.get_global_rect().position.y)
+                        )
+                        await create_timer(0.5).timeout
+                        await _shot("backup")
+                        var import_button: Button = settings_screen.get_node_or_null(
+                                "Margin/Scroll/Wrap/Column/Backup/Padding/Box/Buttons/Import"
+                        )
+                        if import_button != null:
+                                import_button.pressed.emit()
+                                await create_timer(0.6).timeout
+                                await _shot("backup_picker")
+                                var backup_page: Control = settings_screen.get_node_or_null("BackupPicker")
+                                if backup_page != null:
+                                        var cancel: Button = backup_page.get_node_or_null("Centre/Card/Pad/Box/Cancel")
+                                        if cancel != null:
+                                                cancel.pressed.emit()
+                                await create_timer(0.4).timeout
+                        DirAccess.remove_absolute("user://backups".path_join("capture-deck.zip"))
         # The reading card: the verses' face and the app's tongue, offered as
         # what they are -- a basmala drawn in each hand, a language named in
         # its own script.
-        var settings_screen: Control = main.get_node("Settings")
         var reading: Control = settings_screen.get_node_or_null("Margin/Scroll/Wrap/Column/Reading")
         if reading != null:
-                var scroll: ScrollContainer = settings_screen.get_node("Margin/Scroll")
                 scroll.scroll_vertical = int(
                         maxf(0.0, reading.get_global_rect().position.y - scroll.get_global_rect().position.y)
                 )
