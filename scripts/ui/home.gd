@@ -176,7 +176,14 @@ func set_syncing() -> void:
 func _next_reference() -> String:
         if _counts["due"] + _counts["new"] == 0:
                 return ""
-        var queue: Array = SchedulerScript.queue(_deck_of_last_setup, int(Time.get_unix_time_from_system()))
+        # The queue is filled with the day's own offer of new cards -- the
+        # same number the counts carried in -- so the next card shown is the
+        # next card a session would actually bring.
+        var queue: Array = SchedulerScript.queue(
+                _deck_of_last_setup,
+                int(Time.get_unix_time_from_system()),
+                int(_counts.get("new_per_day", SchedulerScript.NEW_PER_DAY))
+        )
         if queue.is_empty():
                 return ""
         var front: String = queue[0].front

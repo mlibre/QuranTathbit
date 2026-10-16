@@ -96,6 +96,8 @@ func _add_eyebrow(ref_line: String) -> void:
         ))
         label.add_theme_font_size_override("normal_font_size", 15 if script == "arabic" else 13)
         label.add_theme_color_override("default_color", ThemeScript.GOLD_DEEP)
+        # The reader's hand rests on the page's own gold, not the engine's blue.
+        label.add_theme_color_override("selection_color", ThemeScript.SELECT)
         label.text = ref_line  # bbcode is off here, so brackets can render literally
         _body.add_child(label)
 
@@ -140,13 +142,13 @@ func _add_text(markdown: String, link: String, lead := false) -> void:
                 # usually -- sits centred like the rest of the page, not
                 # orphaned against the left edge.
                 label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        var face: Font = ThemeScript.font_for(script, ThemeScript.BODY)
+        var face: Font = ThemeScript.verse_face(script)
         label.add_theme_font_override("normal_font", face)
         # The deck's emphasis marks mean a lean, and a lean needs a face that
         # leans: the engine's [i] falls back to the upright normal when no
         # italic is given, and the stars the author wrote would show as
         # nothing at all. Every script gets the sheared twin of its own face.
-        var bold_face: Font = ThemeScript.font_for(script, ThemeScript.BODY, true)
+        var bold_face: Font = ThemeScript.verse_face(script, true)
         label.add_theme_font_override("bold_font", bold_face)
         label.add_theme_font_override("italics_font", ThemeScript.leaning(face))
         label.add_theme_font_override("bold_italics_font", ThemeScript.leaning(bold_face))
@@ -159,6 +161,9 @@ func _add_text(markdown: String, link: String, lead := false) -> void:
         label.add_theme_font_size_override("bold_italics_font_size", face_size)
         label.text = _bbcode(markdown, script)
         label.add_theme_color_override("default_color", ThemeScript.INK if script != "plain" else ThemeScript.INK_SOFT)
+        # Selection, too, wears the page's gold: the verse is the thing a
+        # reader is most likely to reach for with the mouse.
+        label.add_theme_color_override("selection_color", ThemeScript.SELECT)
         # Scripture breathes between its lines; the lead, most of all.
         if script == "arabic":
                 label.add_theme_constant_override("line_separation", 14 if lead else 12)
@@ -213,6 +218,7 @@ func _add_footer(markdown: String, url: String) -> void:
         line.add_theme_font_override("normal_font", font)
         line.add_theme_font_size_override("normal_font_size", 12)
         line.add_theme_color_override("default_color", ThemeScript.INK_SOFT)
+        line.add_theme_color_override("selection_color", ThemeScript.SELECT)
         line.text = "[color=#8D6E24][url=%s]%s[/url][/color]" % [url, label_text]
         line.meta_clicked.connect(_open_link)
         box.add_child(line)

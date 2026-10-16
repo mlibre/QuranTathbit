@@ -30,8 +30,16 @@ const DANGER := Color("#B4553F")
 
 const AMIRI := "res://assets/fonts/Amiri-Regular.ttf"
 const AMIRI_BOLD := "res://assets/fonts/Amiri-Bold.ttf"
+const AMIRI_QURAN := "res://assets/fonts/AmiriQuran-Regular.ttf"
 const VAZIR := "res://assets/fonts/Vazirmatn-Regular.ttf"
 const VAZIR_BOLD := "res://assets/fonts/Vazirmatn-Bold.ttf"
+
+## The wash a selection wears. The engine's own RichTextLabel selection is a
+## hard blue (0.1, 0.1, 1.0, 0.8) -- on this warm paper it reads as a spill
+## from another app. A selection here is the reader's hand resting on a
+## line: the gold of the page's own accents, at a whisper, with the ink left
+## to speak through it.
+const SELECT := Color(0.76, 0.60, 0.23, 0.30)
 
 # Letters that belong to one script and not the other: the tell that
 # separates an Arabic line from a Persian one.
@@ -1047,6 +1055,27 @@ static func vazir(size: int, bold := false) -> Font:
 
 static func amiri(size: int, bold := false) -> Font:
         return load(AMIRI_BOLD if bold else AMIRI) as Font
+
+
+static func quran() -> Font:
+        return load(AMIRI_QURAN) as Font
+
+
+## The face a verse wears, wherever scripture itself is shown: the study
+## card, the open page in the library, the shelf's own preview. Amiri Quran
+## is the family's mushaf cut -- the same hand as Amiri with the harakat
+## drawn larger and rounder, the way a vocalised text is read from. Amiri's
+## own damma at the shelf's small sizes flattens into a fatha's stroke -- a
+## reader learning the vowels read exactly that mistake off the preview --
+## and Amiri Quran's curl stays a curl at every size this app draws. There
+## is no bold in the mushaf cut: bold scripture falls back to the family's
+## own Bold, and references (which carry no vowels to lose) stay with Amiri.
+static func verse_face(script: String, bold := false) -> Font:
+        match script:
+                "arabic":
+                        return amiri(BODY, bold) if bold else quran()
+                _:
+                        return vazir(BODY, bold)
 
 
 ## Which script is this line written in? Arabic gets the Quranic face and a

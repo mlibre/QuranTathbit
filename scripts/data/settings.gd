@@ -7,6 +7,7 @@ extends RefCounted
 ## that lives in the deck's own progress.json, where sync merges it.
 
 const PATH := "user://settings.json"
+const SchedulerScript := preload("res://scripts/data/scheduler.gd")
 
 var token := ""  # GitHub personal access token (or OAuth device-flow token)
 var owner := ""  # GitHub login; filled in the first time we see it
@@ -16,6 +17,12 @@ var last_sync := 0  # unix seconds
 var setup_done := false
 var auto_sync := true  # quiet sync after each session, and when the app opens
 var volume := 1.0  # recitation loudness, 0 (silent) to 1 (full); remembered between visits
+## How many unseen cards a day offers. Anki's deck default (20 a day) is the
+## starting point, not a law: a reader pacing their own memorisation chooses
+## their own number in Settings, and the scheduler asks this before it fills
+## the day's queue. Per device, like volume -- it is how a person reads, not
+## what they have read.
+var new_per_day := SchedulerScript.NEW_PER_DAY
 
 
 static func load_settings():
@@ -26,7 +33,7 @@ static func load_settings():
         if typeof(data) != TYPE_DICTIONARY:
                 push_warning("Settings: %s unreadable; using defaults" % PATH)
                 return s
-        for key in ["token", "owner", "repo", "deck_folder", "last_sync", "setup_done", "auto_sync", "volume"]:
+        for key in ["token", "owner", "repo", "deck_folder", "last_sync", "setup_done", "auto_sync", "volume", "new_per_day"]:
                 if not data.has(key):
                         continue
                 # JSON reads every number back as a float, and every saved int
@@ -62,6 +69,7 @@ func save() -> bool:
                                 "setup_done": setup_done,
                                 "auto_sync": auto_sync,
                                 "volume": volume,
+                                "new_per_day": new_per_day,
                         },
                         "\t"
                 )

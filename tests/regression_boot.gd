@@ -1,6 +1,7 @@
 extends SceneTree
 const DeckScript := preload("res://scripts/data/deck.gd")
 const CardScript := preload("res://scripts/data/card.gd")
+const SchedulerScript := preload("res://scripts/data/scheduler.gd")
 const ThemeScript := preload("res://scripts/ui/theme.gd")
 
 ## The app must boot cold, on any machine, with no warm editor cache: the
@@ -176,6 +177,29 @@ func _check_study_session(main: Node) -> void:
         # so the verse is never read without knowing which one was asked for.
         var eyebrow := view.get_node_or_null("Body/Eyebrow")
         _ok(eyebrow != null and str(eyebrow.text).length() > 0, "the question rides along above the answer")
+        # The verse wears the mushaf's own cut -- Amiri Quran, whose larger
+        # harakat stay round at every size this app draws; Amiri's damma at
+        # the shelf's small sizes read as a fatha's stroke, and a reader
+        # learning the vowels read exactly that mistake off the page. And a
+        # selection rests in the page's gold, never the engine's blue.
+        # The verse breathes inside its own margin wrapper, so the page is
+        # walked branch and all -- the first paragraph found is the verse.
+        var paragraph: RichTextLabel = null
+        for found in view.find_children("Paragraph", "RichTextLabel", true, false):
+                paragraph = found
+                break
+        if paragraph != null:
+                _ok(
+                        str(paragraph.get_theme_font("normal_font").resource_path).ends_with(
+                                "AmiriQuran-Regular.ttf"
+                        ),
+                        "the verse wears the mushaf cut (Amiri Quran)"
+                )
+                _is(
+                        paragraph.get_theme_color("selection_color"),
+                        ThemeScript.SELECT,
+                        "a selection rests in the page's own gold"
+                )
         # The back of the first card is Arabic plus Persian plus audio.
         var texts := []
         for child in view.get_node("Body").get_children():
@@ -342,6 +366,33 @@ func _check_settings(main: Node) -> void:
                 auto_row.set_pressed_no_signal(true)
                 auto_row.toggled.emit(true)
                 _ok(main._settings.auto_sync, "the row keeps the promise it says")
+        # The day's offer is the reader's own: the stepper stands in the deck's
+        # card, a press moves the number and writes the file, and the counts
+        # that reach home answer it.
+        var step_value: Label = settings.get_node_or_null(
+                "Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/NewPerDay/Chip/StepValue"
+        )
+        _ok(step_value != null, "the day's new-card offer stands in the deck's card")
+        if step_value != null:
+                _is(int(step_value.text), main._settings.new_per_day, "the chip says the setting's number")
+                var step_more: Button = settings.get_node_or_null(
+                        "Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/NewPerDay/StepMore"
+                )
+                if step_more != null:
+                        step_more.pressed.emit()
+                        _is(main._settings.new_per_day, 21, "a press on more offers one more card a day")
+                        _is(int(step_value.text), 21, "the chip follows the setting")
+                var step_less: Button = settings.get_node_or_null(
+                        "Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/NewPerDay/StepLess"
+                )
+                if step_less != null:
+                        step_less.pressed.emit()
+                        _is(main._settings.new_per_day, 20, "a press on less offers one fewer")
+        # The home page answers the offer the same hour it changes: counts
+        # carry the cap, and a smaller day is a smaller new count.
+        var counts_now: Dictionary = SchedulerScript.counts(main._deck, int(Time.get_unix_time_from_system()), 3)
+        _is(counts_now.new, 3, "a day that offers three brings three new cards")
+        _is(counts_now.new_per_day, 3, "the counts carry the day's own offer")
         settings.closed.emit()
         await create_timer(0.4).timeout
         _ok(main.get_node_or_null("Home") != null, "closing settings returns home")
@@ -425,6 +476,20 @@ func _check_browse(main: Node) -> void:
                 browse.closed.emit()
                 await create_timer(0.3).timeout
                 return
+        # The shelf's own scripture: the row's preview is the verse itself in
+        # the mushaf cut, at a size its vowels survive -- the one place the
+        # app drew Amiri's harakat small enough to misread.
+        var preview: Label = first_entry.get_node_or_null("Row/Line/Words/Preview")
+        if preview != null:
+                _is(
+                        preview.get_theme_font_size("font_size"),
+                        20,
+                        "the shelf's verse preview reads at the mushaf's size"
+                )
+                _ok(
+                        str(preview.get_theme_font("font").resource_path).ends_with("AmiriQuran-Regular.ttf"),
+                        "the shelf's preview wears the mushaf cut"
+                )
         (first_entry.get_node("Row") as Button).pressed.emit()
         await create_timer(0.4).timeout
         var detail: VBoxContainer = first_entry.get_node("Detail")
@@ -498,6 +563,7 @@ func _check_settings_round_trip() -> void:
         settings.setup_done = true
         settings.auto_sync = false
         settings.volume = 0.35
+        settings.new_per_day = 7
         _ok(settings.save(), "settings save")
         var back = script.load_settings()
         _is(back.token, "round-trip", "the token loads back")
@@ -505,6 +571,7 @@ func _check_settings_round_trip() -> void:
         _is(back.setup_done, true, "setup_done survives its own reload")
         _is(back.auto_sync, false, "a switched-off auto sync stays off")
         _is(back.volume, 0.35, "a chosen loudness survives its own reload")
+        _is(back.new_per_day, 7, "a chosen pace survives its own reload")
         # A file written by any older version of the app carries its ints as
         # floats; those must heal into the ints they were meant as.
         var file := FileAccess.open("user://settings.json", FileAccess.WRITE)

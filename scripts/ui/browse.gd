@@ -126,6 +126,7 @@ func _search_field() -> Control:
         field.add_theme_color_override("font_color", ThemeScript.INK)
         field.add_theme_color_override("font_placeholder_color", ThemeScript.INK_SOFT)
         field.add_theme_color_override("caret_color", ThemeScript.GREEN_DEEP)
+        field.add_theme_color_override("selection_color", ThemeScript.SELECT)
         var page := ThemeScript.soft_stylebox(ThemeScript.CARD, 14)
         page.border_color = ThemeScript.LINE
         page.set_border_width_all(1)
@@ -354,7 +355,9 @@ func _entry(card: CardScript, reference: String) -> Control:
         var row := Button.new()
         row.name = "Row"
         row.toggle_mode = false
-        row.custom_minimum_size = Vector2(0, 68)
+        # The row breathes for the verse it carries: an Arabic preview in the
+        # mushaf cut stands taller than the shelf's old caption-sized line.
+        row.custom_minimum_size = Vector2(0, 76)
         row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         var rest := ThemeScript.soft_stylebox(ThemeScript.CARD, 14)
         rest.border_color = ThemeScript.LINE
@@ -423,8 +426,15 @@ func _entry(card: CardScript, reference: String) -> Control:
                 preview.text_direction = TextDirection.TEXT_DIRECTION_AUTO
                 preview.clip_text = true
                 var preview_script := ThemeScript.script_of(preview_text)
-                preview.add_theme_font_override("font", ThemeScript.font_for(preview_script, 12))
-                preview.add_theme_font_size_override("font_size", 12)
+                # The verse face, at a size its vowels survive: the preview is
+                # the shelf's smallest scripture, and Amiri's damma at 12 px
+                # read as a fatha's flat stroke -- the one mistake a reader
+                # learning the vowels cannot afford. The mushaf cut's larger
+                # marks, at the size the theme gives Arabic beside Persian,
+                # keep every curl a curl.
+                preview.add_theme_font_override("font", ThemeScript.verse_face(preview_script))
+                var preview_size := 20 if preview_script == "arabic" else 12
+                preview.add_theme_font_size_override("font_size", preview_size)
                 preview.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
                 words.add_child(preview)
 

@@ -13,7 +13,10 @@ Windows, web) in Godot 4.7 with GDScript only.
   of scripture is also a book to read through, so the library belongs
   here. A feature that needs a second deck does not belong here.
 - **Anki's math, exactly.** The scheduler is Anki's SM-2 with Anki's
-  parameters, not an approximation. No FSRS, no custom scheduler.
+  parameters, not an approximation. No FSRS, no custom scheduler. The one
+  number the reader owns is the deck option Anki itself exposes — how many
+  new cards a day offers (default 20) — a setting in Settings, never a
+  change to the algorithm.
 - **Folders and files, no database.** The deck is folders and markdown; the
   converter that seeds it is a developer tool, and the app never parses
   Anki's formats. The app writes `progress.json`; the on-the-spot editor

@@ -14,11 +14,11 @@ godot --headless --path . --script tests/regression_<name>.gd   # one suite
 
 | suite                  | what it holds the app to                                              |
 | --- | --- |
-| `regression_scheduler` | Anki's SM-2 with Anki's numbers: interval bands, fuzz bounds, step delays, lapse/relearn round trips, ease moves, queue caps |
+| `regression_scheduler` | Anki's SM-2 with Anki's numbers: interval bands, fuzz bounds, step delays, lapse/relearn round trips, ease moves, queue caps — the per-day new-card offer as the algorithm defaults it and as the reader chooses it |
 | `regression_deck`      | the deck as folders and files: load, card discovery, media resolution, progress round-trip, byte-stable saves (an int never re-saves as a float), repair of a hand-corrupted `progress.json` |
 | `regression_sync`      | sync against a fake GitHub: first push, second device, local-edit-wins, progress merge by card, single-commit batches, ref-conflict retry, foreign files untouched, editor metadata never travelling, web builds skipping media — and a quiet sync that asks for nothing: no upload, no tree, no commit, not even a file download, while both sides match the last sync's record |
 | `regression_markdown`  | the card markdown subset, and the Arabic/Persian/Latin script detection that dresses each block |
-| `regression_boot`      | a cold first run: the bundled deck installs itself, home shows the real numbers, a session renders a real card (its Listen button returning to rest the moment the sound runs out), the volume coin opens and sets the player's loudness, settings opens (token field, Show/Save standing, no paste button — paste happens in the field itself) and returns — and the settings file survives its own handwriting: JSON's floats read back as the ints they were saved as |
+| `regression_boot`      | a cold first run: the bundled deck installs itself, home shows the real numbers, a session renders a real card in the mushaf cut (its Listen button returning to rest the moment the sound runs out, its selections wearing the page's gold), the volume coin opens and sets the player's loudness, settings opens (token field, Show/Save standing, no paste button — paste happens in the field itself — and the new-cards stepper answering a press), and returns — and the settings file survives its own handwriting: JSON's floats read back as the ints they were saved as |
 
 ## Why the battery runs twice
 

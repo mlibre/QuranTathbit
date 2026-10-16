@@ -138,6 +138,7 @@ func _text(what: String, color: Color, size: int, center := false, bold := false
         label.add_theme_font_override("normal_font", ThemeScript.vazir(size, bold))
         label.add_theme_font_size_override("normal_font_size", size)
         label.add_theme_color_override("default_color", color)
+        label.add_theme_color_override("selection_color", ThemeScript.SELECT)
         label.text = what
         return label
 
@@ -161,7 +162,7 @@ func _style_field(field: LineEdit) -> void:
         field.add_theme_color_override("font_color", ThemeScript.INK)
         field.add_theme_color_override("caret_color", ThemeScript.GREEN_DEEP)
         field.add_theme_color_override("font_placeholder_color", ThemeScript.INK_SOFT)
-        field.add_theme_color_override("selection_color", ThemeScript.GREEN_SOFT)
+        field.add_theme_color_override("selection_color", ThemeScript.SELECT)
 
 ## One card's bones: the panel, the padding, the column. Settings' cards all
 ## wear the same frame, so only their contents differ.
@@ -419,7 +420,60 @@ func _deck_body() -> Control:
         var note := _text("Cards are folders on your disk. Edit them anywhere; sync carries them.", ThemeScript.INK_SOFT, ThemeScript.CAPTION)
         note.name = "Note"
         box.add_child(note)
+
+        # The day's own offer: how many unseen cards a session may bring. The
+        # number is the reader's pace, not the algorithm's -- Anki's deck
+        # default of 20 is only where it starts -- so it lives here, beside
+        # the deck it paces, as the one arithmetic the reader is asked to own.
+        box.add_child(ThemeScript.hairline())
+        box.add_child(_field_label("New cards each day"))
+        var stepper := HBoxContainer.new()
+        stepper.name = "NewPerDay"
+        stepper.add_theme_constant_override("separation", 10)
+        box.add_child(stepper)
+        var less := ThemeScript.ghost_button("-", ThemeScript.GREEN_DEEP, 44)
+        less.name = "StepLess"
+        less.tooltip_text = "Offer one fewer new card a day"
+        less.custom_minimum_size = Vector2(52, 44)
+        less.pressed.connect(_step_new_per_day.bind(-1))
+        stepper.add_child(less)
+        var value_chip := PanelContainer.new()
+        value_chip.name = "Chip"
+        value_chip.custom_minimum_size = Vector2(72, 44)
+        value_chip.add_theme_stylebox_override(
+                "panel", ThemeScript.soft_stylebox(ThemeScript.GOLD_SOFT, 14)
+        )
+        var value := Label.new()
+        value.name = "StepValue"
+        value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+        value.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        ThemeScript.dress(value, ThemeScript.BODY + 2, ThemeScript.GOLD_DEEP, true)
+        value_chip.add_child(value)
+        stepper.add_child(value_chip)
+        var more := ThemeScript.ghost_button("+", ThemeScript.GREEN_DEEP, 44)
+        more.name = "StepMore"
+        more.tooltip_text = "Offer one more new card a day"
+        more.custom_minimum_size = Vector2(52, 44)
+        more.pressed.connect(_step_new_per_day.bind(1))
+        stepper.add_child(more)
+        var pace := _text(
+                "How many unseen cards a day offers — 0 studies only reviews. Anki's default is 20.",
+                ThemeScript.INK_SOFT, 12
+        )
+        pace.name = "Pace"
+        stepper.add_child(pace)
         return card
+
+## A press on the stepper is the reader choosing their own pace: the number
+## moves at once, the file is written at once, and the chip says what the
+## next session will bring. The bounds keep the choice sane -- 0 is a day of
+## reviews only, and no day needs more new cards than this.
+func _step_new_per_day(delta: int) -> void:
+        _settings.new_per_day = clampi(_settings.new_per_day + delta, 0, 200)
+        _settings.save()
+        var value: Label = get_node("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/NewPerDay/Chip/StepValue")
+        value.text = str(_settings.new_per_day)
 
 func _source_body() -> Control:
         var parts := _card("DataSource")
@@ -444,6 +498,7 @@ func _source_body() -> Control:
         what.add_theme_color_override("default_color", ThemeScript.INK)
         # Selection lets a user copy the line; the link opens in the browser.
         what.selection_enabled = true
+        what.add_theme_color_override("selection_color", ThemeScript.SELECT)
         what.meta_clicked.connect(func(meta: Variant) -> void: OS.shell_open(str(meta)))
         box.add_child(what)
 
@@ -553,6 +608,10 @@ func _refresh() -> void:
         var folder: RichTextLabel = get_node("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/Folder")
         name.text = "%s — %d cards" % [_deck.name, _deck.cards.size()]
         folder.text = _deck.folder
+        # The day's offer is said here too, not only on a press: a reader
+        # returning to this page reads their pace off the chip.
+        var pace_value: Label = get_node("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/NewPerDay/Chip/StepValue")
+        pace_value.text = str(_settings.new_per_day)
         note_sync_result("")
 
 # --- the device flow ------------------------------------------------------------

@@ -76,11 +76,17 @@ width, two answer buttons to a row, every target a thumb tall:
    back tomorrow. Progress is saved automatically.
 
 Every verse, translation and explanation is selectable — drag, or long-press
-on a touch screen — so you can paste any of it into your notes. The deck is
-also a book: **Browse** under the day's button opens the whole library —
+on a touch screen — so you can paste any of it into your notes: the
+selection rests in the page's own gold, never a browser-blue slab. The deck
+is also a book: **Browse** under the day's button opens the whole library —
 every card under its surah's name, searchable by the surah, the verse's own
 words, or its address (`2:93`, `۲:۹۳` — the hand's own digits both), each
 card opening in place to read and listen.
+
+The day's pace is yours, not the algorithm's. Anki's deck default offers 20
+new cards a day; **Settings → New cards each day** turns that number to your
+own — including 0, for days meant for reviews only — and the home count and
+the queue answer it at once.
 
 ## Sync, in plain words
 
@@ -120,8 +126,10 @@ friends — keep working as on any other page.
   site's own library (`persian-kabiri`), recorded in `deck.json`.
 - **Code** — MIT; **algorithm** — SM-2. Both attributions live in the
   [LICENSE](LICENSE).
-- **Typefaces** — Amiri for the Arabic verses, Vazirmatn for the Persian
-  text, each under its SIL OFL license in `assets/fonts/`.
+- **Typefaces** — Amiri Quran for the Arabic verses (the family's mushaf cut,
+  whose vowel marks stay round at every size this app draws), Amiri for the
+  references, Vazirmatn for the Persian text, each under its SIL OFL license
+  in `assets/fonts/`.
 
 ## For developers
 

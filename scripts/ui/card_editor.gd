@@ -174,6 +174,9 @@ func _field(text: String, min_height: int) -> TextEdit:
         field.add_theme_font_size_override("font_size", 15)
         field.add_theme_color_override("font_color", ThemeScript.INK)
         field.add_theme_color_override("caret_color", ThemeScript.GREEN_DEEP)
+        # The words a hand picks out of a field wear the page's gold, the
+        # same wash every selection in the app wears -- not the engine's grey.
+        field.add_theme_color_override("selection_color", ThemeScript.SELECT)
         var page := ThemeScript.soft_stylebox(ThemeScript.CARD, 12)
         page.border_color = ThemeScript.LINE
         page.set_border_width_all(1)

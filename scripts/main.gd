@@ -171,7 +171,9 @@ func _go_home() -> void:
 func _start_session() -> void:
         if _screen is StudyScript:
                 return
-        var cards := SchedulerScript.queue(_deck, _now())
+        # The day's queue answers the reader's own offer of new cards, not
+        # only the algorithm's default.
+        var cards := SchedulerScript.queue(_deck, _now(), _settings.new_per_day)
         if cards.is_empty():
                 return
         var study := StudyScript.new()
@@ -375,7 +377,12 @@ func _refresh_home() -> void:
         if not _screen is HomeScript:
                 return
         var home: HomeScript = _screen
-        home.setup(_deck, SchedulerScript.counts(_deck, _now()), _sync_line(), _sync_state())
+        home.setup(
+                _deck,
+                SchedulerScript.counts(_deck, _now(), _settings.new_per_day),
+                _sync_line(),
+                _sync_state()
+        )
 
 
 func _sync_line() -> String:
