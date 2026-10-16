@@ -173,6 +173,8 @@ godot --headless --path <project> --export-release "<preset>" <output>
 - **`BoxContainer` separation may be negative, and that keeps a pitch.** A mirror of `RichTextLabel` lines overlaying a `TextEdit` must hold the engine's own line pitch; giving each label internal room via stylebox margins and paying exactly that amount back with `separation = pitch - 2*room` (negative is honored) keeps every line where the engine laid it — the caret and click-mapping never drift. Shift the transparent `TextEdit` down by the same room so its invisible lines sit under the visible ink.
 - **`layout_direction = LAYOUT_DIRECTION_RTL` on a page's root flips every `BoxContainer` below it** — HBox rows mirror their child order (the way back lands at the right), while `horizontal_alignment` stays visual (LEFT still means the left edge; set labels to RIGHT explicitly). A shared `top_bar` needs an `rtl` flag that also mirrors its back chevron, or a right-side back button points off-screen the wrong way.
 
+- **Pushing more than three tags in one `git push` creates no events.** GitHub silently skips workflow triggers when a single push updates more than three refs (tag or branch) — the tags land on the remote, `Release builds`/`Publish to npm` never queue, and the releases page looks "forgotten". Push release tags one at a time (or at most three per command), then verify with the Actions API, not with `git push`'s exit code.
+
 ## Finish checklist
 
 - The implementation matches the project's exact Godot version, renderer, physics backend, feature tags, and platform constraints.
