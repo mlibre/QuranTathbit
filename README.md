@@ -172,8 +172,12 @@ While editing a card: **Esc** closes without saving, **Ctrl+Enter** saves.
 
 [AGENTS.md](AGENTS.md) holds the design rules, [docs/TESTING.md](docs/TESTING.md)
 the test battery, [docs/OAUTH_SETUP.md](docs/OAUTH_SETUP.md) your own GitHub
-app, [docs/README.npm.md](docs/README.npm.md) the npm package. To run from
-source: `godot --headless --path . --import`, then open the project and
+app, [docs/README.npm.md](docs/README.npm.md) the npm package. The technical
+documentation lives in [docs/TEXT.md](docs/TEXT.md) (type and the page's
+chrome), [docs/INPUT.md](docs/INPUT.md) (the writing field, touch, the back
+key), [docs/DECK.md](docs/DECK.md) (folders, the package's audio, the
+repair) and [docs/WEB.md](docs/WEB.md) (the web build's pipeline). To run
+from source: `godot --headless --path . --import`, then open the project and
 press F5.
 
 ## 🇵🇸 In Support of Palestine

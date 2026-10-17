@@ -27,6 +27,10 @@ func _init() -> void:
                 "unhandledrejection",
                 "controllerchange",
                 "index.wasm.gz",
+                "qt-debug-log",
+                "__qtDebugLog",
+                "__qtDebugShow",
+                "execCommand",
         ]:
                 if not include.contains(part):
                         push_error("head_include lost its part: %s" % part)

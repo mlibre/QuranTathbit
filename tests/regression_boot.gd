@@ -114,7 +114,7 @@ func _check_home_numbers(home: Control) -> void:
         var fresh: Label = home.get_node("Margin/Column/Stats/New/Box/Value")
         var learned: Label = home.get_node("Margin/Column/Stats/Learned/Box/Value")
         _is(due.text, "0", "nothing is due on a fresh install")
-        _is(fresh.text, "20", "a day's new cards are offered")
+        _is(fresh.text, "2", "a day's new cards are offered")
         _is(learned.text, "0", "nothing is learned yet")
 
         var study: Button = home.get_node("Margin/Column/Study")
@@ -833,14 +833,14 @@ func _check_settings(main: Node) -> void:
                 )
                 if step_more != null:
                         step_more.pressed.emit()
-                        _is(main._settings.new_per_day, 21, "a press on more offers one more card a day")
-                        _is(int(step_value.text), 21, "the chip follows the setting")
+                        _is(main._settings.new_per_day, 3, "a press on more offers one more card a day")
+                        _is(int(step_value.text), 3, "the chip follows the setting")
                 var step_less: Button = settings.get_node_or_null(
                         "Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/NewPerDay/StepLess"
                 )
                 if step_less != null:
                         step_less.pressed.emit()
-                        _is(main._settings.new_per_day, 20, "a press on less offers one fewer")
+                        _is(main._settings.new_per_day, 2, "a press on less offers one fewer")
                 # The choice is the deck's own to carry: the pace lands in the
                 # progress file, where sync reads it to every other device.
                 var paced: Variant = JSON.parse_string(
@@ -848,7 +848,7 @@ func _check_settings(main: Node) -> void:
                 )
                 _ok(
                         typeof(paced) == TYPE_DICTIONARY
-                                and int((paced as Dictionary).get("new_per_day", -1)) == 20,
+                                and int((paced as Dictionary).get("new_per_day", -1)) == 2,
                         "a chosen pace is stamped into the deck's own progress file"
                 )
         # The deck as one file: the backup card stands in Settings, the two

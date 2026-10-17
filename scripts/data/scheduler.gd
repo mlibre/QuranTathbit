@@ -39,10 +39,11 @@ const HARD_FACTOR := 1.2
 const EASY_BONUS := 1.3
 const LAPSE_MULT := 0.0
 const MAX_IVL := 36500
-## Anki's deck default: how many unseen cards a day offers. The starting
-## point of the app's own setting, and the fallback wherever a caller does
-## not bring a number of its own.
-const NEW_PER_DAY := 20
+## Anki's deck default, worn to this deck's own size: how many unseen cards a
+## day offers. The starting point of the app's own setting, and the fallback
+## wherever a caller does not bring a number of its own. A scripture deck is
+## learned a couple of verses a day, not crammed twenty.
+const NEW_PER_DAY := 2
 const ROLLOVER := 4 * HOUR
 
 const AGAIN := "again"

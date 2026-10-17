@@ -237,6 +237,16 @@ jobs:
           grep -q "unhandledrejection" builds/web/index.html
           grep -q "controllerchange" builds/web/index.html
           grep -q "postMessage('claim')" builds/web/index.html
+          # The debug log rides the same head: five taps on a loading screen
+          # open the log the page kept from its first breath -- environment,
+          # every error, a loading heartbeat -- copyable in one press, so a
+          # reader on a phone the app cannot start on can hand the developer
+          # the whole story. The marker alone would pass even if the watch
+          # arrived truncated, so its working parts are demanded too.
+          grep -q "qt-debug-log" builds/web/index.html
+          grep -q "__qtDebugLog" builds/web/index.html
+          grep -q "__qtDebugShow" builds/web/index.html
+          grep -q "execCommand" builds/web/index.html
           python3 - <<'PY'
           import sys
           data = open("builds/web/index.pck", "rb").read()

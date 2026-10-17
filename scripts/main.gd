@@ -59,8 +59,9 @@ func _ready() -> void:
         # that matters dresses itself.
         get_window().theme = ThemeScript.tooltip_theme()
         _install_deck()
-        _deliver_translations()
         _deliver_cards()
+        _ensure_deck_audio()
+        _sweep_sidecars()
         _settings = SettingsScript.load_settings()
         _deck = DeckScript.load(USER_DECK)
         if _deck == null:
@@ -128,10 +129,19 @@ func _install_deck() -> void:
 
 
 func _copy_tree(from: String, to: String) -> void:
+        # Godot's editor sidecars (.import, .uid) are the editor's own
+        # bookkeeping, never deck content: they never ride a sync or a
+        # backup zip (both refuse them by name), and the copy never plants
+        # them either.
         for entry in DirAccess.get_files_at(from):
+                if entry.ends_with(".import") or entry.ends_with(".uid"):
+                        continue
                 var source := from.path_join(entry)
                 var target := to.path_join(entry)
-                var data := FileAccess.get_file_as_bytes(source)
+                var data := _bundled_bytes(source)
+                if data.is_empty():
+                        push_error("QuranTathbit: cannot read %s" % source)
+                        continue
                 var file := FileAccess.open(target, FileAccess.WRITE)
                 if file == null:
                         push_error("QuranTathbit: cannot write %s" % target)
@@ -143,40 +153,134 @@ func _copy_tree(from: String, to: String) -> void:
                 DirAccess.make_dir_recursive_absolute(sub_to)
                 _copy_tree(from.path_join(entry), sub_to)
 
+## One bundled file's real bytes, read the way the place it is read from
+## actually keeps it. In the editor a bundle path is a folder on disk and
+## raw bytes are the truth; in an exported package an imported file -- every
+## one of the deck's mp3s -- is not a file the file system can see at its
+## own path at all: the package carries it as a resource under
+## .godot/imported, with an .import remap beside the name the deck knows.
+## Measured on the engine, not guessed: in every export,
+## FileAccess.file_exists on the mp3's own path is false while
+## ResourceLoader.load of the same path returns the stream carrying the
+## original bytes as its data -- which is why a deck installed by the file
+## system alone arrived on phones with no audio at all, every button
+## honestly saying it was unavailable. The loader is therefore asked first,
+## in the editor and in a package alike, and the file system answers only
+## for files that were never imported: the markdown, the deck's own json.
+static func _bundled_bytes(path: String) -> PackedByteArray:
+        if ResourceLoader.exists(path):
+                var res: Variant = load(path)
+                if res is AudioStreamMP3:
+                        return (res as AudioStreamMP3).data
+        if FileAccess.file_exists(path):
+                return FileAccess.get_file_as_bytes(path)
+        return PackedByteArray()
 
-## The deck the package first installed did not carry the Persian
-## translations; an updated app does. They are delivered the way the deck
-## itself was installed -- copied from the package into the user's deck,
-## additively and quietly: a file that is already there is never touched,
-## so nothing a user or a sync did here is undone. The files ride the
-## deck's own sync afterwards, like any other card media. On the web the
-## package carries no audio at all, so there is nothing to deliver and the
-## recitations stream from the site, as they always have.
-func _deliver_translations() -> void:
+## Every audio file the bundle carries for a card folder, by the names the
+## deck itself knows. A package lists an imported audio file only as its
+## .import remap (the file system cannot see the mp3 itself), so the remaps
+## are the manifest; in the editor the same names stand as the files
+## themselves. The translation's own name is derived the way the study page
+## derives it: a verse-numbered recitation implies its Persian twin,
+## NNNNNN-fa.mp3 beside NNNNNN.mp3. Together these say what the bundle could
+## hand the installed deck, whatever a folder's listing happens to show.
+static func _bundled_audio_names(card_dir: String) -> PackedStringArray:
+        var found := {}
+        for entry in DirAccess.get_files_at(card_dir):
+                var name := entry
+                if entry.ends_with(".import"):
+                        name = entry.trim_suffix(".import")
+                elif not entry.ends_with(".mp3"):
+                        continue
+                if not name.ends_with(".mp3"):
+                        continue
+                found[name] = true
+        var out := PackedStringArray()
+        for name in found:
+                out.append(name)
+                var stem := (name as String).get_basename()
+                if stem.is_valid_int() and stem.length() == 6:
+                        var fa := "%s-fa.%s" % [stem, (name as String).get_extension()]
+                        if not found.has(fa):
+                                out.append(fa)
+        return out
+
+## Whether a file on disk begins as playable audio: an ID3 tag or an MPEG
+## frame sync. The deck's mp3s are the only audio it carries, and a file
+## that does not begin this way will never decode, whatever its name says.
+static func _plays_audio(path: String) -> bool:
+        var file := FileAccess.open(path, FileAccess.READ)
+        if file == null:
+                return false
+        var head := file.get_buffer(3)
+        file.close()
+        if head.size() < 3:
+                return false
+        if head[0] == 0x49 and head[1] == 0x44 and head[2] == 0x33:
+                return true
+        return head[0] == 0xFF and (head[1] & 0xE0) == 0xE0
+
+
+## The deck's audio, made whole on the installed deck every boot. A file
+## the deck lacks is copied in from the bundle; a file that is there but
+## does not begin as audio -- a truncated download, the litter an earlier
+## release could leave -- is repaired from the bundle the same way. A file
+## that already plays is never touched, whatever wrote it: the user's own
+## deck is the truth, and this only fills what is missing, the same law
+## every joining in this app lives by. On the web the package carries no
+## audio at all, so there is nothing to ensure and the recitations stream
+## from the site, as they always have.
+func _ensure_deck_audio() -> void:
         if OS.has_feature("web"):
                 return
-        var delivered := 0
+        var filled := 0
+        var repaired := 0
         for folder in DirAccess.get_directories_at(BUNDLED_DECK):
-                var from := BUNDLED_DECK.path_join(folder)
                 var into := USER_DECK.path_join(folder)
-                for entry in DirAccess.get_files_at(from):
-                        if not entry.ends_with("-fa.mp3"):
+                if not DirAccess.dir_exists_absolute(into):
+                        continue
+                var from := BUNDLED_DECK.path_join(folder)
+                for name in _bundled_audio_names(from):
+                        var target := into.path_join(name)
+                        var existed := FileAccess.file_exists(target)
+                        if existed and _plays_audio(target):
                                 continue
-                        var target := into.path_join(entry)
-                        if FileAccess.file_exists(target):
+                        var bytes := _bundled_bytes(from.path_join(name))
+                        if bytes.is_empty():
                                 continue
-                        if not DirAccess.dir_exists_absolute(into):
-                                DirAccess.make_dir_recursive_absolute(into)
-                        var data := FileAccess.get_file_as_bytes(from.path_join(entry))
                         var file := FileAccess.open(target, FileAccess.WRITE)
                         if file == null:
-                                push_error("QuranTathbit: cannot deliver %s" % target)
+                                push_error("QuranTathbit: cannot write %s" % target)
                                 continue
-                        file.store_buffer(data)
+                        file.store_buffer(bytes)
                         file.close()
-                        delivered += 1
-        if delivered > 0:
-                print("QuranTathbit: delivered %d Persian translation(s)" % delivered)
+                        if existed:
+                                repaired += 1
+                        else:
+                                filled += 1
+        if filled > 0 or repaired > 0:
+                print("QuranTathbit: deck audio -- %d filled, %d repaired" % [filled, repaired])
+
+## An install made by an earlier release could still carry the editor's
+## sidecars in place; sync and the zip refuse them, but the folder itself
+## should not hold what the deck never asked for. One quiet walk removes
+## them wherever the deck keeps them, and says nothing when there is
+## nothing to do.
+func _sweep_sidecars() -> void:
+        if not DirAccess.dir_exists_absolute(USER_DECK):
+                return
+        var swept := 0
+        var walk := [USER_DECK]
+        while not walk.is_empty():
+                var dir: String = walk.pop_back()
+                for entry in DirAccess.get_files_at(dir):
+                        if entry.ends_with(".import") or entry.ends_with(".uid"):
+                                if DirAccess.remove_absolute(dir.path_join(entry)) == OK:
+                                        swept += 1
+                for sub in DirAccess.get_directories_at(dir):
+                        walk.push_back(dir.path_join(sub))
+        if swept > 0:
+                print("QuranTathbit: swept %d editor sidecar(s) from the deck" % swept)
 
 
 ## New cards the package carries, joined to the installed deck the same way
@@ -201,8 +305,13 @@ func _deliver_cards() -> void:
                         push_error("QuranTathbit: cannot create %s" % into)
                         continue
                 for entry in DirAccess.get_files_at(from):
+                        if entry.ends_with(".import") or entry.ends_with(".uid"):
+                                continue
                         var target := into.path_join(entry)
-                        var data := FileAccess.get_file_as_bytes(from.path_join(entry))
+                        var data := _bundled_bytes(from.path_join(entry))
+                        if data.is_empty():
+                                push_error("QuranTathbit: cannot read %s" % from.path_join(entry))
+                                continue
                         var file := FileAccess.open(target, FileAccess.WRITE)
                         if file == null:
                                 push_error("QuranTathbit: cannot write %s" % target)
