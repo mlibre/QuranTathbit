@@ -268,6 +268,8 @@ Windows, web) in Godot 4.7 with GDScript only.
 
 Write it down only when the work reveals something durable — a project principle, a reusable technique, a corrected fact, or an operational lesson. Update the project’s `AGENTS.md` for rules and principles, the relevant `docs` for technical documentation, the `README` for usage, and the relevant `skill` for lessons that belong to its domain — not whichever skill or document you happened to be using.
 
-Be sparing. Most things are not worth recording. If a lesson will not matter in a week, or you are not sure it is true, leave it out. A short file that is read is worth more than a long one that is ignored.
+Be sparing. Keep docs and skills concise and deduplicated. Most things are not worth recording. If a lesson will not matter in a week, or you are not sure it is true, leave it out. A short file that is read is worth more than a long one that is ignored.
 
 Record evidence and confidence when uncertain. Never promote an experiment, benchmark, or hypothesis. Remove or correct stale claims the moment you notice them — documentation must describe reality. Left alone, rules pile up. Each rule must justify itself. If a rule cannot, remove it.
+
+never revert working code to match stale documentation.
