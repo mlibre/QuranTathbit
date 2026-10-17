@@ -108,7 +108,10 @@ func _build() -> void:
         add_child(_rig.popup())
 
 func _top_bar() -> Control:
-        var bar: Dictionary = ThemeScript.top_bar(I18nScript.t("Browse"))
+        # The bar answers the reading's own direction: under a right-reading
+        # tongue the way back points right from the right corner, the way the
+        # settings page already reads, so every page answers alike.
+        var bar: Dictionary = ThemeScript.top_bar(I18nScript.t("Browse"), I18nScript.is_rtl())
         var row: HBoxContainer = bar["row"]
         var back: Button = bar["back"]
         back.tooltip_text = I18nScript.t("Back to home")
@@ -729,6 +732,7 @@ func _entry(card: CardScript, reference: String) -> Control:
                 preview.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
                 preview.text_direction = TextDirection.TEXT_DIRECTION_AUTO
                 preview.clip_text = true
+                preview.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
                 var preview_script := ThemeScript.script_of(preview_text)
                 var preview_face: Font = ThemeScript.verse_face(preview_script)
                 var preview_size := ThemeScript.fs(27 if preview_script == "arabic" else 15)
@@ -737,6 +741,28 @@ func _entry(card: CardScript, reference: String) -> Control:
                 preview.add_theme_color_override("font_color", ThemeScript.INK)
                 ThemeScript.give_label_room(preview, preview_text, preview_face, preview_size)
                 words.add_child(preview)
+
+        # The verse's other half: its Persian, one quiet line under the Arabic,
+        # so a reader hunting a card by what it means finds it as surely as a
+        # reader hunting by what it says. It is the shelf's own voice at a
+        # whisper -- ink soft, one line, its tail trimmed with an ellipsis
+        # rather than cut mid-letter -- and it stands flush right, the edge
+        # the translation itself is read from.
+        var translation_text := _translation_of(card)
+        if not translation_text.is_empty():
+                var translation := Label.new()
+                translation.name = "Translation"
+                translation.text = translation_text
+                translation.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+                translation.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+                translation.text_direction = TextDirection.TEXT_DIRECTION_AUTO
+                translation.clip_text = true
+                translation.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+                var t_size := ThemeScript.fs(14)
+                translation.add_theme_font_override("font", ThemeScript.font_for("persian", 14))
+                translation.add_theme_font_size_override("font_size", t_size)
+                translation.add_theme_color_override("font_color", ThemeScript.INK_SOFT)
+                words.add_child(translation)
 
         # The row's second line: the card's standing written small in the
         # left margin when there is a standing to write -- a card never yet
@@ -924,16 +950,21 @@ func _pencil_row(card: CardScript) -> Control:
         var edit := Button.new()
         edit.name = "Edit"
         edit.tooltip_text = I18nScript.t("Edit this card")
-        edit.custom_minimum_size = Vector2(132, 40)
-        edit.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-        var rest := ThemeScript.soft_stylebox(Color(0, 0, 0, 0), 8)
+        edit.custom_minimum_size = Vector2(148, 44)
+        # The pencil sits at the edge its page reads from -- the left edge in
+        # a left-reading tongue, the right edge in a right-reading one -- so
+        # the card's own tool answers from the corner its reader starts at.
+        edit.size_flags_horizontal = (
+                Control.SIZE_SHRINK_END if I18nScript.is_rtl() else Control.SIZE_SHRINK_BEGIN
+        )
+        var rest := ThemeScript.soft_stylebox(Color(0, 0, 0, 0), 10)
         var held := ThemeScript.soft_stylebox(
-                Color(ThemeScript.GOLD.r, ThemeScript.GOLD.g, ThemeScript.GOLD.b, 0.10), 8
+                Color(ThemeScript.GOLD.r, ThemeScript.GOLD.g, ThemeScript.GOLD.b, 0.10), 10
         )
         edit.add_theme_stylebox_override("normal", rest)
         edit.add_theme_stylebox_override("hover", held)
         edit.add_theme_stylebox_override("pressed", held)
-        var ring := ThemeScript.soft_stylebox(Color(0, 0, 0, 0), 8)
+        var ring := ThemeScript.soft_stylebox(Color(0, 0, 0, 0), 10)
         ring.border_color = Color(ThemeScript.GOLD.r, ThemeScript.GOLD.g, ThemeScript.GOLD.b, 0.55)
         ring.set_border_width_all(2)
         edit.add_theme_stylebox_override("focus", ring)
@@ -943,14 +974,18 @@ func _pencil_row(card: CardScript) -> Control:
         inside.name = "Pad"
         inside.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
         inside.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        inside.add_theme_constant_override("margin_left", 12)
-        inside.add_theme_constant_override("margin_right", 18)
+        inside.add_theme_constant_override("margin_left", 14)
+        inside.add_theme_constant_override("margin_right", 20)
         var words := HBoxContainer.new()
         words.name = "Row"
         words.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
         words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-        words.add_theme_constant_override("separation", 9)
+        words.add_theme_constant_override("separation", 10)
         words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        # The mark leads the words from the reading's own end: a right-reading
+        # row mirrors, so the pencil stands where the eye starts.
+        if I18nScript.is_rtl():
+                words.layout_direction = Control.LAYOUT_DIRECTION_RTL
         inside.add_child(words)
         var pencil := ThemeScript.PencilMark.new(ThemeScript.GOLD_DEEP)
         pencil.name = "Pencil"
@@ -960,7 +995,7 @@ func _pencil_row(card: CardScript) -> Control:
         label.name = "Words"
         label.text = I18nScript.t("Edit card")
         label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-        ThemeScript.dress(label, 13, ThemeScript.GOLD_DEEP, true)
+        ThemeScript.dress(label, 14, ThemeScript.GOLD_DEEP, true)
         words.add_child(label)
         edit.add_child(inside)
         return edit
@@ -1032,6 +1067,25 @@ func _preview_of(card: CardScript) -> String:
                 if not plain.is_empty():
                         return plain
         return ""
+
+## The verse's Persian, for the row's second line: the first text block that
+## reads in Persian -- the deck's own translation, the half the Arabic above
+## it is speaking to. A deck without a Persian half falls back to its second
+## text block, so the shelf still says what the card answers with.
+func _translation_of(card: CardScript) -> String:
+        var blocks: Array[String] = []
+        for block in MarkdownScript.parse(card.back):
+                if block.kind != "text":
+                        continue
+                var plain := MarkdownScript.plain(block.text).strip_edges()
+                if plain.is_empty():
+                        continue
+                if ThemeScript.script_of(plain) == "persian":
+                        return plain
+                blocks.append(plain)
+        # No Persian half: the verse itself stood first; the next text
+        # block is the best remaining witness to what the card means.
+        return blocks[1] if blocks.size() > 1 else ""
 
 ## The surah a reference belongs to: its own words before the dash.
 func _surah_of(reference: String) -> String:

@@ -96,13 +96,26 @@ Windows, web) in Godot 4.7 with GDScript only.
   is right-to-left (`I18n.is_rtl()`), the page's root turns
   (`LAYOUT_DIRECTION_RTL`), every title, label, field and line stands at the
   right edge, and the way back points right from the right corner; a page
-  said again in another tongue says its own direction again. The alignment
-  that puts a line there is `LEFT`, in both tongues — measured, not guessed:
-  under an RTL layout the engine reads `LEFT` as the reading's start (the
-  right edge) and `RIGHT` as the far end, so a `RIGHT` on an RTL page stands
-  the title at the left margin, exactly the corner a reader once reported it
-  stuck in. `LEFT` means "where the reading begins" on every page the app
-  speaks.
+  said again in another tongue says its own direction again. For **Label** and
+  **LineEdit** the alignment that puts a line there is `LEFT`, in both
+  tongues — measured, not guessed: under an RTL layout the engine reads a
+  Label's `LEFT` as the reading's start (the right edge) and `RIGHT` as the
+  far end, so a `RIGHT` on an RTL page stands the title at the left margin,
+  exactly the corner a reader once reported it stuck in. A **RichTextLabel**
+  answers the other way — its `LEFT` stays the visual left edge whatever the
+  layout reads, measured on the same engine — so its lines must be told
+  `RIGHT` in so many words (`settings_screen._text`), or every explanation
+  line on a right-reading page hangs from the wrong edge, the corner a reader
+  reported next. Two controls, two laws, one edge: measure which one you are
+  holding before you align it.
+- **A bold run is told its own hand.** A `[b]` inside a RichTextLabel wears
+  `bold_font` and `bold_font_size` — and when they are not overridden, the run
+  falls to the theme's default face at the theme's default size, which on this
+  app's theming carried no Arabic letters at all and drowned the number it
+  dressed (card_view dresses all four faces and all four sizes; the home chip
+  once dressed only one of each). Every run the bbcode can reach must find a
+  face and a size the app chose, and a wash is a light tone by definition —
+  a pill drawn in a text colour drowns its own words.
 - **The engine's own chrome still wears the app's hand.** A tooltip is
   raised by the engine, dressed by the theme alone — and the engine's
   default face carries no Arabic letters, so a Persian tooltip was a row of
@@ -120,6 +133,51 @@ Windows, web) in Godot 4.7 with GDScript only.
   And the field is opened on the words, never on the file's trailing
   newline — a phantom blank line under every reference is where a reader's
   eye goes first.
+- **The field answers the press; the engine answers the key.** The engine
+  lays a TextEdit's lines flush left while the field's mirror shows them
+  flush right, so a raw click on the ink a reader sees is, to the engine, a
+  click past the line's end — which a right-reading line answers with its
+  very beginning, wherever the finger pressed. The field therefore takes
+  every left press itself (`rtl_field._on_editor_input` accepts it), slides
+  it back onto the engine's own words (`_hit`, through
+  `get_line_column_at_pos` twice — once for the row, once for the column at
+  the slid x), and gives the caret to the word the finger meant: one press
+  places, two take the word, three the line, a held press chooses. And
+  because `select()` and `set_caret_*` move the caret without saying
+  `caret_changed`, the field says it for them (`_mirror_follows`) or the
+  mirror sits a whole hand behind.
+- **A page's hero is its news, not its name.** The home page's middle card
+  once carried the deck's name in shouting weight above a lonely figure-box
+  a reader had to live under every day. The name is furniture, read daily
+  and rarely hunted for; the next card is the news. The card now opens with
+  the name at one calm measure, the deck's own ornament beneath it, and the
+  next reference as the card's hero at the hero's own measure — and no
+  figure at all, because the pills below own the numbers and nothing is
+  said twice. A reader's latest report can also ask a removed line back:
+  the repo hint left by an earlier round and returned by a later one, this
+  time standing at the reading's edge.
+- **The shelf says what a card means, not only what it says.** A browse row
+  carries its verse in the mushaf cut and its Persian as a second quiet
+  line under it, one line, ink soft, its tail trimmed with an ellipsis
+  rather than cut mid-letter — so a reader hunting by meaning finds the
+  card as surely as a reader hunting by words. The line comes from the
+  card's own back (the first Persian text block), never from a table.
+- **A rule a thumb drags runs the width of its page.** The volume popover
+  was the app's worst box: narrow, a 110px rule, its number squeezed beside
+  it. It is drawn now the way the app draws its own cards — as wide as the
+  page, the number said large in the reader's own digits over the rule,
+  the mute at the reading's far end — because a control a hand rests on is
+  sized for the hand, not for the panel it came in.
+- **Yesterday's phones read the web too, or the build says no.** The
+  engine's web loader ships speaking only today's browsers; a Firefox 68
+  phone parses none of it and the page hangs forever, bar motionless. The
+  Pages and npm workflows therefore lower `index.js` once through esbuild
+  (`firefox68,chrome57`) and fail loudly, by token, if any post-2017
+  parse-breaker survives; the page's head carries a WebGL2 pre-flight that
+  tells a device it cannot run rather than downloading an engine at it. An
+  APK that ships arm64 only refuses to install on the 32-bit phones a
+  reader keeps longest, so the Android preset ships both ABIs.
+
 - **The chrome speaks the reader's tongue; the deck never changes.** Every
   user-visible string of the interface goes through `scripts/ui/i18n.gd`'s
   `t()` (English is the key and the fallback), in English, فارسی and

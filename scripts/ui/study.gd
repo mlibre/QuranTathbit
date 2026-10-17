@@ -149,7 +149,10 @@ func _key_hints() -> Control:
 ## how loud -- with a spacer of the same width beside the way back, so the
 ## count in the middle stays the middle.
 func _top_bar() -> Control:
-        var bar: Dictionary = ThemeScript.top_bar("")
+        # The bar answers the reading's own direction: under a right-reading
+        # tongue the way back points right from the right corner, the way the
+        # settings page already reads, so every page answers alike.
+        var bar: Dictionary = ThemeScript.top_bar("", I18nScript.is_rtl())
         var row: HBoxContainer = bar["row"]
         var back: Button = bar["back"]
         back.tooltip_text = I18nScript.t("Back to home")

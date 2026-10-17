@@ -492,17 +492,24 @@ class VolumePopover extends Popover:
         var _loud := 1.0  # the last loudness above silence, for unmuting
 
         func _init() -> void:
-                super(238.0)
+                # A page wide enough for a thumb: the reader called this box
+                # the app's worst, and it was -- a narrow slip of paper with
+                # a 110px rule inside it. It is drawn now the way the app
+                # draws its own cards: wide, calm, one figure in the
+                # reader's own digits standing large over the rule it
+                # answers for.
+                super(300.0)
                 name = "VolumePopup"
 
-                var pad := content(16, 14, 16, 14)
+                var pad := content(20, 18, 20, 18)
                 var column := VBoxContainer.new()
                 column.name = "Column"
-                column.add_theme_constant_override("separation", 12)
+                column.add_theme_constant_override("separation", 14)
                 pad.add_child(column)
 
                 # The page says what it is for before it asks for a number:
-                # its name in the reader's own tongue, the mute beside it.
+                # its name in the reader's own tongue at the edge the page
+                # reads from, the mute standing at the reading's far end.
                 var head := HBoxContainer.new()
                 head.name = "Head"
                 head.add_theme_constant_override("separation", 10)
@@ -512,14 +519,20 @@ class VolumePopover extends Popover:
                 title.text = I18N.t("Recitation volume")
                 title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
                 title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-                THEME.dress(title, CAPTION, INK_SOFT)
-                head.add_child(title)
+                # The popover rides a page whose root does not turn, so the
+                # tongue says the edge in so many words: LEFT for a
+                # left-reading page, RIGHT for a right-reading one.
+                if I18N.is_rtl():
+                        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+                else:
+                        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+                THEME.dress(title, 13, INK_SOFT, true)
 
                 # The speaker is also the mute: one press for silence, one
                 # press for the loudness silence replaced.
                 var mute := Button.new()
                 mute.name = "Mute"
-                mute.custom_minimum_size = Vector2(36, 36)
+                mute.custom_minimum_size = Vector2(42, 42)
                 mute.tooltip_text = I18N.t("Mute or unmute")
                 THEME.apply_mark_styles(mute, THEME.mark_button_styles(GREEN, true))
                 _mark = VolumeMark.new(GREEN_DEEP)
@@ -532,48 +545,58 @@ class VolumePopover extends Popover:
                 mute.add_child(mute_center)
                 THEME.pressable(mute)
                 mute.pressed.connect(_toggle_mute)
-                head.add_child(mute)
+                if I18N.is_rtl():
+                        head.add_child(mute)
+                        head.add_child(title)
+                else:
+                        head.add_child(title)
+                        head.add_child(mute)
 
-                # The rule itself: wide enough to drag with a thumb, its
-                # number said beside it in the reader's own digits.
-                var row := HBoxContainer.new()
-                row.name = "Row"
-                row.add_theme_constant_override("separation", 12)
-                column.add_child(row)
+                # The figure itself, said large over the rule it answers
+                # for: the reader's own digits, centred, live -- the one
+                # number this page exists to change, big enough to read
+                # from arm's length while the hand is on the rule.
+                _readout = Label.new()
+                _readout.name = "Readout"
+                _readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                _readout.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+                _readout.custom_minimum_size = Vector2(0, 40)
+                THEME.dress(_readout, 26, GREEN_DEEP, true)
+                column.add_child(_readout)
 
+                # The rule: as wide as the page holds, drawn as the app
+                # draws its own pills, its grabber a drawn knob, its travel
+                # marked by five quiet ticks -- wide enough that a thumb
+                # finds it without aiming, tall enough that no stray press
+                # moves it by accident.
                 _slider = HSlider.new()
                 _slider.name = "Slider"
                 _slider.min_value = 0.0
                 _slider.max_value = 1.0
                 _slider.step = 0.01
-                _slider.custom_minimum_size = Vector2(110, 40)
+                _slider.custom_minimum_size = Vector2(0, 46)
                 _slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+                _slider.tick_count = 5
+                _slider.ticks_on_borders = true
                 var track := StyleBoxFlat.new()
                 track.bg_color = Color("#E6DFCE")
-                track.set_corner_radius_all(3)
-                track.content_margin_top = 3
-                track.content_margin_bottom = 3
+                track.set_corner_radius_all(99)
+                track.content_margin_top = 4
+                track.content_margin_bottom = 4
                 var filled := StyleBoxFlat.new()
                 filled.bg_color = GREEN
-                filled.set_corner_radius_all(3)
-                filled.content_margin_top = 3
-                filled.content_margin_bottom = 3
+                filled.set_corner_radius_all(99)
+                filled.content_margin_top = 4
+                filled.content_margin_bottom = 4
                 _slider.add_theme_stylebox_override("slider", track)
                 _slider.add_theme_stylebox_override("grabber_area", filled)
                 _slider.add_theme_stylebox_override("grabber_area_highlight", filled)
-                _slider.add_theme_icon_override("grabber", THEME.knob_icon(18, GREEN_DEEP))
-                _slider.add_theme_icon_override("grabber_highlight", THEME.knob_icon(21, GREEN_DEEP))
-                _slider.add_theme_icon_override("grabber_disabled", THEME.knob_icon(18, Color("#9AA79E")))
+                _slider.add_theme_icon_override("grabber", THEME.knob_icon(24, GREEN_DEEP))
+                _slider.add_theme_icon_override("grabber_highlight", THEME.knob_icon(28, GREEN_DEEP))
+                _slider.add_theme_icon_override("grabber_disabled", THEME.knob_icon(24, Color("#9AA79E")))
+                _slider.add_theme_color_override("tick_color", Color("#C9BFA8"))
                 _slider.value_changed.connect(_on_dragged)
-                row.add_child(_slider)
-
-                _readout = Label.new()
-                _readout.name = "Readout"
-                _readout.custom_minimum_size = Vector2(58, 0)
-                _readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-                _readout.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-                THEME.dress(_readout, 17, GREEN_DEEP, true)
-                row.add_child(_readout)
+                column.add_child(_slider)
                 _say(1.0)
 
         ## Say a loudness without saying it out loud: the rule, the mark and
@@ -833,22 +856,38 @@ class PencilMark extends Control:
 
         func _init(p_color: Color = INK) -> void:
                 color = p_color
-                custom_minimum_size = Vector2(18, 18)
+                # A touch larger than it was: the mark leads a word a reader
+                # hunts by, and at 18 it read as a splinter, not a pencil.
+                custom_minimum_size = Vector2(22, 22)
 
         func _draw() -> void:
-                # The shaft, from the eraser end down to the tip.
-                draw_line(Vector2(5.6, 12.4), Vector2(12.2, 5.8), color, 3.0, true)
-                # The tip: a small triangle pointing to the page's corner.
+                # The shaft, a fat diagonal from the eraser end down toward
+                # the tip: wide enough to read as a pencil's body at a
+                # glance, with rounded ends so it draws soft.
+                draw_line(Vector2(8.2, 13.8), Vector2(15.8, 6.2), color, 4.8, true)
+                # A facet of light along the body: one thin line, the way a
+                # wooden pencil carries a flat face beside its round ones.
+                draw_line(
+                        Vector2(9.2, 12.6), Vector2(14.6, 7.2),
+                        Color(1, 1, 1, 0.42), 1.4, true
+                )
+                # The wood cone, lighter than the body: a triangle standing
+                # across the shaft's end and aimed down the shaft's own
+                # diagonal, at the page's corner the way a pencil points.
                 draw_colored_polygon(
                         PackedVector2Array([
-                                Vector2(3.0, 15.0), Vector2(6.6, 13.4), Vector2(4.6, 10.4),
+                                Vector2(9.4, 15.0), Vector2(7.0, 12.6), Vector2(4.95, 17.05),
                         ]),
-                        color
+                        Color(color.r, color.g, color.b, 0.55)
                 )
-                # The eraser: a softer cap on the far end.
+                # The lead: the very point of the cone, solid -- the dot the
+                # writing happens with.
+                draw_circle(Vector2(4.95, 17.05), 1.3, color)
+                # The eraser: a softer cap on the far end, set apart by its
+                # own tone the way a real pencil's ferrule stands apart.
                 draw_line(
-                        Vector2(12.6, 5.4), Vector2(14.6, 7.4), Color(color.r, color.g, color.b, 0.55),
-                        3.0, true
+                        Vector2(16.4, 5.6), Vector2(18.6, 7.8),
+                        Color(color.r, color.g, color.b, 0.55), 4.8, true
                 )
 
 

@@ -18,14 +18,21 @@ const ThemeScript := preload("res://scripts/ui/theme.gd")
 ## first strong letter (a verse runs right to left, an audio file's name runs
 ## left to right inside the same right-flush block). Above it, a TextEdit
 ## with fully transparent ink, caret and selection -- the real input engine,
-## taking every key, every drag, every long-press, doing every BiDi
-## resolution per line exactly as the mirror does. The two agree on the
-## layout because they share one font at one size and one line pitch, and the
-## field asks the engine where the caret stands (`get_rect_at_line_column`)
-## and where each laid-out line ends (`get_line_width`) to place its own
-## drawn caret beside the mirror's ink. Selection rides in the mirror as a
-## gold wash behind the chosen words, the same gold every selection in this
-## app wears.
+## taking every key and doing every BiDi resolution per line exactly as the
+## mirror does. The two agree on the layout because they share one font at
+## one size and one line pitch, and the field asks the engine where the
+## caret stands (`get_rect_at_line_column`) and where each laid-out line ends
+## (`get_line_width`) to place its own drawn caret beside the mirror's ink.
+## Selection rides in the mirror as a gold wash behind the chosen words, the
+## same gold every selection in this app wears.
+##
+## One thing the engine cannot be trusted with here is the press of a hand:
+## its own lines sit flush LEFT while the mirror's sit flush right, so a
+## click on the ink the reader sees lands, to the engine, past the line's
+## end -- which a right-reading line answers with its very beginning. The
+## field therefore takes every left press itself and answers it through the
+## engine's own geometry (see _hit): the press is slid back onto the words,
+## and the caret arrives at the word the finger meant.
 ##
 ## The field grows to fit what is written (the page beneath scrolls; the
 ## field never scrolls inside itself), and when the words are Arabic the
@@ -75,6 +82,24 @@ var _part_counts: PackedInt32Array = PackedInt32Array()  # visual lines per logi
 var _wrapped_at := -1.0  # the width the current mirror was wrapped at
 var _rebuilding := false
 var _rebuild_pending := false  # one rebuild a frame, however many reasons
+
+# --- the hand on the glass ----------------------------------------------------
+# The state a speaking hand needs: how many presses have come in a breath
+# (one places the caret, two take the word, three the line), where the
+# choosing began, and what kind of choosing a held press is making.
+const DOUBLE_CLICK_MSEC := 500
+const DRAG_NONE := 0
+const DRAG_POINTER := 1
+const DRAG_WORD := 2
+const DRAG_LINE := 3
+
+var _click_count := 0
+var _last_click_at := -1000000
+var _last_click_pos := Vector2(1.0e9, 1.0e9)
+var _anchor_line := -1
+var _anchor_col := -1
+var _anchor_word := Vector2i(-1, -1)  # the anchor word's start and end columns
+var _drag_mode := DRAG_NONE
 
 func _init() -> void:
         custom_minimum_size = Vector2(0, 58)
@@ -198,6 +223,146 @@ func _on_editor_input(event: InputEvent) -> void:
                 if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
                         advance_requested.emit()
                         _editor.accept_event()
+                        return
+        if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+                if event.pressed:
+                        # The engine's own press would read the click against
+                        # its flush-left words -- see _hit -- so the field
+                        # answers the press itself and the engine never hears
+                        # it. Everything else (keys, the menu button, the
+                        # wheel) stays the engine's.
+                        _editor.accept_event()
+                        _press(event)
+                else:
+                        _drag_mode = DRAG_NONE
+                return
+        if event is InputEventMouseMotion and _drag_mode != DRAG_NONE:
+                if event.button_mask & MOUSE_BUTTON_MASK_LEFT:
+                        _drag(event)
+
+## Where a hand's press lands, in the engine's own words: the row under the
+## finger is found by the engine's own hit-test, the press is slid left by
+## the distance that row's words travel to reach the right edge (the
+## difference between the engine's flush-left line and the mirror's
+## flush-right one), and the engine's hit-test is asked again -- so the
+## caret is placed by the very geometry that shaped the line, bidi and all,
+## only at the place the ink actually stands. The answer comes as the
+## engine gives it: x the column, y the line.
+func _hit(where: Vector2) -> Vector2i:
+        if _editor.size.x <= 0.0:
+                return Vector2i(-1, -1)
+        var row := _editor.get_line_column_at_pos(Vector2i(0, int(where.y)), true, true)
+        if row.y < 0 or row.y >= _editor.get_line_count():
+                return Vector2i(-1, -1)
+        var wrap := _editor.get_line_wrap_index_at_column(row.y, maxi(row.x, 0))
+        var slide := maxf(_editor.size.x - _editor.get_line_width(row.y, wrap), 0.0)
+        return _editor.get_line_column_at_pos(Vector2i(int(where.x - slide), int(where.y)), true, true)
+
+## One press, answered: a single press places the caret (or, with Shift
+## held, extends what is chosen to it), a second takes the word under the
+## finger, a third the whole line -- the rhythm every editor the reader
+## has ever used already taught their hand.
+func _press(event: InputEventMouseButton) -> void:
+        if not _editor.has_focus():
+                _editor.grab_focus()
+        var hit := _hit(event.position)
+        if hit.x < 0:
+                return
+        var now := Time.get_ticks_msec()
+        if (
+                now - _last_click_at > DOUBLE_CLICK_MSEC
+                or _last_click_pos.distance_squared_to(event.position) > 36.0
+        ):
+                _click_count = 0
+        _click_count = (_click_count % 3) + 1
+        _last_click_at = now
+        _last_click_pos = event.position
+        match _click_count:
+                1:
+                        var from_line := hit.y
+                        var from_col := hit.x
+                        if event.shift_pressed:
+                                if _editor.has_selection():
+                                        from_line = _editor.get_selection_origin_line()
+                                        from_col = _editor.get_selection_origin_column()
+                                else:
+                                        from_line = _editor.get_caret_line()
+                                        from_col = _editor.get_caret_column()
+                                _editor.select(from_line, from_col, hit.y, hit.x)
+                        else:
+                                _editor.deselect()
+                                _editor.set_caret_line(hit.y, false)
+                                _editor.set_caret_column(hit.x, false)
+                        _anchor_line = from_line
+                        _anchor_col = from_col
+                        _drag_mode = DRAG_POINTER
+                2:
+                        var span := _word_span(hit.y, hit.x)
+                        _editor.select(hit.y, span.x, hit.y, span.y)
+                        _anchor_line = hit.y
+                        _anchor_col = span.x
+                        _anchor_word = span
+                        _drag_mode = DRAG_WORD
+                3:
+                        var length := _editor.get_line(hit.y).length()
+                        _editor.select(hit.y, 0, hit.y, length)
+                        _anchor_line = hit.y
+                        _anchor_col = 0
+                        _drag_mode = DRAG_LINE
+        _mirror_follows()
+
+## A press held and moving: the choosing grows from where it began -- by
+## letters, by words, or by whole lines, as the press that began it chose.
+func _drag(event: InputEventMouseMotion) -> void:
+        var hit := _hit(event.position)
+        if hit.x < 0:
+                return
+        match _drag_mode:
+                DRAG_POINTER:
+                        _editor.select(_anchor_line, _anchor_col, hit.y, hit.x)
+                DRAG_WORD:
+                        var span := _word_span(hit.y, hit.x)
+                        var forward := hit.y > _anchor_line or (hit.y == _anchor_line and span.x >= _anchor_word.y)
+                        if forward:
+                                _editor.select(_anchor_line, _anchor_word.x, hit.y, span.y)
+                        else:
+                                _editor.select(_anchor_line, _anchor_word.y, hit.y, span.x)
+                DRAG_LINE:
+                        var from_line := mini(_anchor_line, hit.y)
+                        var to_line := maxi(_anchor_line, hit.y)
+                        _editor.select(from_line, 0, to_line, _editor.get_line(to_line).length())
+        _mirror_follows()
+
+## The words of one line, as the hand's double press means them: a run of
+## letters with air around it. A press that lands on the air between words
+## takes the nearest word, because that is what the finger meant.
+func _word_span(line: int, col: int) -> Vector2i:
+        var text := _editor.get_line(line)
+        if text.is_empty():
+                return Vector2i(0, 0)
+        var at := clampi(col, 0, text.length() - 1)
+        if text[at] == " ":
+                var look := at
+                while look < text.length() and text[look] == " ":
+                        look += 1
+                if look < text.length():
+                        at = look
+                else:
+                        while at > 0 and text[at] == " ":
+                                at -= 1
+        var start := at
+        while start > 0 and text[start - 1] != " ":
+                start -= 1
+        var end := at + 1
+        while end < text.length() and text[end] != " ":
+                end += 1
+        return Vector2i(start, end)
+
+## The engine moves its caret silently -- select() and set_caret_* say
+## nothing as they go -- so the field says it for them, or the mirror and
+## the drawn caret would sit a whole hand behind the choosing.
+func _mirror_follows() -> void:
+        _on_caret_changed()
 
 func _on_text_changed() -> void:
         if _rebuilding:

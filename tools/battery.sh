@@ -30,6 +30,14 @@ trap restore EXIT
 
 mkdir -p "$LOGS"
 
+# The export presets ride with every CI workflow; a head_include value that
+# broke at a stray quote, an APK that lost an ABI, or a version code that
+# forgot to move must fail here, loudly, before any workflow ships it.
+if ! "$GODOT" --headless --path . --script tools/check_presets.gd >"$LOGS/check_presets.log" 2>&1; then
+	echo "  FAIL  check_presets -- see .godot/battery_logs/check_presets.log"
+	exit 1
+fi
+
 run_pass() {
 	local label="$1"
 	local failed=0

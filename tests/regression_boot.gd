@@ -121,28 +121,37 @@ func _check_home_numbers(home: Control) -> void:
         _ok(not study.disabled, "study is ready")
         _ok(study.text == "Learn new cards", "the button names what the session is")
 
-        # The deck's own account arrives as one figure, not a sentence: the
-        # whole holding alone -- the learned and the waiting were the pills
-        # below said a second time, so they live only where the day's own
-        # work is, and the card keeps the one number no pill says.
+        # The deck's own account is not said on the card at all any more:
+        # the reader found the one lonely box it lived in bad to look at, so
+        # it left with the box -- the pills below own the day's numbers, and
+        # the card between owns the day's one news, standing as its hero.
         _ok(
                 home.get_node_or_null("Margin/Column/DeckCard/Pad/Box/Caption") == null,
                 "the deck card no longer says its account as a line of prose"
         )
-        var chips: HBoxContainer = home.get_node_or_null("Margin/Column/DeckCard/Pad/Box/Chips")
-        _ok(chips != null and chips.get_child_count() == 1, "the deck card holds one chip: the whole holding, and nothing the pills below already say")
-        if chips != null and chips.get_child_count() >= 1:
-                var first_text: String = ""
-                var label_node: RichTextLabel = chips.get_child(0).find_children("*", "RichTextLabel", true, false)[0] if chips.get_child(0).find_children("*", "RichTextLabel", true, false).size() > 0 else null
-                if label_node != null:
-                        first_text = label_node.text
-                _ok(
-                        first_text.contains("151") or first_text.contains("۱۵۱"),
-                        "the chip carries the deck's whole holding"
+        _ok(
+                home.get_node_or_null("Margin/Column/DeckCard/Pad/Box/Chips") == null,
+                "the total-card box is gone from the middle card entirely"
+        )
+        _ok(
+                home.get_node_or_null("Margin/Column/DeckCard/Pad/Box/Ornament") != null,
+                "the card wears the deck's own ornament between its name and its news"
+        )
+        var next_up: Label = home.get_node_or_null("Margin/Column/DeckCard/Pad/Box/NextUp")
+        if next_up != null:
+                _ok(next_up.visible and not next_up.text.is_empty(), "the day's news stands on the card")
+                var hero_script := ThemeScript.reference_script(next_up.text)
+                _is(
+                        next_up.get_theme_font_size("font_size"),
+                        ThemeScript.fs(30 if hero_script == "arabic" else (22 if hero_script == "persian" else 16)),
+                        "the day's news is the card's hero, at the hero's own measure"
                 )
-                _ok(
-                        not first_text.contains("Learned") and not first_text.contains("آموخته"),
-                        "the learned count is not said a second time above the pills"
+        var deck_title: Label = home.get_node_or_null("Margin/Column/DeckCard/Pad/Box/Title")
+        if deck_title != null:
+                _is(
+                        deck_title.get_theme_font_size("font_size"),
+                        ThemeScript.fs(22),
+                        "the deck's name is calm furniture at one quiet measure"
                 )
 
         # The settings corner once sat under a full-rect container added after
@@ -273,11 +282,18 @@ func _check_study_session(main: Node) -> void:
                         volume_popup.get_node_or_null("Sheet/Pad/Column/Head/Title") != null,
                         "the page says what it is for before it asks for a number"
                 )
-                var slider: HSlider = volume_popup.get_node("Sheet/Pad/Column/Row/Slider")
+                var slider: HSlider = volume_popup.get_node("Sheet/Pad/Column/Slider")
                 slider.value = 0.5
                 await create_timer(0.7).timeout
                 _is(study.volume, 0.5, "the rule sets the loudness it says")
                 _ok(absf(study._player.volume_db - linear_to_db(0.5)) < 0.01, "the player obeys the rule")
+                # The rule a thumb actually wants: as wide as the page it
+                # answers for, its number said large above it -- the box the
+                # reader called the app's worst was neither.
+                _ok(
+                        slider.size.x >= 240.0,
+                        "the rule runs the width of the page, wide enough for a thumb"
+                )
                 # The speaker in the page is the mute: one press for silence,
                 # one press back for the loudness silence replaced.
                 (volume_popup.get_node("Sheet/Pad/Column/Head/Mute") as Button).pressed.emit()
@@ -287,9 +303,9 @@ func _check_study_session(main: Node) -> void:
                 await create_timer(0.2).timeout
                 _is(study.volume, 0.5, "pressing it again unmutes to what was")
                 _is(
-                        (volume_popup.get_node("Sheet/Pad/Column/Row/Readout") as Label).text,
+                        (volume_popup.get_node("Sheet/Pad/Column/Readout") as Label).text,
                         "50%",
-                        "the number says the loudness inline"
+                        "the number says the loudness, large, over the rule"
                 )
                 volume_coin.pressed.emit()
                 await create_timer(0.1).timeout
@@ -704,6 +720,41 @@ func _check_settings(main: Node) -> void:
         _ok(saved != null, "the save button stands beside it")
         var card_title: Label = settings.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/CardTitle")
         _ok(card_title != null and card_title.text.length() > 0, "the GitHub card carries its own title inside it")
+        # A card's own name is the word a reader hunts for, so it stands one
+        # breath larger than the captions beneath it.
+        if card_title != null:
+                _is(card_title.get_theme_font_size("font_size"), ThemeScript.fs(13), "a card title stands one breath larger than its captions")
+        # The token field stands alone -- its lecture left with it -- but the
+        # repo field kept its own words: the reader asked for them aligned
+        # to the reading, not gone, and an English page stands them at the
+        # left, as English reads (a RichTextLabel's LEFT is its visual left
+        # under a plain LTR root).
+        var token_hint: RichTextLabel = settings.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/TokenHint")
+        _ok(token_hint == null, "no hint line stands under the token field")
+        var repo_hint: RichTextLabel = settings.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/RepoHint")
+        _ok(repo_hint != null and repo_hint.text.length() > 0, "the repo field keeps its own words under it")
+        _ok(
+                repo_hint != null and repo_hint.horizontal_alignment == HORIZONTAL_ALIGNMENT_LEFT,
+                "the English repo hint stands at the left, as English reads"
+        )
+        var i18n := load("res://scripts/ui/i18n.gd")
+        _ok(
+                not i18n.STRINGS.has("From github.com/settings/tokens — needs the repo scope. Stays on this device."),
+                "the token hint's words left the app's table with the line that said them"
+        )
+        _ok(
+                i18n.STRINGS.has("Where your deck lives on GitHub — created on first sync if it does not exist."),
+                "the repo hint's words stay in the app's table with the line that says them"
+        )
+        _ok(
+                not i18n.STRINGS.has("In the browser, recitations stream from this site while you study."),
+                "the browser's recitation note left the source card with the line that said it"
+        )
+        var source_en: RichTextLabel = settings.get_node_or_null("Margin/Scroll/Wrap/Column/DataSource/Padding/Box/What")
+        _ok(
+                source_en != null and source_en.horizontal_alignment == HORIZONTAL_ALIGNMENT_LEFT,
+                "the English source line stands at the left, as English reads"
+        )
         # The deck's card speaks in words, not paths: user://decks/quran is
         # the machine's own address for the deck, and no reader needs it.
         var folder_line: Control = settings.get_node_or_null(
@@ -950,6 +1001,25 @@ func _check_browse(main: Node) -> void:
                         headers += 1
         _is(rows, deck.cards.size(), "every card has its row in the library")
         _ok(headers >= 2, "the cards are gathered under their surahs' names")
+        # The shelf says what a card means, not only what it says: every row
+        # carries its verse's Persian as a second quiet line under the Arabic,
+        # flush right the way the verse is read, its tail trimmed with an
+        # ellipsis rather than cut mid-letter.
+        var carrying := 0
+        for child in column.get_children():
+                if not child.name.begins_with("Entry"):
+                        continue
+                var translation: Label = child.get_node_or_null("Row/Pad/Line/Words/Translation")
+                if translation == null:
+                        continue
+                if not translation.text.is_empty():
+                        carrying += 1
+                _ok(
+                        translation.horizontal_alignment == HORIZONTAL_ALIGNMENT_RIGHT
+                                and translation.text_overrun_behavior == TextServer.OVERRUN_TRIM_ELLIPSIS,
+                        "a row's Persian stands at the reading's edge, trimmed with an ellipsis"
+                )
+        _ok(carrying >= rows - 2, "the rows carry their Persian under the verse (got %d of %d)" % [carrying, rows])
         # The chapter's opening: no thread under the name -- a partial green
         # line reads as a line that failed to render -- and how many rest in
         # review is said in the count's own words, never as a broken-looking
@@ -1238,6 +1308,77 @@ func _check_marks_and_rtl(main: Node) -> void:
                 var pitch := second.position.y - first.position.y
                 _is(roundf(pitch), roundf(field._editor.get_line_height()),
                         "the mirror's pitch stays the engine's own, room or no room")
+
+        # The hand on the glass: the engine lays its lines flush left while
+        # the mirror shows them flush right, so a raw click on the ink a
+        # reader sees used to land at the line's very beginning -- every
+        # time, wherever the finger pressed. The field answers the press
+        # itself, sliding it back onto the engine's own words.
+        var verse_line: String = field._editor.get_line(0)
+        var verse_width: float = field._editor.get_line_width(0, 0)
+        var verse_slide: float = maxf(field._editor.size.x - verse_width, 0.0)
+        var verse_y: float = field._editor.get_rect_at_line_column(0, 0).position.y + field._editor.get_rect_at_line_column(0, 0).size.y * 0.5
+        var press := func(where: Vector2) -> void:
+                var event := InputEventMouseButton.new()
+                event.button_index = MOUSE_BUTTON_LEFT
+                event.pressed = true
+                event.position = where
+                field._on_editor_input(event)
+        var release := func() -> void:
+                var event := InputEventMouseButton.new()
+                event.button_index = MOUSE_BUTTON_LEFT
+                event.pressed = false
+                event.position = Vector2(10, 10)
+                field._on_editor_input(event)
+        press.call(Vector2(field._editor.size.x - 1.0, verse_y))
+        _is(field._editor.get_caret_column(), 0,
+                "a press at the ink's right edge places the caret at the reading's start, not the press's habit")
+        press.call(Vector2(verse_slide + 1.0, verse_y))
+        _ok(field._editor.get_caret_column() >= verse_line.length() - 2,
+                "a press at the ink's left edge places the caret at the line's far end")
+        press.call(Vector2(verse_slide + verse_width * 0.5, verse_y))
+        _ok(
+                field._editor.get_caret_column() > 0 and field._editor.get_caret_column() < verse_line.length(),
+                "a press inside the ink lands inside the line"
+        )
+        press.call(Vector2(field._editor.size.x - 1.0, verse_y + field._editor.get_line_height()))
+        _is(field._editor.get_caret_line(), 1, "a press on the second line reaches the second line")
+        # The second press takes the word under the finger, the third the line.
+        release.call()
+        press.call(Vector2(verse_slide + verse_width * 0.2, verse_y))
+        release.call()
+        await create_timer(0.02).timeout
+        press.call(Vector2(verse_slide + verse_width * 0.2, verse_y))
+        _ok(
+                field._editor.has_selection() and field._editor.get_selected_text().length() > 0
+                        and not field._editor.get_selected_text().contains(" "),
+                "a second press takes the word under the finger, whole"
+        )
+        release.call()
+        # The third press needs its own rhythm: the counter counts from the
+        # last press, so a breath longer than a double press starts it over.
+        await create_timer(0.6).timeout
+        press.call(Vector2(verse_slide + verse_width * 0.2, verse_y))
+        release.call()
+        await create_timer(0.02).timeout
+        press.call(Vector2(verse_slide + verse_width * 0.2, verse_y))
+        release.call()
+        await create_timer(0.02).timeout
+        press.call(Vector2(verse_slide + verse_width * 0.2, verse_y))
+        _is(field._editor.get_selected_text().length(), verse_line.length(),
+                "a third press takes the whole line")
+        release.call()
+        # A press held and moving chooses, from where it began to where it is.
+        press.call(Vector2(field._editor.size.x - 2.0, verse_y))
+        var drag := InputEventMouseMotion.new()
+        drag.position = Vector2(verse_slide + 4.0, verse_y)
+        drag.button_mask = MOUSE_BUTTON_MASK_LEFT
+        field._on_editor_input(drag)
+        _ok(
+                field._editor.has_selection() and field._editor.get_selected_text().length() >= verse_line.length() - 2,
+                "a held press chooses across the line, from its beginning to its end"
+        )
+        release.call()
         field.queue_free()
 
         # The quiet promise says itself once; the line beneath it that
@@ -1251,10 +1392,14 @@ func _check_marks_and_rtl(main: Node) -> void:
         # A page said in Persian is laid out from the right: the root turns,
         # the titles and labels stand at the reading's edge, and the way back
         # points the way it goes. Said again in English, everything returns.
-        # The alignments are LEFT on purpose in both tongues: under an RTL
-        # layout the engine reads LEFT as the reading's start (the right
-        # edge) and RIGHT as the far end, so a RIGHT would stand a Persian
-        # title at the LEFT margin -- the corner it was reported stuck in.
+        # For Labels the alignment is LEFT on purpose in both tongues: under
+        # an RTL layout the engine reads a Label's LEFT as the reading's
+        # start (the right edge), so a RIGHT would stand a Persian title at
+        # the LEFT margin -- the corner it was reported stuck in. A
+        # RichTextLabel answers the other way -- its LEFT stays the visual
+        # left edge whatever the layout reads, measured -- so its explanation
+        # lines must be told RIGHT in so many words or they stand at the
+        # wrong edge, the corner the reader next reported them stuck in.
         main._apply_language("fa")
         main._on_settings_pressed()
         await create_timer(0.5).timeout
@@ -1268,14 +1413,35 @@ func _check_marks_and_rtl(main: Node) -> void:
                 var pace_label_fa: Label = settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/CardTitle")
                 _ok(pace_label_fa != null and pace_label_fa.horizontal_alignment == HORIZONTAL_ALIGNMENT_LEFT,
                         "the Persian pace title stands at the right edge")
+                if title_fa != null:
+                        _is(title_fa.get_theme_font_size("font_size"), ThemeScript.fs(13),
+                                "a Persian card title stands one breath larger too")
                 var repo_field: LineEdit = settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Repo")
                 _ok(repo_field != null and repo_field.alignment == HORIZONTAL_ALIGNMENT_LEFT,
                         "a Persian page's field meets its reader at the reading's start")
+                var repo_hint_fa: RichTextLabel = settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/RepoHint")
+                _ok(
+                        repo_hint_fa != null and repo_hint_fa.horizontal_alignment == HORIZONTAL_ALIGNMENT_RIGHT,
+                        "the Persian repo hint stands at the reading's edge, not the visual left"
+                )
+                var state_fa: RichTextLabel = settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State")
+                _ok(
+                        state_fa != null and state_fa.horizontal_alignment == HORIZONTAL_ALIGNMENT_RIGHT,
+                        "the Persian account line (وصل شده به …) stands at the reading's edge"
+                )
                 _ok(settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/AutoRow/AutoPad/AutoLine/Words/Sub") == null,
                         "the quiet promise carries no explainer beneath it")
                 var source_fa: RichTextLabel = settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/DataSource/Padding/Box/What")
                 _ok(source_fa != null and source_fa.text.contains("می‌آیند") and not source_fa.text.contains("بی‌کم‌وکاست"),
                         "the Persian source line says its say and stops")
+                _ok(source_fa != null and source_fa.horizontal_alignment == HORIZONTAL_ALIGNMENT_RIGHT,
+                        "the Persian source line stands at the right edge (a RichTextLabel's LEFT stays the visual left)")
+                var backup_caption_fa: RichTextLabel = settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/Backup/Padding/Box/Caption")
+                _ok(backup_caption_fa != null and backup_caption_fa.horizontal_alignment == HORIZONTAL_ALIGNMENT_RIGHT,
+                        "the Persian backup card's own words stand at the right edge")
+                var backup_note_fa: RichTextLabel = settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/Backup/Padding/Box/BackupNote")
+                _ok(backup_note_fa != null and backup_note_fa.horizontal_alignment == HORIZONTAL_ALIGNMENT_CENTER,
+                        "the backup note still says itself from the middle, both tongues")
                 var back_fa: Button = settings_fa.get_node_or_null("Margin/Scroll/Wrap/Column/TopBar/Back")
                 _ok(back_fa != null and back_fa.get_global_rect().position.x > settings_fa.get_global_rect().size.x / 2.0,
                         "the way back stands at the reading's start, the right")

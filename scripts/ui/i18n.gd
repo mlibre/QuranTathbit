@@ -145,7 +145,6 @@ const STRINGS := {
                 "fa": "نسخهٔ تازه آماده است — دکمهٔ طلایی بالا آن را نصب می‌کند.",
                 "ar": "الإصدار الجديد جاهز — الزر الذهبي في الأعلى يثبّته.",
         },
-        "cards": {"fa": "کارت", "ar": "بطاقة"},
         # --- the sync's own words, on home and under Settings ---------------------
         "Syncing…": {"fa": "همگام‌سازی…", "ar": "مزامنة…"},
         "Not connected — your deck lives on this device only": {
@@ -373,10 +372,6 @@ const STRINGS := {
                 "fa": "نمایش یا پنهان‌کردن آنچه نوشته شد",
                 "ar": "إظهار ما كُتب أو إخفاؤه",
         },
-        "From github.com/settings/tokens — needs the repo scope. Stays on this device.": {
-                "fa": "از github.com/settings/tokens — به دسترسی repo نیاز دارد. روی همین دستگاه می‌ماند.",
-                "ar": "من github.com/settings/tokens — يحتاج نطاق repo. يبقى على هذا الجهاز.",
-        },
         "Repository": {"fa": "مخزن", "ar": "المستودع"},
         "Repository name": {"fa": "نام مخزن", "ar": "اسم المستودع"},
         "Where your deck lives on GitHub — created on first sync if it does not exist.": {
@@ -408,10 +403,6 @@ const STRINGS := {
                 "ar": "آيات المجموعة وترجمتها الفارسية وتلاواتها من [url=https://quran.makarem.ir/]quran.makarem.ir[/url]، منقولةً دون تغيير من حزمة المجموعة.",
         },
         "Open quran.makarem.ir": {"fa": "گشودن quran.makarem.ir", "ar": "فتح quran.makarem.ir"},
-        "In the browser, recitations stream from this site while you study.": {
-                "fa": "در مرورگر، تلاوت‌ها هنگام مطالعه از همین سایت پخش می‌شوند.",
-                "ar": "في المتصفح، تُبثّ التلاوات من هذا الموقع أثناء الدراسة.",
-        },
         "QuranTathbit v%s": {"fa": "QuranTathbit نسخهٔ %s", "ar": "QuranTathbit الإصدار %s"},
         "This build has no GitHub app id yet. Add your OAuth app's client id to scripts/net/github_auth.gd, or paste a token below.": {
                 "fa": "این ساخت هنوز شناسهٔ برنامهٔ GitHub ندارد. شناسهٔ کلاینت OAuth خود را در scripts/net/github_auth.gd بنویسید، یا توکنی را در پایین بچسبانید.",

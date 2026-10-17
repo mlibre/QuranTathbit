@@ -15,7 +15,7 @@ extends SceneTree
 const MainScript := preload("res://scripts/main.gd")
 const DeckZipScript := preload("res://scripts/data/deck_zip.gd")
 
-const SHOTS := 29
+const SHOTS := 31
 
 var _out := "/tmp/shots"
 var _saved := 0
@@ -263,6 +263,20 @@ func _init() -> void:
         await _shot("settings_fa")
         var settings_fa: Control = main.get_node_or_null("Settings")
         if settings_fa != null:
+                # The cards the reader named live below the fold: the backup's
+                # own words and the source's line, both of which once stood at
+                # the left edge of a right-reading page.
+                var scroll_fa: ScrollContainer = settings_fa.get_node("Margin/Scroll")
+                for card_name in ["Backup", "DataSource"]:
+                        var card_fa: Control = settings_fa.get_node_or_null(
+                                "Margin/Scroll/Wrap/Column/" + card_name
+                        )
+                        if card_fa != null:
+                                scroll_fa.scroll_vertical = int(
+                                        maxf(0.0, card_fa.get_global_rect().position.y - scroll_fa.get_global_rect().position.y)
+                                )
+                                await create_timer(0.5).timeout
+                                await _shot("settings_fa_" + card_name.to_lower())
                 settings_fa.closed.emit()
                 await create_timer(0.6).timeout
         # The library in Persian: the shelf's pills and counts carry the

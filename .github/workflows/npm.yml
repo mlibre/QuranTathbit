@@ -48,6 +48,29 @@ jobs:
           touch builds/.gdignore
           godot --headless --path . --export-release "Web" builds/web/index.html
 
+      # The engine's loader must speak the browsers a reader keeps longest
+      # (the Pages workflow explains why); the npm package serves the same
+      # page from a local disk, so its loader is lowered the same way.
+      - name: Make the loader speak older browsers
+        run: |
+          npx --yes esbuild@0.28.2 builds/web/index.js --target=firefox68,chrome57 --outfile=builds/web/index.js
+          node --check builds/web/index.js
+          python3 - <<'PY'
+          import re, sys
+          data = open("builds/web/index.js", encoding="utf-8").read()
+          blockers = {
+              "optional chaining": r"\?\.",
+              "nullish coalescing": r"[^?]\?\?[^=]",
+              "logical assignment": r"(&&|\|\||\?\?)=",
+              "catch without binding": r"catch\s*\{",
+          }
+          found = {k: len(re.findall(p, data)) for k, p in blockers.items()}
+          bad = {k: v for k, v in found.items() if v}
+          if bad:
+              sys.exit("ERROR: index.js still carries syntax an old phone cannot parse: %s" % bad)
+          print("loader speaks firefox68/chrome57: no post-2017 parse-breakers left")
+          PY
+
       # The web build's .pck carries the deck's text; the audio streams from
       # decks/quran/ beside index.html. Both must land in the npm package.
       - name: Lay the recitations beside the app

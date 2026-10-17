@@ -176,16 +176,20 @@ func _layout() -> void:
 ## the edge the page reads from.
 ##
 ## The alignment is LEFT on purpose, in both directions. Under an RTL layout
-## the engine reads LEFT as the reading's start -- the right edge -- and
-## RIGHT as its far end, so a RIGHT here would stand a Persian title at the
-## page's LEFT margin: exactly the corner the reader reported it stuck in.
-## LEFT means "where the reading begins" on every page this app speaks.
+## the engine reads a Label's LEFT as the reading's start -- the right edge --
+## and RIGHT as its far end, so a RIGHT here would stand a Persian title at
+## the page's LEFT margin: exactly the corner the reader reported it stuck in.
+## LEFT means "where the reading begins" on every page this app speaks. (A
+## RichTextLabel answers the other way -- see _text -- which is why the two
+## builders say different words for the same edge.)
 func _card_header(box: VBoxContainer, title: String) -> void:
         var label := Label.new()
         label.name = "CardTitle"
         label.text = title
         label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-        ThemeScript.dress(label, 12, ThemeScript.GOLD_DEEP, true)
+        # A card's own name is the smallest word a reader hunts for, so it
+        # stands one breath larger than the captions beneath it.
+        ThemeScript.dress(label, 13, ThemeScript.GOLD_DEEP, true)
         box.add_child(label)
         box.add_child(ThemeScript.hairline(ThemeScript.LINE))
 
@@ -203,9 +207,17 @@ func _text(what: String, color: Color, size: int, center := false, bold := false
         if center:
                 label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         else:
-                # A line stands at the edge its page reads from: LEFT is the
-                # reading's start under either layout (see _card_header).
-                label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+                # A line stands at the edge its page reads from -- but the two
+                # controls answer differently under a right-reading layout:
+                # a Label's LEFT is the reading's start (the visual right
+                # edge), while a RichTextLabel's LEFT stays the visual left
+                # edge, measured, whatever the paragraph inside it reads. A
+                # RichTextLabel must therefore be told the reading's edge in
+                # so many words: RIGHT when the tongue reads from the right.
+                label.horizontal_alignment = (
+                        HORIZONTAL_ALIGNMENT_RIGHT if I18nScript.is_rtl()
+                        else HORIZONTAL_ALIGNMENT_LEFT
+                )
         label.add_theme_font_override("normal_font", ThemeScript.vazir(size, bold))
         label.add_theme_font_size_override("normal_font_size", ThemeScript.fs(size))
         label.add_theme_color_override("default_color", color)
@@ -390,12 +402,6 @@ func _github_body() -> Control:
         save_token.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         save_token.pressed.connect(_save_token)
         token_row.add_child(save_token)
-        var token_hint := _text(
-                I18nScript.t("From github.com/settings/tokens — needs the repo scope. Stays on this device."),
-                ThemeScript.INK_SOFT, ThemeScript.CAPTION
-        )
-        token_hint.name = "TokenHint"
-        box.add_child(token_hint)
 
         # The page's own division: the account above, the deck's home below.
         box.add_child(ThemeScript.hairline())
@@ -413,13 +419,18 @@ func _github_body() -> Control:
         repo.text_submitted.connect(_save_repo)
         box.add_child(repo)
         _paste_on_hold(repo)
+        repo.focus_exited.connect(func() -> void: _save_repo(repo.text))
+        # The deck's home on GitHub, said once under the field that names it:
+        # a RichTextLabel, so under a right-reading tongue it stands at the
+        # reading's own edge (see _text) -- the corner the reader reported
+        # it stuck at when the line was left to the visual left edge.
         var repo_hint := _text(
                 I18nScript.t("Where your deck lives on GitHub — created on first sync if it does not exist."),
-                ThemeScript.INK_SOFT, ThemeScript.CAPTION
+                ThemeScript.INK_SOFT,
+                ThemeScript.CAPTION
         )
         repo_hint.name = "RepoHint"
         box.add_child(repo_hint)
-        repo.focus_exited.connect(func() -> void: _save_repo(repo.text))
 
         # The quiet promise, said plainly and changeable: after each session
         # the deck tells GitHub on its own. A promise that matters is a row
@@ -690,9 +701,12 @@ func _dress_segment(button: Button, on: bool) -> void:
         button.add_theme_stylebox_override("focus", wash)
 
 ## A quiet explanatory line under a choice, the caption a field's label
-## never quite is.
+## never quite is. It carries a stable name, the way field labels do, so a
+## page's own words can be found by their path.
 func _caption_line(what: String) -> RichTextLabel:
-        return _text(what, ThemeScript.INK_SOFT, 12)
+        var label := _text(what, ThemeScript.INK_SOFT, 12)
+        label.name = "Caption"
+        return label
 
 ## The verses' own face, chosen: the setting remembers it on this device,
 ## the theme wears it from this breath on, and the deck's own progress file
@@ -1040,8 +1054,13 @@ func _source_body() -> Control:
         what.scroll_active = false
         what.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         what.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        # LEFT is the reading's start under either layout (see _card_header).
-        what.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+        # The reading's own edge, said in so many words: a RichTextLabel's
+        # LEFT stays the visual left edge under a right-reading layout too
+        # (see _text), so the tongue itself decides the edge.
+        what.horizontal_alignment = (
+                HORIZONTAL_ALIGNMENT_RIGHT if I18nScript.is_rtl()
+                else HORIZONTAL_ALIGNMENT_LEFT
+        )
         what.text = I18nScript.t(
                 "The deck's verses, Persian translation and recitations come from [url=https://quran.makarem.ir/]quran.makarem.ir[/url], carried unchanged from the deck package."
         )
@@ -1065,11 +1084,6 @@ func _source_body() -> Control:
                 OS.shell_open(url)
         )
         box.add_child(open)
-
-        if OS.has_feature("web"):
-                var note := _text(I18nScript.t("In the browser, recitations stream from this site while you study."), ThemeScript.INK_SOFT, ThemeScript.CAPTION)
-                note.name = "WebNote"
-                box.add_child(note)
         return card
 
 func _about() -> Control:

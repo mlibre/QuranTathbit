@@ -90,7 +90,10 @@ func _ready() -> void:
         _front.set_caret_at_end()
 
 func _build_top_bar() -> Control:
-        var bar: Dictionary = ThemeScript.top_bar(I18nScript.t("Edit card"))
+        # The bar answers the reading's own direction: under a right-reading
+        # tongue the way back points right from the right corner, the way the
+        # settings page already reads, so every page answers alike.
+        var bar: Dictionary = ThemeScript.top_bar(I18nScript.t("Edit card"), I18nScript.is_rtl())
         var row: HBoxContainer = bar["row"]
         var back: Button = bar["back"]
         back.tooltip_text = I18nScript.t("Back without saving")

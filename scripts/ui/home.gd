@@ -46,10 +46,14 @@ func _layout() -> void:
         margin.add_theme_constant_override("margin_top", int(36.0 + inset))
         margin.add_theme_constant_override("margin_bottom", int(30.0 + ThemeScript.bottom_inset()))
         # The deck card's own padding leans in with the page: the phone's
-        # card gives its words the room the tighter margins took.
+        # card gives its words the room the tighter margins took. Its width
+        # is said here too, so the middle box keeps a presence on the page
+        # whatever its words cost -- never wider than the window holds.
+        var deck: PanelContainer = get_node("Margin/Column/DeckCard")
         var pad: MarginContainer = get_node("Margin/Column/DeckCard/Pad")
         pad.add_theme_constant_override("margin_left", 20 if narrow else 30)
         pad.add_theme_constant_override("margin_right", 20 if narrow else 30)
+        deck.custom_minimum_size = Vector2(minf(324.0, size.x - 2.0 * side), 138.0)
         for coin_name in ["SyncCoin", "SettingsCorner", "UpdateCoin"]:
                 var coin: Button = get_node(coin_name)
                 coin.offset_top = 22.0 + inset
@@ -92,7 +96,10 @@ func setup(deck: DeckScript, counts: Dictionary, sync_line: String, sync_state :
 
 ## The three numbers and the one button, said once: setup() and refresh()
 ## both end here, so the page can never disagree with itself between the
-## two doors it is reached through.
+## two doors it is reached through. The whole holding is no longer said here
+## at all: the pills below own the day's numbers, and the card between owns
+## the day's one news -- the next card -- so nothing is said twice and the
+## box the reader once found lonely is gone with the figure that filled it.
 func _apply_counts(counts: Dictionary) -> void:
         _counts = counts
         var due_pill: Label = get_node("Margin/Column/Stats/Due/Box/Value")
@@ -104,7 +111,6 @@ func _apply_counts(counts: Dictionary) -> void:
         ThemeScript.count_up(due_pill, int(counts["due"]))
         ThemeScript.count_up(new_pill, int(counts["new"]))
         ThemeScript.count_up(learned_pill, int(counts["learned"]))
-        _apply_deck_chips()
         var study: Button = get_node("Margin/Column/Study")
         if counts["due"] + counts["new"] == 0:
                 study.text = I18nScript.t("All caught up")
@@ -120,53 +126,6 @@ func _apply_counts(counts: Dictionary) -> void:
         else:
                 study.text = I18nScript.t("Study") if counts["due"] > 0 else I18nScript.t("Learn new cards")
                 study.disabled = false
-
-## The deck's own account, said as one figure rather than a sentence: the
-## whole holding, as its own small chip -- the number bold in its own colour
-## and the word quiet beside it. The learned and the waiting once stood here
-## too, but they were the pills below said a second time; the card keeps the
-## one number no pill says, and the day's own story stays where the day's
-## own work is. The chip stands in the reading's own order, so a Persian
-## page counts from the right.
-func _apply_deck_chips() -> void:
-        var row: HBoxContainer = get_node_or_null("Margin/Column/DeckCard/Pad/Box/Chips")
-        if row == null:
-                return
-        for child in row.get_children():
-                row.remove_child(child)
-                child.queue_free()
-        var figures := [
-                [I18nScript.num(_deck_of_last_setup.cards.size()) if _deck_of_last_setup != null else "…", I18nScript.t("cards"), ThemeScript.INK, ThemeScript.INK_SOFT],
-        ]
-        if I18nScript.is_rtl():
-                figures.reverse()
-        for figure in figures:
-                row.add_child(_deck_chip(str(figure[0]), str(figure[1]), figure[2], figure[3]))
-
-## One figure, one chip: a soft pill of its own colour with the number bold
-## inside it and the word after it, said in one breath of bbcode so the two
-## share a baseline and a direction whatever tongue the page speaks.
-func _deck_chip(number: String, word: String, tone: Color, wash: Color) -> Control:
-        var chip := PanelContainer.new()
-        chip.add_theme_stylebox_override("panel", ThemeScript.pill_stylebox(wash, Color(wash.r, wash.g, wash.b, 0.0)))
-        var pad := MarginContainer.new()
-        pad.add_theme_constant_override("margin_left", 10)
-        pad.add_theme_constant_override("margin_right", 10)
-        pad.add_theme_constant_override("margin_top", 4)
-        pad.add_theme_constant_override("margin_bottom", 4)
-        chip.add_child(pad)
-        var label := RichTextLabel.new()
-        label.bbcode_enabled = true
-        label.fit_content = true
-        label.scroll_active = false
-        label.autowrap_mode = TextServer.AUTOWRAP_OFF
-        label.text_direction = TextDirection.TEXT_DIRECTION_AUTO
-        label.add_theme_font_override("normal_font", ThemeScript.vazir(13))
-        label.add_theme_font_size_override("normal_font_size", ThemeScript.fs(13))
-        label.add_theme_color_override("default_color", ThemeScript.INK_SOFT)
-        label.text = "[b][color=#%s]%s[/color][/b] %s" % [tone.to_html(false), number, word]
-        pad.add_child(label)
-        return chip
 
 ## The sync coin says the state before any words do: a green coin when the
 ## deck and the repo last agreed, a gold coin while answers still wait to
@@ -236,11 +195,16 @@ func _next_reference() -> String:
         return ""
 
 func _size_for(script: String) -> int:
+        # The reference is the card's hero now, the figure the eye is brought
+        # to the middle box to read: the mushaf cut keeps its own generous
+        # measure, and the other scripts stand a breath above the body they
+        # left, so the day's news outweighs the name above it whatever
+        # script the reference is written in.
         if script == "arabic":
                 return 30
         if script == "persian":
-                return 21
-        return ThemeScript.BODY
+                return 22
+        return 16
 
 func _build() -> void:
         set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -369,42 +333,46 @@ func _deck_card() -> Control:
         var card := PanelContainer.new()
         card.name = "DeckCard"
         card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-        card.custom_minimum_size = Vector2(0, 112)
-        card.add_theme_stylebox_override("panel", ThemeScript.card_stylebox())
         # The page's own margins: every other card in the app pads its
         # content; this one was letting its widest line touch the frame.
+        # Its height answers its words (never below this breath), and its
+        # width is said by the page's own layout, which knows the window.
+        card.custom_minimum_size = Vector2(0, 138)
+        card.add_theme_stylebox_override("panel", ThemeScript.card_stylebox())
         var pad := MarginContainer.new()
         pad.name = "Pad"
         pad.add_theme_constant_override("margin_left", 30)
         pad.add_theme_constant_override("margin_right", 30)
-        pad.add_theme_constant_override("margin_top", 16)
-        pad.add_theme_constant_override("margin_bottom", 16)
+        pad.add_theme_constant_override("margin_top", 18)
+        pad.add_theme_constant_override("margin_bottom", 18)
         card.add_child(pad)
         var box := VBoxContainer.new()
         box.name = "Box"
         box.alignment = BoxContainer.ALIGNMENT_CENTER
-        box.add_theme_constant_override("separation", 6)
+        box.add_theme_constant_override("separation", 9)
         pad.add_child(box)
 
+        # The deck's name opens the card, calm rather than shouting: the
+        # name is the page's own furniture, read daily and rarely hunted for,
+        # so it stands at one quiet measure while the card's hero -- the
+        # day's own news -- takes the weight below it.
         var title := Label.new()
         title.name = "Title"
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        # The deck's name is the hero of this card, but not of the screen:
-        # one size below the app's own wordmark weight class.
-        ThemeScript.dress(title, 30, ThemeScript.INK, true)
+        ThemeScript.dress(title, 22, ThemeScript.INK, true)
         box.add_child(title)
 
-        # The deck's own account as small figures, each in its own chip.
-        var chips := HBoxContainer.new()
-        chips.name = "Chips"
-        chips.alignment = BoxContainer.ALIGNMENT_CENTER
-        chips.add_theme_constant_override("separation", 8)
-        box.add_child(chips)
+        # The deck's own figure, where another card would hang a hairline:
+        # the wordmark's star between its rules, standing as the card's
+        # own ornament between the name and the day's news.
+        var ornament := ThemeScript.OrnamentMark.new()
+        ornament.name = "Ornament"
+        ornament.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        box.add_child(ornament)
 
-        # The card's lower half is an editor's block: a hairline, an eyebrow
-        # that says what is coming, and the reference itself in its own script.
-        box.add_child(ThemeScript.hairline())
-
+        # The card's lower half is the day's: an eyebrow that says what is
+        # coming, and the reference itself in its own script, the figure the
+        # eye is brought to the card to read.
         var eyebrow := Label.new()
         eyebrow.name = "Eyebrow"
         eyebrow.text = I18nScript.t("NEXT UP")
