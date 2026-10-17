@@ -15,7 +15,7 @@ extends SceneTree
 const MainScript := preload("res://scripts/main.gd")
 const DeckZipScript := preload("res://scripts/data/deck_zip.gd")
 
-const SHOTS := 31
+const SHOTS := 32
 
 var _out := "/tmp/shots"
 var _saved := 0
@@ -243,6 +243,14 @@ func _init() -> void:
                 study_fa._reveal()
                 await create_timer(0.9).timeout
                 await _shot("study_fa_back")
+                # The recitation's own page, said in Persian: the name and the
+                # figure at the reading's ends, the mute anchoring a rule
+                # that fills from the right.
+                study_fa._rig.toggle()
+                await create_timer(0.5).timeout
+                await _shot("volume_fa")
+                study_fa._rig.toggle()
+                await create_timer(0.3).timeout
                 # The card's own page, said in Persian: the boxes named at the
                 # right edge, the ayeh set in the verses' own hand, and no
                 # phantom blank line under the reference.

@@ -248,13 +248,38 @@ func _on_editor_input(event: InputEvent) -> void:
 ## caret is placed by the very geometry that shaped the line, bidi and all,
 ## only at the place the ink actually stands. The answer comes as the
 ## engine gives it: x the column, y the line.
+##
+## The row's own wrap index cannot be read from the column the first hit
+## returns: that hit is asked at x=0, the row's far end, and on a wrapped
+## line the column at a row's end is the first column of the NEXT row -- so
+## every wrapped row but the last was slid by the next row's width, and the
+## caret landed a handful of words away from the finger (the reader's
+## "waaay back"). The row is found by its own place on the page instead:
+## the wrap row whose band of y holds the press, said by the same rects
+## that draw the caret.
 func _hit(where: Vector2) -> Vector2i:
         if _editor.size.x <= 0.0:
                 return Vector2i(-1, -1)
         var row := _editor.get_line_column_at_pos(Vector2i(0, int(where.y)), true, true)
         if row.y < 0 or row.y >= _editor.get_line_count():
                 return Vector2i(-1, -1)
-        var wrap := _editor.get_line_wrap_index_at_column(row.y, maxi(row.x, 0))
+        var parts := _editor.get_line_wrapped_text(row.y)
+        if parts.is_empty():
+                parts = PackedStringArray([""])
+        var line_len := _editor.get_line(row.y).length()
+        # Each wrap row's top, from the same rects that draw the caret: the
+        # pressed row is the one whose band -- its own top up to the next
+        # row's -- holds the press.
+        var tops: Array[float] = []
+        var col := 0
+        for w in parts.size():
+                tops.append(_editor.get_rect_at_line_column(row.y, mini(col, line_len)).position.y)
+                col += parts[w].length()
+        var wrap := parts.size() - 1
+        for w in parts.size():
+                if w + 1 >= parts.size() or where.y < tops[w + 1]:
+                        wrap = w
+                        break
         var slide := maxf(_editor.size.x - _editor.get_line_width(row.y, wrap), 0.0)
         return _editor.get_line_column_at_pos(Vector2i(int(where.x - slide), int(where.y)), true, true)
 

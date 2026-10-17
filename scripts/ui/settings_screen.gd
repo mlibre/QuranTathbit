@@ -567,9 +567,10 @@ func _step_new_per_day(delta: int) -> void:
 
 ## How the reading reads: the hand the verses are written in, and the tongue
 ## the app's own words speak. Both are the reader's to choose, both are
-## shown (a font's name in the UI's own face beside a verse drawn in the
-## font itself; a language named in its own script), and both travel with
-## the deck -- one reader, one way of reading, every device.
+## shown rather than explained (a font's name in the UI's own face beside a
+## verse drawn in the font itself; a language named in its own script) -- the
+## choice is judged on what it chooses -- and both travel with the deck: one
+## reader, one way of reading, every device.
 func _reading_body() -> Control:
         var parts := _card("Reading")
         var card: PanelContainer = parts[0]
@@ -589,7 +590,6 @@ func _reading_body() -> Control:
         var current_face := ThemeScript.ayah_face_key()
         for face in ThemeScript.AYAH_FACES:
                 faces.add_child(_ayah_font_segment(str(face["key"]), str(face["label"]), str(face["key"]) == current_face))
-        box.add_child(_caption_line(I18nScript.t("The face the verses are read in, wherever scripture is shown. Carried with your deck.")))
 
         box.add_child(ThemeScript.hairline())
 
@@ -602,7 +602,6 @@ func _reading_body() -> Control:
         var current_lang := I18nScript.lang()
         for code in I18nScript.LANGS:
                 langs.add_child(_language_segment(code, code == current_lang))
-        box.add_child(_caption_line(I18nScript.t("Menus and messages only — the verses and their translations stay as they are. Carried with your deck.")))
         return card
 
 ## One font, one segment: its own name in the UI's face, and beneath it a
@@ -1072,18 +1071,6 @@ func _source_body() -> Control:
         what.add_theme_color_override("selection_color", ThemeScript.SELECT)
         what.meta_clicked.connect(func(meta: Variant) -> void: OS.shell_open(str(meta)))
         box.add_child(what)
-
-        var open := ThemeScript.ghost_button(I18nScript.t("Open quran.makarem.ir"), ThemeScript.GOLD_DEEP, 42)
-        open.name = "Open"
-        # The deck's source is read when the button is pressed: the screen
-        # builds before its setup() brings the deck in.
-        open.pressed.connect(func() -> void:
-                var url := "https://quran.makarem.ir/"
-                if _deck != null and not _deck.source.is_empty():
-                        url = _deck.source
-                OS.shell_open(url)
-        )
-        box.add_child(open)
         return card
 
 func _about() -> Control:

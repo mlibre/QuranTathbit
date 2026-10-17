@@ -141,14 +141,22 @@ func _top_bar() -> Control:
 ## It sits pressed into the paper as a line one writes on: no box, no
 ## fill, no lens -- the placeholder itself says what the line is for, the
 ## way a ledger's ruled line waits for its entry -- a hairline of ink
-## under the words, lifting to gold while it is being written in.
+## under the words, lifting to gold while it is being written in. A page
+## that reads from the right writes its entry line from the right too:
+## the tongue says the direction, and the placeholder stands where the
+## reading begins.
 func _search_field() -> Control:
         var field := LineEdit.new()
         field.name = "Search"
         field.placeholder_text = I18nScript.t("Search the deck — a surah, a verse, 2:1…")
         field.custom_minimum_size = Vector2(0, 44)
         field.clear_button_enabled = true
-        field.text_direction = TextDirection.TEXT_DIRECTION_LTR
+        field.text_direction = (
+                TextDirection.TEXT_DIRECTION_RTL if I18nScript.is_rtl()
+                else TextDirection.TEXT_DIRECTION_LTR
+        )
+        if I18nScript.is_rtl():
+                field.alignment = HORIZONTAL_ALIGNMENT_RIGHT
         field.add_theme_font_override("font", ThemeScript.vazir(15))
         field.add_theme_font_size_override("font_size", ThemeScript.fs(15))
         field.add_theme_color_override("font_color", ThemeScript.INK)
@@ -177,13 +185,17 @@ func _search_field() -> Control:
 ## The shelf's other question, asked in pills: the whole story, or one
 ## thread of it -- what the day is asking for, what has never been started,
 ## what is resting between reviews. A pill knows its count, so the answer
-## is read before it is chosen.
+## is read before it is chosen. The pills are asked in the reading's own
+## order: a page that reads from the right begins its shelf with همه at
+## the right hand, the way the question occurs to the reader.
 func _filters_row() -> Control:
         var flow := HFlowContainer.new()
         flow.name = "Filters"
         flow.add_theme_constant_override("h_separation", 8)
         flow.add_theme_constant_override("v_separation", 6)
         flow.mouse_filter = Control.MOUSE_FILTER_PASS
+        if I18nScript.is_rtl():
+                flow.layout_direction = Control.LAYOUT_DIRECTION_RTL
         return flow
 
 func _rebuild_filters() -> void:

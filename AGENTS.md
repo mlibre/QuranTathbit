@@ -107,7 +107,12 @@ Windows, web) in Godot 4.7 with GDScript only.
   `RIGHT` in so many words (`settings_screen._text`), or every explanation
   line on a right-reading page hangs from the wrong edge, the corner a reader
   reported next. Two controls, two laws, one edge: measure which one you are
-  holding before you align it.
+  holding before you align it. And a page whose root does not turn — the
+  library, a popover — still asks its questions from the reading's edge: the
+  shelf's entry line is told `TEXT_DIRECTION_RTL` and `RIGHT`, its pill row
+  `LAYOUT_DIRECTION_RTL` (so همه stands at the right hand), and a slider
+  inside an `LAYOUT_DIRECTION_RTL` container draws its fill growing from the
+  right — measured, not guessed.
 - **A bold run is told its own hand.** A `[b]` inside a RichTextLabel wears
   `bold_font` and `bold_font_size` — and when they are not overridden, the run
   falls to the theme's default face at the theme's default size, which on this
@@ -142,10 +147,17 @@ Windows, web) in Godot 4.7 with GDScript only.
   it back onto the engine's own words (`_hit`, through
   `get_line_column_at_pos` twice — once for the row, once for the column at
   the slid x), and gives the caret to the word the finger meant: one press
-  places, two take the word, three the line, a held press chooses. And
-  because `select()` and `set_caret_*` move the caret without saying
-  `caret_changed`, the field says it for them (`_mirror_follows`) or the
-  mirror sits a whole hand behind.
+  places, two take the word, three the line, a held press chooses. The
+  slide's row cannot be read from the column the first hit returns: that
+  hit is asked at x=0, a wrapped row's far end, whose column belongs to the
+  NEXT row — so every wrapped row but the last was slid by its neighbour's
+  width and the caret landed a handful of words behind the finger (the
+  reader's "waaay back" on a long translation). The row is found by its own
+  place on the page instead: the wrap row whose band of y holds the press,
+  said by the same rects that draw the caret. And because `select()` and
+  `set_caret_*` move the caret without saying `caret_changed`, the field
+  says it for them (`_mirror_follows`) or the mirror sits a whole hand
+  behind.
 - **A page's hero is its news, not its name.** The home page's middle card
   once carried the deck's name in shouting weight above a lonely figure-box
   a reader had to live under every day. The name is furniture, read daily
@@ -163,11 +175,14 @@ Windows, web) in Godot 4.7 with GDScript only.
   card as surely as a reader hunting by words. The line comes from the
   card's own back (the first Persian text block), never from a table.
 - **A rule a thumb drags runs the width of its page.** The volume popover
-  was the app's worst box: narrow, a 110px rule, its number squeezed beside
-  it. It is drawn now the way the app draws its own cards — as wide as the
-  page, the number said large in the reader's own digits over the rule,
-  the mute at the reading's far end — because a control a hand rests on is
-  sized for the hand, not for the panel it came in.
+  was the app's worst box twice over — first a narrow slip, then a page of
+  parts (a big number on its own line, a ticked rule) the reader still
+  called wrong. It is one setting row said twice now: the quiet name with
+  the live figure at the row's far end, and beneath it the mute anchoring
+  one rule as wide as the page, its fill growing from the reading's own
+  edge — the shape every volume rule the reader has ever dragged already
+  taught their hand, because a control a hand rests on is sized for the
+  hand, not for the panel it came in.
 - **Yesterday's phones read the web too, or the build says no.** The
   engine's web loader ships speaking only today's browsers; a Firefox 68
   phone parses none of it and the page hangs forever, bar motionless. The

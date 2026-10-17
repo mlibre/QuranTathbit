@@ -282,30 +282,43 @@ func _check_study_session(main: Node) -> void:
                         volume_popup.get_node_or_null("Sheet/Pad/Column/Head/Title") != null,
                         "the page says what it is for before it asks for a number"
                 )
-                var slider: HSlider = volume_popup.get_node("Sheet/Pad/Column/Slider")
+                # The page is one setting row said twice: the quiet name with
+                # the live figure at the row's far end, and beneath it the
+                # mute anchoring one rule the width of the page -- the way
+                # every volume rule the reader has ever dragged behaves, the
+                # box the reader twice called wrong being neither.
+                var readout: Label = volume_popup.get_node_or_null("Sheet/Pad/Column/Head/Readout")
+                _ok(
+                        readout != null and readout.text.length() > 0,
+                        "the figure stands in the row's head, at the far end"
+                )
+                var slider: HSlider = volume_popup.get_node("Sheet/Pad/Column/Band/Slider")
                 slider.value = 0.5
                 await create_timer(0.7).timeout
                 _is(study.volume, 0.5, "the rule sets the loudness it says")
                 _ok(absf(study._player.volume_db - linear_to_db(0.5)) < 0.01, "the player obeys the rule")
-                # The rule a thumb actually wants: as wide as the page it
-                # answers for, its number said large above it -- the box the
-                # reader called the app's worst was neither.
+                # The rule a thumb actually wants: everything the band holds
+                # after the mute, which is the width of the page.
                 _ok(
                         slider.size.x >= 240.0,
                         "the rule runs the width of the page, wide enough for a thumb"
                 )
-                # The speaker in the page is the mute: one press for silence,
+                _ok(
+                        volume_popup.get_node_or_null("Sheet/Pad/Column/Band/Mute") != null,
+                        "the mute anchors the rule at the reading's start"
+                )
+                # The speaker in the band is the mute: one press for silence,
                 # one press back for the loudness silence replaced.
-                (volume_popup.get_node("Sheet/Pad/Column/Head/Mute") as Button).pressed.emit()
+                (volume_popup.get_node("Sheet/Pad/Column/Band/Mute") as Button).pressed.emit()
                 await create_timer(0.2).timeout
                 _is(study.volume, 0.0, "pressing the speaker mutes the recitation")
-                (volume_popup.get_node("Sheet/Pad/Column/Head/Mute") as Button).pressed.emit()
+                (volume_popup.get_node("Sheet/Pad/Column/Band/Mute") as Button).pressed.emit()
                 await create_timer(0.2).timeout
                 _is(study.volume, 0.5, "pressing it again unmutes to what was")
                 _is(
-                        (volume_popup.get_node("Sheet/Pad/Column/Readout") as Label).text,
+                        (volume_popup.get_node("Sheet/Pad/Column/Head/Readout") as Label).text,
                         "50%",
-                        "the number says the loudness, large, over the rule"
+                        "the figure says the loudness from the row's own head"
                 )
                 volume_coin.pressed.emit()
                 await create_timer(0.1).timeout
@@ -750,6 +763,23 @@ func _check_settings(main: Node) -> void:
                 not i18n.STRINGS.has("In the browser, recitations stream from this site while you study."),
                 "the browser's recitation note left the source card with the line that said it"
         )
+        # The explainer under a choice that shows itself was saying what the
+        # choice already says: the font's and the tongue's captions are gone,
+        # and the source card's button went with the link that already opens.
+        _ok(
+                not i18n.STRINGS.has("The face the verses are read in, wherever scripture is shown. Carried with your deck."),
+                "the font card's explainer left the app's table with the line that said it"
+        )
+        _ok(
+                not i18n.STRINGS.has("Menus and messages only — the verses and their translations stay as they are. Carried with your deck."),
+                "the tongue card's explainer left the app's table with the line that said it"
+        )
+        _ok(
+                not i18n.STRINGS.has("Open quran.makarem.ir"),
+                "the source card's open button left the app's table with the button that said it"
+        )
+        var open_coin: Control = settings.get_node_or_null("Margin/Scroll/Wrap/Column/DataSource/Padding/Box/Open")
+        _ok(open_coin == null, "the source card carries its link and no button beside it")
         var source_en: RichTextLabel = settings.get_node_or_null("Margin/Scroll/Wrap/Column/DataSource/Padding/Box/What")
         _ok(
                 source_en != null and source_en.horizontal_alignment == HORIZONTAL_ALIGNMENT_LEFT,
@@ -914,6 +944,18 @@ func _check_settings(main: Node) -> void:
                 faces != null and faces.get_child_count() == 3,
                 "the reading card offers every face the verses can wear"
         )
+        # The choice says itself: a face named beside its own basmala needs
+        # no explainer under it, and neither does a tongue named in its own
+        # script -- the reading card carries its choices and no captions.
+        var reading_box: VBoxContainer = settings.get_node_or_null(
+                "Margin/Scroll/Wrap/Column/Reading/Padding/Box"
+        )
+        if reading_box != null:
+                var captions := 0
+                for child in reading_box.get_children():
+                        if child is RichTextLabel:
+                                captions += 1
+                _is(captions, 0, "the reading card shows its choices without explaining them")
         if faces != null and faces.get_child_count() == 3:
                 var sample := (faces.get_child(2).get_node("Pad/Stack/Sample") as Label)
                 _ok(
@@ -1381,6 +1423,92 @@ func _check_marks_and_rtl(main: Node) -> void:
         release.call()
         field.queue_free()
 
+        # A line that wraps is the case the slide was built for and the case
+        # that broke it: the column a press at the row's far end returns is
+        # the first column of the NEXT row, so every wrapped row but the last
+        # was slid by its neighbour's width and the caret landed a handful of
+        # words behind the finger -- the reader's "waaay back" on exactly
+        # this sentence. The row is found by its own place on the page now,
+        # so a press on any wrapped row lands inside that row.
+        var wrap_field = RtlFieldForPitch.new()
+        # The field is given a phone's own width, not the window's: the
+        # reader's sentence wraps on the phone, and a field stretched across
+        # a 1152px window would carry it on one row and prove nothing.
+        wrap_field.position = Vector2(40, 60)
+        wrap_field.size = Vector2(360, 260)
+        main.add_child(wrap_field)
+        wrap_field.set_face(ThemeScript.editor_face())
+        wrap_field.set_text(
+                "(همان) کسانى که به غیب [= حقایقى که از حس پوشیده و پنهان است] ایمان مى آورند و نماز را برپا مى دارند و از نعمتهایى که به آنان روزى داده ایم انفاق مى کنند"
+        )
+        await create_timer(0.4).timeout
+        var wrap_editor: TextEdit = wrap_field._editor
+        var wrap_parts := wrap_editor.get_line_wrapped_text(0)
+        _ok(
+                wrap_parts.size() >= 2,
+                "the reader's own sentence wraps in the field, as it did on the phone"
+        )
+        if wrap_parts.size() >= 2:
+                var wrap_press := func(where: Vector2) -> void:
+                        var down := InputEventMouseButton.new()
+                        down.button_index = MOUSE_BUTTON_LEFT
+                        down.pressed = true
+                        down.position = where
+                        wrap_field._on_editor_input(down)
+                        var up := InputEventMouseButton.new()
+                        up.button_index = MOUSE_BUTTON_LEFT
+                        up.pressed = false
+                        up.position = where
+                        wrap_field._on_editor_input(up)
+                var wrap_tops: Array[float] = []
+                var wrap_col := 0
+                for w in wrap_parts.size():
+                        wrap_tops.append(wrap_editor.get_rect_at_line_column(0, wrap_col).position.y)
+                        wrap_col += wrap_parts[w].length()
+                for w in wrap_parts.size() - 1:
+                        var ink_w: float = wrap_editor.get_line_width(0, w)
+                        var slide_w: float = maxf(wrap_editor.size.x - ink_w, 0.0)
+                        var row_y: float = wrap_tops[w] + 20.0
+                        # The row's own first column: everything this row holds.
+                        var row_start := 0
+                        for i in w:
+                                row_start += wrap_parts[i].length()
+                        var row_end: int = row_start + wrap_parts[w].length()
+                        # The column a press at this x means: the one whose own
+                        # caret rect stands nearest the pressed place, slid
+                        # onto the engine's flush-left ink. The old bug slid
+                        # every row by its neighbour's width, which stands
+                        # out here as a handful of words of miss.
+                        var nearest := func(press_x: float) -> int:
+                                var ex: float = press_x - slide_w
+                                var best := row_start
+                                var best_d := 1.0e9
+                                for col in range(row_start, row_end + 1):
+                                        var r: Rect2 = wrap_editor.get_rect_at_line_column(0, col)
+                                        var d: float = absf(r.position.x - ex)
+                                        if d < best_d:
+                                                best_d = d
+                                                best = col
+                                return best
+                        # A press at the row's middle: the caret stands within
+                        # a breath of the word the finger meant, not a
+                        # handful of words away.
+                        var mid_x: float = slide_w + ink_w * 0.5
+                        wrap_press.call(Vector2(mid_x, row_y))
+                        _ok(
+                                absi(wrap_editor.get_caret_column() - nearest.call(mid_x)) <= 2,
+                                "a press on wrapped row %d lands on the word the finger meant" % w
+                        )
+                        # A press at the row's reading start (the right edge):
+                        # the caret stands at the row's first word, not the
+                        # next row's.
+                        wrap_press.call(Vector2(wrap_editor.size.x - 1.0, row_y))
+                        _ok(
+                                wrap_editor.get_caret_column() <= row_start + 1,
+                                "a press at row %d's reading start takes that row's first word" % w
+                        )
+        wrap_field.queue_free()
+
         # The quiet promise says itself once; the line beneath it that
         # explained it again is gone.
         i18n.set_lang("en")
@@ -1446,6 +1574,37 @@ func _check_marks_and_rtl(main: Node) -> void:
                 _ok(back_fa != null and back_fa.get_global_rect().position.x > settings_fa.get_global_rect().size.x / 2.0,
                         "the way back stands at the reading's start, the right")
                 settings_fa.closed.emit()
+                await create_timer(0.3).timeout
+        # The library said in Persian asks its questions from the right: the
+        # entry line's placeholder stands where the reading begins, and the
+        # pills run همه first from the right hand, the way the questions
+        # occur to a right-reading reader -- not washed up against the left
+        # margin the way a left-reading page would put them.
+        main._on_browse_pressed()
+        await create_timer(0.6).timeout
+        var browse_fa: Control = main.get_node_or_null("Browse")
+        if browse_fa != null:
+                var search_fa: LineEdit = browse_fa.get_node_or_null("Margin/Column/Search")
+                _ok(
+                        search_fa != null
+                                and search_fa.text_direction == Control.TEXT_DIRECTION_RTL
+                                and search_fa.alignment == HORIZONTAL_ALIGNMENT_RIGHT,
+                        "the Persian entry line meets its reader at the reading's start"
+                )
+                var filters_fa: HFlowContainer = browse_fa.get_node_or_null("Margin/Column/Filters")
+                if filters_fa != null and filters_fa.get_child_count() == 4:
+                        _ok(
+                                filters_fa.layout_direction == Control.LAYOUT_DIRECTION_RTL,
+                                "the Persian pills are asked in the reading's own order"
+                        )
+                        var first_pill: Control = filters_fa.get_child(0)
+                        var last_pill: Control = filters_fa.get_child(3)
+                        _ok(
+                                first_pill.get_global_rect().position.x
+                                        > last_pill.get_global_rect().position.x,
+                                "همه stands at the right hand and در مرور at the left"
+                        )
+                browse_fa.closed.emit()
                 await create_timer(0.3).timeout
         # The editor said in Persian: the boxes are named at the right edge,
         # and both fields write in the verses' own hand -- the ayeh is never

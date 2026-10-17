@@ -66,7 +66,10 @@ A few quiet extras:
   right the way the Quran is read, its Persian translation as a second
   quiet line under it — so you can find a card by what it means, not only
   by what it says — with search (`2:93` or `۲:۹۳` — either digits work) and
-  filters for what is due, new, or resting.
+  filters for what is due, new, or resting. In a right-reading tongue the
+  page asks its questions from the right too: the search line waits at the
+  right edge and the pills read همه، سررسید، تازه، در مرور from the right
+  hand.
 - **Set your own pace.** Settings → *New cards each day* (default 20, set
   it to 0 for review-only days).
 - **Size the app for your eyes.** Settings → *Display*: an *interface
@@ -87,7 +90,10 @@ A few quiet extras:
   the right, the pages are laid out from the right too — titles, labels,
   fields, explanation lines, the tooltips a hover raises and the way back
   all standing where the reading starts. The verses and their Persian
-  translation always stay exactly as they are.
+  translation always stay exactly as they are. A choice that shows itself
+  carries no explainer: the Reading card offers each typeface as its own
+  drawing of the Basmala and each tongue in its own name, and the source
+  card carries its link with no button beside it.
 - **Every mark is drawn, whole.** The vowels a verse stacks above its
   tallest letters reach past the box a font declares for itself, and a
   renderer that clips at that box would draw them nowhere at all. The app
@@ -97,7 +103,8 @@ A few quiet extras:
   library, or in the editor.
 - **Edit by touch, precisely.** Tap anywhere in a verse or a translation and
   the caret lands under your finger — on the very word you meant, in text
-  that reads from the right. One tap places the caret, a double tap takes
+  that reads from the right, on the very line you pressed when the words
+  wrap. One tap places the caret, a double tap takes
   the word, a triple takes the line, and a held tap selects as it moves.
 - **Keep the deck as one file.** Settings → *Backup* packs the whole deck —
   verses, recitations, and all your progress — into a single zip that lands

@@ -402,7 +402,6 @@ const STRINGS := {
                 "fa": "آیه‌های مجموعه، ترجمهٔ فارسی و تلاوت‌ها از [url=https://quran.makarem.ir/]quran.makarem.ir[/url] می‌آیند.",
                 "ar": "آيات المجموعة وترجمتها الفارسية وتلاواتها من [url=https://quran.makarem.ir/]quran.makarem.ir[/url]، منقولةً دون تغيير من حزمة المجموعة.",
         },
-        "Open quran.makarem.ir": {"fa": "گشودن quran.makarem.ir", "ar": "فتح quran.makarem.ir"},
         "QuranTathbit v%s": {"fa": "QuranTathbit نسخهٔ %s", "ar": "QuranTathbit الإصدار %s"},
         "This build has no GitHub app id yet. Add your OAuth app's client id to scripts/net/github_auth.gd, or paste a token below.": {
                 "fa": "این ساخت هنوز شناسهٔ برنامهٔ GitHub ندارد. شناسهٔ کلاینت OAuth خود را در scripts/net/github_auth.gd بنویسید، یا توکنی را در پایین بچسبانید.",
@@ -522,15 +521,7 @@ const STRINGS := {
         # --- the reading card -------------------------------------------------------------
         "Reading": {"fa": "خوانش", "ar": "القراءة"},
         "Ayah font": {"fa": "قلم آیه‌ها", "ar": "خط الآيات"},
-        "The face the verses are read in, wherever scripture is shown. Carried with your deck.": {
-                "fa": "چهره‌ای که آیه‌ها با آن خوانده می‌شوند، هر جا متنِ وحی نشان داده شود. همراه مجموعهٔ شما می‌آید.",
-                "ar": "الوجه الذي تُقرأ به الآيات أينما عُرض النص. يُحمل مع مجموعتك.",
-        },
         "App language": {"fa": "زبان برنامه", "ar": "لغة التطبيق"},
-        "Menus and messages only — the verses and their translations stay as they are. Carried with your deck.": {
-                "fa": "تنها منوها و پیام‌ها — آیه‌ها و ترجمه‌هایشان همان‌گونه می‌مانند. همراه مجموعهٔ شما می‌آید.",
-                "ar": "القوائم والرسائل فقط — تبقى الآيات وترجماتها كما هي. يُحمل مع مجموعتك.",
-        },
         # --- the display card --------------------------------------------------------------
         "Display": {"fa": "نمایش", "ar": "العرض"},
         "Interface scale": {"fa": "اندازهٔ رابط", "ar": "مقياس الواجهة"},

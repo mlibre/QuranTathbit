@@ -472,11 +472,15 @@ class TypeMark extends Control:
                 )
 
 
-## The volume's own small page: its name, the mute, a rule the hand drags,
-## and the number it stands at -- a page the size of the question it
-## answers, hung from the coin that opens it. Both places that play a
-## recitation (a session and the browser) open the same page, so loudness
-## is one idea everywhere it can be changed.
+## The volume's own small page, drawn as the app draws its own setting rows:
+## a quiet name with the live figure standing at the row's far end, and under
+## it the one control -- the mute anchoring a rule wide enough for a thumb,
+## the rule's fill growing from the reading's own edge in a right-reading
+## tongue, exactly the way every volume rule the reader has ever dragged
+## behaves. A page the size of the question it answers, hung from the coin
+## that opens it; both places that play a recitation (a session and the
+## browser) open the same page, so loudness is one idea everywhere it can be
+## changed.
 class VolumePopover extends Popover:
         ## Every nudge of the rule, live -- the hand hears the change as it
         ## makes it.
@@ -492,27 +496,21 @@ class VolumePopover extends Popover:
         var _loud := 1.0  # the last loudness above silence, for unmuting
 
         func _init() -> void:
-                # A page wide enough for a thumb: the reader called this box
-                # the app's worst, and it was -- a narrow slip of paper with
-                # a 110px rule inside it. It is drawn now the way the app
-                # draws its own cards: wide, calm, one figure in the
-                # reader's own digits standing large over the rule it
-                # answers for.
-                super(300.0)
+                super(340.0)
                 name = "VolumePopup"
 
-                var pad := content(20, 18, 20, 18)
+                var pad := content(18, 14, 18, 16)
                 var column := VBoxContainer.new()
                 column.name = "Column"
-                column.add_theme_constant_override("separation", 14)
+                column.add_theme_constant_override("separation", 10)
                 pad.add_child(column)
 
-                # The page says what it is for before it asks for a number:
-                # its name in the reader's own tongue at the edge the page
-                # reads from, the mute standing at the reading's far end.
+                # The row's own head: the page's quiet name at the reading's
+                # start, the live figure at the row's far end -- a setting row
+                # says what it holds before it asks for a hand.
                 var head := HBoxContainer.new()
                 head.name = "Head"
-                head.add_theme_constant_override("separation", 10)
+                head.add_theme_constant_override("separation", 8)
                 column.add_child(head)
                 var title := Label.new()
                 title.name = "Title"
@@ -520,19 +518,43 @@ class VolumePopover extends Popover:
                 title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
                 title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
                 # The popover rides a page whose root does not turn, so the
-                # tongue says the edge in so many words: LEFT for a
-                # left-reading page, RIGHT for a right-reading one.
+                # tongue says the edge in so many words.
+                title.horizontal_alignment = (
+                        HORIZONTAL_ALIGNMENT_RIGHT if I18N.is_rtl()
+                        else HORIZONTAL_ALIGNMENT_LEFT
+                )
+                THEME.dress(title, 12, INK_SOFT, true)
+                _readout = Label.new()
+                _readout.name = "Readout"
+                _readout.text = "100%"
+                _readout.custom_minimum_size = Vector2(46, 0)
+                _readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                _readout.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+                THEME.dress(_readout, 16, GREEN_DEEP, true)
                 if I18N.is_rtl():
-                        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+                        head.add_child(_readout)
+                        head.add_child(title)
                 else:
-                        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-                THEME.dress(title, 13, INK_SOFT, true)
+                        head.add_child(title)
+                        head.add_child(_readout)
+
+                # The band: the mute anchoring one rule the width of the page.
+                var band := HBoxContainer.new()
+                band.name = "Band"
+                band.add_theme_constant_override("separation", 12)
+                # A right-reading page reads its rule from the right: the
+                # container turns, so the mute stands at the reading's start
+                # and the rule's fill grows from it -- measured, the engine
+                # mirrors a slider's fill under a right-reading layout.
+                if I18N.is_rtl():
+                        band.layout_direction = Control.LAYOUT_DIRECTION_RTL
+                column.add_child(band)
 
                 # The speaker is also the mute: one press for silence, one
                 # press for the loudness silence replaced.
                 var mute := Button.new()
                 mute.name = "Mute"
-                mute.custom_minimum_size = Vector2(42, 42)
+                mute.custom_minimum_size = Vector2(40, 40)
                 mute.tooltip_text = I18N.t("Mute or unmute")
                 THEME.apply_mark_styles(mute, THEME.mark_button_styles(GREEN, true))
                 _mark = VolumeMark.new(GREEN_DEEP)
@@ -545,58 +567,37 @@ class VolumePopover extends Popover:
                 mute.add_child(mute_center)
                 THEME.pressable(mute)
                 mute.pressed.connect(_toggle_mute)
-                if I18N.is_rtl():
-                        head.add_child(mute)
-                        head.add_child(title)
-                else:
-                        head.add_child(title)
-                        head.add_child(mute)
+                band.add_child(mute)
 
-                # The figure itself, said large over the rule it answers
-                # for: the reader's own digits, centred, live -- the one
-                # number this page exists to change, big enough to read
-                # from arm's length while the hand is on the rule.
-                _readout = Label.new()
-                _readout.name = "Readout"
-                _readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                _readout.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-                _readout.custom_minimum_size = Vector2(0, 40)
-                THEME.dress(_readout, 26, GREEN_DEEP, true)
-                column.add_child(_readout)
-
-                # The rule: as wide as the page holds, drawn as the app
-                # draws its own pills, its grabber a drawn knob, its travel
-                # marked by five quiet ticks -- wide enough that a thumb
-                # finds it without aiming, tall enough that no stray press
-                # moves it by accident.
+                # The rule: everything the band has left, tall enough that a
+                # thumb finds it without aiming, its fill rounded and quiet,
+                # its grabber a drawn knob. No ticks: the figure above says
+                # the number, the ear says the rest.
                 _slider = HSlider.new()
                 _slider.name = "Slider"
                 _slider.min_value = 0.0
                 _slider.max_value = 1.0
                 _slider.step = 0.01
-                _slider.custom_minimum_size = Vector2(0, 46)
+                _slider.custom_minimum_size = Vector2(0, 44)
                 _slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-                _slider.tick_count = 5
-                _slider.ticks_on_borders = true
                 var track := StyleBoxFlat.new()
                 track.bg_color = Color("#E6DFCE")
                 track.set_corner_radius_all(99)
-                track.content_margin_top = 4
-                track.content_margin_bottom = 4
+                track.content_margin_top = 3
+                track.content_margin_bottom = 3
                 var filled := StyleBoxFlat.new()
                 filled.bg_color = GREEN
                 filled.set_corner_radius_all(99)
-                filled.content_margin_top = 4
-                filled.content_margin_bottom = 4
+                filled.content_margin_top = 3
+                filled.content_margin_bottom = 3
                 _slider.add_theme_stylebox_override("slider", track)
                 _slider.add_theme_stylebox_override("grabber_area", filled)
                 _slider.add_theme_stylebox_override("grabber_area_highlight", filled)
-                _slider.add_theme_icon_override("grabber", THEME.knob_icon(24, GREEN_DEEP))
-                _slider.add_theme_icon_override("grabber_highlight", THEME.knob_icon(28, GREEN_DEEP))
-                _slider.add_theme_icon_override("grabber_disabled", THEME.knob_icon(24, Color("#9AA79E")))
-                _slider.add_theme_color_override("tick_color", Color("#C9BFA8"))
+                _slider.add_theme_icon_override("grabber", THEME.knob_icon(22, GREEN_DEEP))
+                _slider.add_theme_icon_override("grabber_highlight", THEME.knob_icon(26, GREEN_DEEP))
+                _slider.add_theme_icon_override("grabber_disabled", THEME.knob_icon(22, Color("#9AA79E")))
                 _slider.value_changed.connect(_on_dragged)
-                column.add_child(_slider)
+                band.add_child(_slider)
                 _say(1.0)
 
         ## Say a loudness without saying it out loud: the rule, the mark and
@@ -621,14 +622,19 @@ class VolumePopover extends Popover:
                 committed.emit(v)
 
         ## What the page says about a loudness: the mark goes quiet at
-        ## silence, the number keeps the number's own place and its own
-        ## script -- 50% for an English reader, ۵۰٪ for a Persian one.
+        ## silence, the number keeps the number's own place, its own colour
+        ## and its own script -- 50% in green for an English reader, ۵۰٪ for
+        ## a Persian one, and silence said softly.
         func _say(v: float) -> void:
                 if v > 0.005:
                         _loud = v
                 _mark.muted = v <= 0.005
                 _mark.queue_redraw()
                 _readout.text = I18N.num("%d%%" % int(round(v * 100.0)))
+                _readout.add_theme_color_override(
+                        "font_color",
+                        GREEN_DEEP if v > 0.005 else Color("#9AA79E")
+                )
 
         ## A save waits for the hand to stop moving: only the latest nudge
         ## commits, so one drag is one word, not one per tick along it.
