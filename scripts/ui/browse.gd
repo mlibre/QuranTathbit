@@ -1225,3 +1225,22 @@ func _input(event: InputEvent) -> void:
                                 next = clampi(at + step, 0, rows.size() - 1)
                         (rows[next] as Button).grab_focus()
                         get_viewport().set_input_as_handled()
+
+
+## The phone's back key asks the same question Esc asks, in the same
+## order: the editor over the page first, then the volume's popover, then
+## the search field's own keys, and only then the page itself.
+func request_back() -> bool:
+        var editor := get_node_or_null("Editor") as CardEditorScript
+        if editor != null:
+                return editor.request_back()
+        var popup := get_node_or_null("VolumePopup")
+        if popup != null and popup.visible:
+                popup.visible = false
+                return true
+        var search: LineEdit = get_node_or_null("Margin/Column/Search")
+        if search != null and search.has_focus():
+                search.release_focus()
+                return true
+        closed.emit()
+        return true

@@ -82,9 +82,38 @@ jobs:
 
       # The npm package serves from a local disk, where the raw .wasm costs
       # nothing to transfer: no .gz is shipped (the page's fetch patch falls
-      # back to the raw file when the .gz is absent) and the service worker
-      # stays as generated, caching the raw file on first load. Only the
-      # installed-app colours are aligned with the Pages build.
+      # back to the raw file when the .gz is absent) and the worker keeps
+      # caching the raw file on first load. It still takes over the moment
+      # it installs -- the same skipWaiting patch the Pages build carries,
+      # for the same reason: a waiting worker heals nothing while the page
+      # it should heal is the one that cannot run. Only the installed-app
+      # colours are aligned with the Pages build beyond that.
+      - name: The worker takes over at once
+        run: |
+          python3 - <<'PY'
+          import sys
+          path = "builds/web/index.service.worker.js"
+          data = open(path, encoding="utf-8").read()
+          pairs = [
+              (
+                  "\tevent.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(CACHED_FILES)));\n});",
+                  "\tevent.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(CACHED_FILES)).then(() => self.skipWaiting()));\n});",
+              ),
+              (
+                  "return ('navigationPreload' in self.registration) ? self.registration.navigationPreload.enable() : Promise.resolve();\n\t}));",
+                  "return ('navigationPreload' in self.registration) ? self.registration.navigationPreload.enable() : Promise.resolve();\n\t}).then(() => self.clients.claim()));",
+              ),
+          ]
+          for old, new in pairs:
+              if old not in data:
+                  sys.exit("ERROR: the worker's shape changed; the skipWaiting patch needs rewriting: %r" % old[:60])
+              data = data.replace(old, new)
+          open(path, "w", encoding="utf-8").write(data)
+          print("worker: installs skip waiting, activates claim clients")
+          PY
+          grep -q "skipWaiting" builds/web/index.service.worker.js
+          grep -q "clients.claim" builds/web/index.service.worker.js
+
       - name: Stage the npm package
         run: |
           sed -i 's/"background_color":"#000000"/"background_color":"#faf5ed","theme_color":"#14513d"/' builds/web/index.manifest.json
@@ -109,6 +138,12 @@ jobs:
           grep -q "qt-browser-keys" builds/web/index.html
           grep -q "stopImmediatePropagation" builds/web/index.html
           grep -q "addEventListener('keydown'" builds/web/index.html
+          # The boot watch rides that same head, the same way: a page that
+          # cannot start says why, a load gone quiet says so.
+          grep -q "qt-boot-watch" builds/web/index.html
+          grep -q "unhandledrejection" builds/web/index.html
+          grep -q "controllerchange" builds/web/index.html
+          grep -q "postMessage('claim')" builds/web/index.html
           mkdir -p pkg
           cp builds/web/index.html builds/web/index.js builds/web/index.wasm \
                 builds/web/index.pck builds/web/index.png \

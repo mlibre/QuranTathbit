@@ -106,6 +106,15 @@ A few quiet extras:
   that reads from the right, on the very line you pressed when the words
   wrap. One tap places the caret, a double tap takes
   the word, a triple takes the line, and a held tap selects as it moves.
+- **Every page scrolls under your finger** — the library, a session, the
+  settings — even when the drag starts on a button, which is where drags
+  usually start. The page follows the finger, a quick flick carries on and
+  slows the way paper slows, a tap still taps, and a scroll never lands as
+  a press on the row it began on. Fields you drag in (writing, the volume
+  rule) keep their own drags. The phone's back button works the way back
+  buttons work everywhere: it closes what stands over the page first — an
+  editor, a popover, the search field's keyboard — then the page itself,
+  and only from home does it leave the app.
 - **Keep the deck as one file.** Settings → *Backup* packs the whole deck —
   verses, recitations, and all your progress — into a single zip that lands
   in your Downloads folder (in a browser, it downloads). Import joins a
@@ -117,7 +126,11 @@ A few quiet extras:
   lowered at build time to the syntax an older Firefox or WebView reads
   (Firefox 68 / Chrome 57 era), so the page opens instead of hanging
   forever; a device too old to run it at all is told so, in English and
-  Persian, instead of being left watching a bar that never moves. The
+  Persian, instead of being left watching a bar that never moves — and if
+  the app still cannot start, or a download stalls, the page says that too,
+  in plain words, rather than hanging in silence. The app's service worker
+  takes over the moment an update arrives, so a returning reader is never
+  left on the copy their first visit cached. The
   Android APK ships both 32- and 64-bit (`armeabi-v7a` + `arm64-v8a`), so
   it installs on the old phone too — Android 5.0 or newer.
 

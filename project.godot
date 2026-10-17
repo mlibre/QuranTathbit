@@ -9,6 +9,10 @@ config_version=5
 
 config/name="QuranTathbit"
 config/description="A quiet companion for keeping the Qur'an close — one deck, kept as folders and files."
+; The phone's back key is a page's way back, not the app's way out: with
+; this off, the engine hands the key to the app (main.gd answers it the
+; way every page answers Esc) instead of quitting on the spot.
+config/quit_on_go_back=false
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7")
 boot_splash/bg_color=Color(0.98, 0.96, 0.93, 1)

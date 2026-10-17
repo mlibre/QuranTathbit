@@ -918,3 +918,19 @@ func _input(event: InputEvent) -> void:
                                 if _revealed and not _busy:
                                         _answer("easy")
                                         get_viewport().set_input_as_handled()
+
+
+## The phone's back key closes what stands over the page before it closes
+## the page: the editor first, then a popover the coin raised, and only
+## then the session itself, the same order the keys above leave in.
+func request_back() -> bool:
+        var editor := get_node_or_null("Editor") as CardEditorScript
+        if editor != null:
+                return editor.request_back()
+        for page_name in ["VolumePopup", "FontPopup"]:
+                var popup := get_node_or_null(page_name)
+                if popup != null and popup.visible:
+                        popup.visible = false
+                        return true
+        closed.emit()
+        return true

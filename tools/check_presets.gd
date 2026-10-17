@@ -23,6 +23,9 @@ func _init() -> void:
                 "qt-paste-bridge",
                 "qt-browser-keys",
                 "qt-update-watch",
+                "qt-boot-watch",
+                "unhandledrejection",
+                "controllerchange",
                 "index.wasm.gz",
         ]:
                 if not include.contains(part):

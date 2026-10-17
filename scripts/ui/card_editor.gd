@@ -492,6 +492,16 @@ func _input(event: InputEvent) -> void:
                                 _save()
                         get_viewport().set_input_as_handled()
 
+
+## The phone's back key is Esc's sibling: it dismisses the guard first,
+## and only a second press leaves, through the same guarded door.
+func request_back() -> bool:
+        if _guard.visible:
+                _dismiss_guard()
+        else:
+                _request_close()
+        return true
+
 ## The first plain line of the card's question: the name of what is being
 ## edited, said the way the study page says it.
 static func _reference_of(card: CardScript) -> String:

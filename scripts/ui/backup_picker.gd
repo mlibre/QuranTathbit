@@ -194,5 +194,13 @@ func _unhandled_input(event: InputEvent) -> void:
                 get_viewport().set_input_as_handled()
 
 
+## The phone's back key puts the page away the same way: one of the four
+## doors out (Esc, the page around it, Cancel, and now the key the hand
+## knows best).
+func request_back() -> bool:
+        _close()
+        return true
+
+
 func _close() -> void:
         ThemeScript.vanish(self)

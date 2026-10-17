@@ -112,6 +112,42 @@ jobs:
           sed -i 's/"background_color":"#000000"/"background_color":"#faf5ed","theme_color":"#14513d"/' builds/web/index.manifest.json
           ls -la builds/web/index.wasm builds/web/index.wasm.gz
 
+      # The worker serves its cache first, so a returning reader keeps the
+      # files their visit cached -- and a newer deploy would sit forever
+      # "waiting" beside the old worker while the page it should heal is
+      # the very page that cannot run to say 'claim' (the report: Firefox
+      # on an old phone, still stuck on the loader the reader's first
+      # visit cached). The worker therefore takes over the moment it
+      # installs -- skipWaiting on install, clients.claim on activate --
+      # and the page's head script turns itself once into the fresh cache
+      # when the takeover arrives (qt-update-watch). The patch fails loudly
+      # if the exporter's worker ever changes shape.
+      - name: The worker takes over at once
+        run: |
+          python3 - <<'PY'
+          import sys
+          path = "builds/web/index.service.worker.js"
+          data = open(path, encoding="utf-8").read()
+          pairs = [
+              (
+                  "\tevent.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(CACHED_FILES)));\n});",
+                  "\tevent.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(CACHED_FILES)).then(() => self.skipWaiting()));\n});",
+              ),
+              (
+                  "return ('navigationPreload' in self.registration) ? self.registration.navigationPreload.enable() : Promise.resolve();\n\t}));",
+                  "return ('navigationPreload' in self.registration) ? self.registration.navigationPreload.enable() : Promise.resolve();\n\t}).then(() => self.clients.claim()));",
+              ),
+          ]
+          for old, new in pairs:
+              if old not in data:
+                  sys.exit("ERROR: the worker's shape changed; the skipWaiting patch needs rewriting: %r" % old[:60])
+              data = data.replace(old, new)
+          open(path, "w", encoding="utf-8").write(data)
+          print("worker: installs skip waiting, activates claim clients")
+          PY
+          grep -q "skipWaiting" builds/web/index.service.worker.js
+          grep -q "clients.claim" builds/web/index.service.worker.js
+
       # Installable on a phone's home screen (a PWA): Chrome's install
       # criteria ask for a 192px icon beside the 512px one and a short_name
       # for the label under it. The exporter writes neither, so both are
@@ -191,6 +227,16 @@ jobs:
           # could never run it.
           grep -q "qt-webgl2-guard" builds/web/index.html
           grep -q "__qtWebGL2Missing" builds/web/index.html
+          # The boot watch rides the same head: a page that cannot start
+          # says why (a script that never parsed, a promise nothing
+          # caught), and a load gone quiet for a long spell says so too,
+          # instead of hanging forever without a word. The marker alone
+          # would pass even if the watch arrived truncated, so its working
+          # parts are demanded, as always.
+          grep -q "qt-boot-watch" builds/web/index.html
+          grep -q "unhandledrejection" builds/web/index.html
+          grep -q "controllerchange" builds/web/index.html
+          grep -q "postMessage('claim')" builds/web/index.html
           python3 - <<'PY'
           import sys
           data = open("builds/web/index.pck", "rb").read()

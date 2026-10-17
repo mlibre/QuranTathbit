@@ -14,6 +14,7 @@ const SettingsScreenScript := preload("res://scripts/ui/settings_screen.gd")
 const BrowseScript := preload("res://scripts/ui/browse.gd")
 const I18nScript := preload("res://scripts/ui/i18n.gd")
 const LanguagePickerScript := preload("res://scripts/ui/language_picker.gd")
+const TouchScrollScript := preload("res://scripts/ui/touch_scroll.gd")
 
 ## QuranTathbit: one deck, kept in folders and files, studied one card at
 ## a time. This root owns the small amount of state the app has -- settings,
@@ -85,6 +86,12 @@ func _ready() -> void:
 
         _install_paste_bridge()
         _watch_updates()
+        # The hand's own scroller, standing above every page from the first
+        # one: on a phone the shelf answers a finger the way every list the
+        # reader has ever scrolled does.
+        var touch := TouchScrollScript.new()
+        touch.name = "TouchScroll"
+        add_child(touch)
         _go_home()
         # The app's very first question, over the page it asks on: which
         # tongue do its own words speak? Only a reader who has never
@@ -208,6 +215,44 @@ func _deliver_cards() -> void:
 
 
 # --- screens -------------------------------------------------------------------
+
+## The phone's back key, arriving as a window message the engine would
+## otherwise answer by leaving the app entirely (quit_on_go_back, off in
+## the project settings, is what turns the leaving into this question).
+## It is answered the way the keyboard's Esc is answered everywhere: by
+## whatever stands over the page first, then by the page itself, and only
+## from home by the app's own going.
+func _notification(what: int) -> void:
+        if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+                # The key arrives while the engine walks the window's
+                # children, and a page swapped mid-walk is a child added to
+                # a parent that is busy setting up children -- refused. The
+                # answer is given a frame later, which no hand can tell.
+                call_deferred("_handle_back")
+
+
+func _handle_back() -> void:
+        # Work under way is not a page: back cannot hurry a sync, and the
+        # sync is resumable by design, so the key is simply kept.
+        if get_node_or_null("SyncOverlay") != null:
+                return
+        # The app's one first question stands over the page: back puts it
+        # away, the app speaks its fallback tongue, and the question asks
+        # itself again the next time the app opens (until it is answered,
+        # or answered in Settings).
+        var asking := get_node_or_null("LanguagePicker")
+        if asking != null:
+                asking.queue_free()
+                return
+        if _screen != null and _screen.has_method("request_back") and _screen.request_back():
+                return
+        if _screen == null or _screen is HomeScript:
+                # The way out of the app itself: from its first page, the
+                # way every app on the phone leaves.
+                get_tree().quit()
+                return
+        _go_home()
+
 
 func _go_home() -> void:
         if _screen is HomeScript:
@@ -667,6 +712,15 @@ func _swap(next: Control, from_above := false) -> void:
                 var old: Control = _screen
                 old.mouse_filter = Control.MOUSE_FILTER_IGNORE  # a fading screen stops taking input
                 ThemeScript.vanish(old)
+        # A page still fading under its successor keeps its place but gives
+        # up its name the moment that name is asked for again: two children
+        # of one parent cannot share one, and the engine would quietly
+        # rename the newcomer -- @Control@44 -- leaving every hand that
+        # asks for Home holding nothing. A quick there-and-back is exactly
+        # when it happens.
+        for sibling in get_children():
+                if sibling != next and sibling.name == next.name:
+                        sibling.name = String(next.name) + "Leaving"
         _screen = next
         add_child(next)
         ThemeScript.appear(next, 0.0, -14.0 if from_above else 14.0)

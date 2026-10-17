@@ -170,6 +170,17 @@ func _layout() -> void:
                 return
         column.custom_minimum_size = Vector2(minf(620.0, size.x - 52.0), 0.0)
 
+
+## The phone's back key puts away whatever stands over the settings --
+## today the backup page -- and then the settings themselves, the same
+## door the page's own back button opens.
+func request_back() -> bool:
+        var picker := get_node_or_null("BackupPicker") as BackupPickerScript
+        if picker != null:
+                return picker.request_back()
+        closed.emit()
+        return true
+
 ## A card's own name, said inside the card: a small gold word over a rule,
 ## so each card reads as its own page with a running title -- not a label
 ## floating between cards, where the margin swallows it. The word stands at

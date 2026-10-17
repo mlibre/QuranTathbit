@@ -158,6 +158,45 @@ Windows, web) in Godot 4.7 with GDScript only.
   `set_caret_*` move the caret without saying `caret_changed`, the field
   says it for them (`_mirror_follows`) or the mirror sits a whole hand
   behind.
+- **A page scrolls under the finger, whatever the finger pressed.** The
+  engine's own touch scrolling lives in ScrollContainer's mouse path, and
+  it only ever receives a drag whose press landed on the container itself
+  -- but a shelf is rows of buttons, a button takes the press, and on a
+  phone the page behind the rows never moved. The hand's own scroller
+  (`touch_scroll.gd`, one node standing above every page from the first)
+  follows each real finger itself: past ten pixels the page follows the
+  drag one-to-one, a fast release carries on alone and slows the way
+  paper slows, any new finger catches it, and a press between rows
+  scrolls like a press on one. Three laws hold the edges. Fields that own
+  their own drags keep them (the writing fields, a rule the thumb slides,
+  the scrollbar). A tap still clicks, because the touch's mouse echo --
+  the press the engine makes from every touch -- is never touched. And a
+  scroll never lands as a click on the row it began on: one far-off
+  motion of the finger's own is delivered the moment the scroll starts,
+  telling that row the hand has left (a scroll that ends inside its own
+  row is the proof). The scroller's own drag is consumed before the GUI
+  (so the engine's native scroller never double-scrolls), and the echo's
+  motions are consumed while a scroll is afoot (so no row the finger
+  passes over lights up) -- but its releases always pass, because they
+  are what lets go cleanly. The engine's own finder for "the control a
+  point stands on" went away with 4.7 (`gui_find_control`), so the walk
+  is said once in the scroller itself -- children before parents, the
+  last-added first, the invisible and the mouse-blind skipped -- at
+  press-time only, never per frame.
+- **The phone's back key is a page's way back, not the app's way out.**
+  The engine quits on it by default; `quit_on_go_back` is off in the
+  project settings, and the key is answered the way every page answers
+  Esc -- whatever stands over the page closes first (the editor over the
+  library, a popover, the search field's own keys), then the page, and
+  only from home the app itself leaves. Work under way is not a page: a
+  sync keeps the key. Two engine laws shape the answer: the key arrives
+  while the engine walks the window's children, so the answer is deferred
+  a frame (a page swapped mid-walk is refused outright); and a page still
+  fading under its successor must give up its name to the page arriving
+  (`_swap` renames the fading sibling), because the engine silently
+  renames a clash to `@Control@44` and every hand that asks for Home
+  would hold nothing -- a quick there-and-back is exactly when it
+  happens.
 - **A page's hero is its news, not its name.** The home page's middle card
   once carried the deck's name in shouting weight above a lonely figure-box
   a reader had to live under every day. The name is furniture, read daily
@@ -189,9 +228,20 @@ Windows, web) in Godot 4.7 with GDScript only.
   Pages and npm workflows therefore lower `index.js` once through esbuild
   (`firefox68,chrome57`) and fail loudly, by token, if any post-2017
   parse-breaker survives; the page's head carries a WebGL2 pre-flight that
-  tells a device it cannot run rather than downloading an engine at it. An
-  APK that ships arm64 only refuses to install on the 32-bit phones a
-  reader keeps longest, so the Android preset ships both ABIs.
+  tells a device it cannot run rather than downloading an engine at it.
+  The same head carries a boot watch: a page that cannot start says why
+  (every error, every promise nothing caught), and a load gone quiet for
+  a long spell says so too, in both of the app's tongues -- a stuck page
+  is never a silent one. And the worker that serves the page's own cache
+  would keep a returning reader on the files their first visit cached
+  while a newer deploy sat "waiting" beside it -- the very page that
+  cannot run is the one that must say claim, so it never does; the worker
+  is therefore patched in CI to take over the moment it installs
+  (skipWaiting on install, clients.claim on activate), and the page turns
+  itself once into the fresh cache when the takeover arrives
+  (controllerchange). An APK that ships arm64 only refuses to install on
+  the 32-bit phones a reader keeps longest, so the Android preset ships
+  both ABIs.
 
 - **The chrome speaks the reader's tongue; the deck never changes.** Every
   user-visible string of the interface goes through `scripts/ui/i18n.gd`'s
