@@ -53,7 +53,7 @@ jobs:
       # page from a local disk, so its loader is lowered the same way.
       - name: Make the loader speak older browsers
         run: |
-          npx --yes esbuild@0.28.2 builds/web/index.js --target=firefox68,chrome57 --outfile=builds/web/index.js
+          npx --yes esbuild@0.28.2 builds/web/index.js --target=firefox68,chrome57 --outfile=builds/web/index.js --allow-overwrite
           node --check builds/web/index.js
           python3 - <<'PY'
           import re, sys

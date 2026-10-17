@@ -67,7 +67,7 @@ jobs:
       # loudly instead of silently on a reader's phone.
       - name: Make the loader speak older browsers
         run: |
-          npx --yes esbuild@0.28.2 builds/web/index.js --target=firefox68,chrome57 --outfile=builds/web/index.js
+          npx --yes esbuild@0.28.2 builds/web/index.js --target=firefox68,chrome57 --outfile=builds/web/index.js --allow-overwrite
           node --check builds/web/index.js
           python3 - <<'PY'
           import re, sys
