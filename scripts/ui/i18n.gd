@@ -146,7 +146,6 @@ const STRINGS := {
                 "ar": "الإصدار الجديد جاهز — الزر الذهبي في الأعلى يثبّته.",
         },
         "cards": {"fa": "کارت", "ar": "بطاقة"},
-        "waiting": {"fa": "در انتظار", "ar": "بانتظارك"},
         # --- the sync's own words, on home and under Settings ---------------------
         "Syncing…": {"fa": "همگام‌سازی…", "ar": "مزامنة…"},
         "Not connected — your deck lives on this device only": {
@@ -540,6 +539,22 @@ const STRINGS := {
         "Menus and messages only — the verses and their translations stay as they are. Carried with your deck.": {
                 "fa": "تنها منوها و پیام‌ها — آیه‌ها و ترجمه‌هایشان همان‌گونه می‌مانند. همراه مجموعهٔ شما می‌آید.",
                 "ar": "القوائم والرسائل فقط — تبقى الآيات وترجماتها كما هي. يُحمل مع مجموعتك.",
+        },
+        # --- the display card --------------------------------------------------------------
+        "Display": {"fa": "نمایش", "ar": "العرض"},
+        "Interface scale": {"fa": "اندازهٔ رابط", "ar": "مقياس الواجهة"},
+        "Text scale": {"fa": "اندازهٔ متن", "ar": "مقياس النص"},
+        "Shrink the interface one step": {"fa": "رابط یک پله کوچک‌تر شود", "ar": "صغّر الواجهة درجة"},
+        "Grow the interface one step": {"fa": "رابط یک پله بزرگ‌تر شود", "ar": "كبّر الواجهة درجة"},
+        "Shrink the text one step": {"fa": "متن یک پله کوچک‌تر شود", "ar": "صغّر النص درجة"},
+        "Grow the text one step": {"fa": "متن یک پله بزرگ‌تر شود", "ar": "كبّر النص درجة"},
+        "Scales the whole interface — cards, pills and words together — the way a phone's display-size setting does.": {
+                "fa": "کل رابط را یکجا بزرگ یا کوچک می‌کند — کارت‌ها، قرص‌ها و واژه‌ها با هم — مانند تنظیم اندازهٔ نمایش در گوشی.",
+                "ar": "يُكبِّر الواجهة كلها أو يُصغِّرها دفعةً واحدة — البطاقات والأرقام والكلمات معًا — كإعداد حجم العرض في الهاتف.",
+        },
+        "Scales the words only — verses, translations and messages — leaving the layout where it is.": {
+                "fa": "تنها واژه‌ها را بزرگ یا کوچک می‌کند — آیه‌ها، ترجمه‌ها و پیام‌ها — و صفحه را سر جای خود می‌گذارد.",
+                "ar": "يُكبِّر الكلمات وحدها — الآيات والترجمات والرسائل — ويترك التخطيط في مكانه.",
         },
         # --- the first-run picker -----------------------------------------------------------
         "Choose your language": {"fa": "زبان خود را انتخاب کنید", "ar": "اختر لغتك"},

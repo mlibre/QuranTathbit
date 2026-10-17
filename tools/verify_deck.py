@@ -9,12 +9,21 @@ assets/decks/quran:
   deck.json                    may differ only in the deck *name* label
                                ("Default" in the package -> the app's name)
                                and key order; the recorded source URL must
-                               match the one the app ships
+                               match the one the app ships; the card list is
+                               the package's own followed by the extension
+                               cards in their folder order
   *-fa.mp3                     are the Persian translation recitations the
                                app delivers beside the package's verses
                                (tools/fetch_persian.py, from the CDN that
                                deck.json's translation_audio records); they
                                are additive, ignored here
+  cards 100-151                are Al-Baqarah 94-145, transcribed by hand
+                               from the deck's recorded source by the reader
+                               (tools/extend_baqarah.py); text-only --
+                               front.md and back.md and nothing else -- they
+                               are an additive layer the package cannot
+                               vouch for, allowed by shape and ignored
+                               below it
   *.import                     are Godot editor metadata, ignored
   progress.json                is runtime state, ignored
   anything else                is a failure
@@ -56,9 +65,35 @@ def is_translation(name: str) -> bool:
     return name.endswith("-fa.mp3")
 
 
+def is_extension_card(rel: Path, fresh_card_ids: set[str]) -> bool:
+    """A file that belongs to a card folder the package never carried.
+
+    Al-Baqarah 94-145 (folders 100-151) joined the deck from the reader's
+    own transcription of the deck's recorded source -- the same source the
+    package came from, said once, by hand, in tools/extend_baqarah.py. The
+    proof treats them the way it treats the translation recitations: an
+    additive layer the package cannot vouch for, allowed only as the two
+    markdown files a text-only card is -- no audio may arrive for them from
+    anywhere, and none did.
+    """
+    if len(rel.parts) != 2:
+        return False
+    folder = rel.parts[0]
+    try:
+        int(folder)
+    except ValueError:
+        return False
+    return folder not in fresh_card_ids and rel.name in ("front.md", "back.md")
+
+
 def compare_filesets(fresh: Path, shipped: Path) -> list[str]:
     problems: list[str] = []
 
+    fresh_card_ids = {
+        p.relative_to(fresh).parts[0]
+        for p in fresh.iterdir()
+        if p.is_dir() and p.name.isdigit()
+    }
     fresh_files = {p.relative_to(fresh) for p in fresh.rglob("*") if p.is_file()}
     shipped_files = {
         p.relative_to(shipped)
@@ -67,6 +102,7 @@ def compare_filesets(fresh: Path, shipped: Path) -> list[str]:
         and p.suffix != ".import"
         and p.name != "progress.json"
         and not is_translation(p.name)
+        and not is_extension_card(p.relative_to(shipped), fresh_card_ids)
     }
 
     for rel in sorted(fresh_files - shipped_files):
@@ -80,17 +116,24 @@ def compare_filesets(fresh: Path, shipped: Path) -> list[str]:
         if a == b:
             continue
         if rel.name == "deck.json":
-            problems.extend(compare_deck_json(a, b))
+            problems.extend(compare_deck_json(a, b, fresh_card_ids))
         else:
             problems.append(f"content differs from the package: {rel}")
     return problems
 
 
-def compare_deck_json(fresh: bytes, shipped: bytes) -> list[str]:
+def compare_deck_json(fresh: bytes, shipped: bytes, fresh_card_ids: set[str]) -> list[str]:
     a = json.loads(fresh)
     b = json.loads(shipped)
-    if a.get("cards") != b.get("cards"):
-        return ["deck.json: the card list differs from the package"]
+    package_cards = [str(c) for c in a.get("cards", [])]
+    shipped_cards = [str(c) for c in b.get("cards", [])]
+    # The package's cards, then the extension's own folders in their folder
+    # order -- the same order the loader itself appends them in.
+    expected = package_cards + sorted(
+        {c for c in shipped_cards if c not in package_cards}
+    )
+    if shipped_cards != expected:
+        return ["deck.json: the card list is not the package's list followed by the extension's"]
     if b.get("name") != APP_NAME or a.get("name") != PACKAGE_NAME:
         return [
             f"deck.json: unexpected deck name (package has {a.get('name')!r}, "
@@ -132,7 +175,9 @@ def main() -> None:
         sys.exit(1)
 
     print("OK: the shipped deck is byte-identical to the package "
-          "(deck.json differs only by the app's deck name label)")
+          "(deck.json differs only by the app's deck name label; the "
+          "Al-Baqarah 94-145 extension cards ride beside it as an additive "
+          "layer, the way the translation recitations do)")
 
 
 if __name__ == "__main__":

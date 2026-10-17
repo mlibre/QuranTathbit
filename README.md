@@ -14,7 +14,9 @@ A calm app for memorising the Quran. Each day it shows you the cards that
 are due — a verse, its Persian translation, and its recitation — and asks
 how it went. Cards you found hard come back sooner, easy ones later.
 
-It ships with 99 cards from Al-Fātiḥah and Al-Baqarah. Everything is in
+It ships with 151 cards from Al-Fātiḥah and Al-Baqarah (through 2:145) —
+the original 99, joined additively by Al-Baqarah 94-145, transcribed from
+the same source the deck has always recorded. Everything is in
 Arabic and Persian, set in proper Quranic typefaces.
 
 No streaks, no notifications, no account needed. The app invites; it never
@@ -65,6 +67,12 @@ A few quiet extras:
   digits work) and filters for what is due, new, or resting.
 - **Set your own pace.** Settings → *New cards each day* (default 20, set
   it to 0 for review-only days).
+- **Size the app for your eyes.** Settings → *Display*: an *interface
+  scale* that grows the whole page at once — cards, pills and words
+  together, the way a phone's display-size setting does — and a *text
+  scale* that grows the words alone, leaving the layout where it is. Both
+  are per-device comforts, so a desk and a phone can read at different
+  distances.
 - **Choose the verse's typeface.** In Settings → *Reading*, or right in a
   study session (the alif button beside the speaker): **Amiri Quran** (the
   default), **Amiri**, or **Noto Naskh Arabic** — each shown by its own
@@ -117,6 +125,10 @@ While editing a card: **Esc** closes without saving, **Ctrl+Enter** saves.
 
 - **Card data** — verses, Persian translation, and recitations from
   [quran.makarem.ir](https://quran.makarem.ir); no other source is used.
+  Al-Baqarah 94-145 was transcribed by hand from that source by the deck's
+  own reader (`tools/extend_baqarah.py` carries the transcription); the
+  extension cards are text-only — no recitation audio exists for them, and
+  none was fetched or invented.
 - **Code** — MIT; **algorithm** — SM-2 (the same spaced-repetition math
   Anki uses). Both attributions live in the [LICENSE](LICENSE).
 - **Typefaces** — Amiri Quran for the verses, Amiri for references, Noto

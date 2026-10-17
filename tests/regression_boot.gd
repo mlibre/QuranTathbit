@@ -108,7 +108,7 @@ func _check_home_numbers(home: Control) -> void:
         if deck == null:
                 return
         _is(deck.name, "Quran", "the deck is the Quran deck")
-        _ok(deck.cards.size() == 99, "all 99 cards are there (got %d)" % deck.cards.size())
+        _ok(deck.cards.size() == 151, "all 151 cards are there (got %d)" % deck.cards.size())
 
         var due: Label = home.get_node("Margin/Column/Stats/Due/Box/Value")
         var fresh: Label = home.get_node("Margin/Column/Stats/New/Box/Value")
@@ -121,23 +121,28 @@ func _check_home_numbers(home: Control) -> void:
         _ok(not study.disabled, "study is ready")
         _ok(study.text == "Learn new cards", "the button names what the session is")
 
-        # The deck's own account arrives as figures, not a sentence: each
-        # number in its own chip with its word beside it, and the plain-text
-        # caption that once said the whole thing in one line is gone.
+        # The deck's own account arrives as one figure, not a sentence: the
+        # whole holding alone -- the learned and the waiting were the pills
+        # below said a second time, so they live only where the day's own
+        # work is, and the card keeps the one number no pill says.
         _ok(
                 home.get_node_or_null("Margin/Column/DeckCard/Pad/Box/Caption") == null,
                 "the deck card no longer says its account as a line of prose"
         )
         var chips: HBoxContainer = home.get_node_or_null("Margin/Column/DeckCard/Pad/Box/Chips")
-        _ok(chips != null and chips.get_child_count() == 3, "the deck card holds a chip each for the holding, the learned and the waiting")
+        _ok(chips != null and chips.get_child_count() == 1, "the deck card holds one chip: the whole holding, and nothing the pills below already say")
         if chips != null and chips.get_child_count() >= 1:
                 var first_text: String = ""
                 var label_node: RichTextLabel = chips.get_child(0).find_children("*", "RichTextLabel", true, false)[0] if chips.get_child(0).find_children("*", "RichTextLabel", true, false).size() > 0 else null
                 if label_node != null:
                         first_text = label_node.text
                 _ok(
-                        first_text.contains("99") or first_text.contains("۹۹"),
-                        "the first chip carries the deck's whole holding"
+                        first_text.contains("151") or first_text.contains("۱۵۱"),
+                        "the chip carries the deck's whole holding"
+                )
+                _ok(
+                        not first_text.contains("Learned") and not first_text.contains("آموخته"),
+                        "the learned count is not said a second time above the pills"
                 )
 
         # The settings corner once sat under a full-rect container added after
@@ -832,7 +837,7 @@ func _check_settings(main: Node) -> void:
                                         note != null and note.text == "This deck already holds everything the backup has.",
                                         "the note says what arrived, in the reader's own words"
                                 )
-                                _is(main._deck.cards.size(), 99, "the deck re-reads whole after the join")
+                                _is(main._deck.cards.size(), 151, "the deck re-reads whole after the join")
                         _ok(settings.get_node_or_null("BackupPicker") == null, "the page puts itself away")
                 import_button.pressed.emit()
                 await create_timer(0.3).timeout

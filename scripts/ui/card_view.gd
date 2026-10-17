@@ -57,7 +57,20 @@ func _init(p_player: AudioStreamPlayer) -> void:
 ## `stagger` settles each element in, a beat apart. A paragraph that is a
 ## lone link is the card's citation: it leaves the verses and takes its
 ## place at the page's foot, under a gentle rule, bottom-left.
+##
+## The saying is deferred to the end of the frame on purpose. A card is
+## usually built inside containers that have never been laid out yet -- a
+## shelf's detail under its row, a preview inside the editor -- and a
+## RichTextLabel shaped at the width of a moment that has no width wraps
+## one character a line and floods the log with the shaper's own
+## complaints (an Arabic verse with its marks is the loudest customer).
+## The deferred call lands after this frame's container sort, so the first
+## shaping already sees the width the card will actually be read at.
 func show_text(text: String, folder: String, lead := false, ref_line := "", stagger := false) -> void:
+        _show_text_now.call_deferred(text, folder, lead, ref_line, stagger)
+
+
+func _show_text_now(text: String, folder: String, lead := false, ref_line := "", stagger := false) -> void:
         _clear()
         _folder = folder
         if not ref_line.is_empty():
@@ -100,7 +113,7 @@ func _add_eyebrow(ref_line: String) -> void:
                 ThemeScript.ayah_face() if script == "arabic" else ThemeScript.vazir(15, true)
         )
         label.add_theme_font_override("normal_font", face)
-        var face_size := 17 if script == "arabic" else 15
+        var face_size := ThemeScript.fs(17 if script == "arabic" else 15)
         label.add_theme_font_size_override("normal_font_size", face_size)
         label.add_theme_color_override("default_color", ThemeScript.GOLD_DEEP)
         # The reader's hand rests on the page's own gold, not the engine's blue.
@@ -164,7 +177,7 @@ func _add_text(markdown: String, link: String, lead := false) -> void:
         label.add_theme_font_override("bold_italics_font", ThemeScript.leaning(bold_face))
         # The size rides on all four faces: a run that leans must not also
         # shrink back to the theme's default size.
-        var face_size := _size_for(script, lead)
+        var face_size := ThemeScript.fs(_size_for(script, lead))
         label.add_theme_font_size_override("normal_font_size", face_size)
         label.add_theme_font_size_override("bold_font_size", face_size)
         label.add_theme_font_size_override("italics_font_size", face_size)
@@ -236,7 +249,7 @@ func _add_footer(markdown: String, url: String) -> void:
         line.bbcode_enabled = true
         var font := ThemeScript.vazir(12)
         line.add_theme_font_override("normal_font", font)
-        line.add_theme_font_size_override("normal_font_size", 12)
+        line.add_theme_font_size_override("normal_font_size", ThemeScript.fs(12))
         line.add_theme_color_override("default_color", ThemeScript.INK_SOFT)
         line.add_theme_color_override("selection_color", ThemeScript.SELECT)
         line.text = "[color=#8D6E24][url=%s]%s[/url][/color]" % [url, label_text]
@@ -309,18 +322,21 @@ func _make_audio_button(name: String, path: String, persian := false) -> Button:
         # children it cannot see: the width is set by hand from the widest
         # line the button will ever carry, so the pill is a pill on arrival
         # and never jumps between states. The widest line is measured in the
-        # tongue the app is speaking, not the last one it spoke.
+        # tongue the app is speaking, not the last one it spoke -- and at the
+        # size the label will wear it, which fs() says for both the words and
+        # the measure, so the pill grows with the text scale.
+        var caption := ThemeScript.fs(ThemeScript.CAPTION)
         var font := ThemeScript.vazir(ThemeScript.CAPTION)
         var widest := maxf(
-                font.get_string_size(I18nScript.t("Listening…"), HORIZONTAL_ALIGNMENT_LEFT, -1, ThemeScript.CAPTION).x,
-                font.get_string_size(idle_text, HORIZONTAL_ALIGNMENT_LEFT, -1, ThemeScript.CAPTION).x
+                font.get_string_size(I18nScript.t("Listening…"), HORIZONTAL_ALIGNMENT_LEFT, -1, caption).x,
+                font.get_string_size(idle_text, HORIZONTAL_ALIGNMENT_LEFT, -1, caption).x
         )
         # 48 tall, not 46: a fingertip deserves the whole guideline, and on a
         # phone's canvas this is the button a verse is heard by.
         button.custom_minimum_size = Vector2(ceil(widest) + 15 + 9 + 42, 48)
         button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         button.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-        button.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+        button.add_theme_font_size_override("font_size", caption)
         var ink := ThemeScript.GOLD_DEEP if persian else ThemeScript.GREEN_DEEP
         button.add_theme_color_override("font_color", ink)
         button.add_theme_color_override("font_hover_color", ink)

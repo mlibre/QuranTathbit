@@ -59,6 +59,7 @@ func _ready() -> void:
         get_window().theme = ThemeScript.tooltip_theme()
         _install_deck()
         _deliver_translations()
+        _deliver_cards()
         _settings = SettingsScript.load_settings()
         _deck = DeckScript.load(USER_DECK)
         if _deck == null:
@@ -68,6 +69,13 @@ func _ready() -> void:
         _adopt_deck_choices()
         I18nScript.set_lang(_settings.ui_lang)
         ThemeScript.set_ayah_face(_settings.ayah_font)
+        # The device's own two sizes, worn before the first page is built: a
+        # desk and a phone read at different distances, so these are this
+        # machine's comfort and never travel with the deck. 1.0 is the size
+        # the app has always been, so a reader who has never chosen sees the
+        # app they had.
+        ThemeScript.set_ui_scale(_settings.ui_scale)
+        ThemeScript.set_font_scale(_settings.font_scale)
 
         _http = HttpClientScript.new()
         _http.name = "HttpClient"
@@ -162,6 +170,41 @@ func _deliver_translations() -> void:
                         delivered += 1
         if delivered > 0:
                 print("QuranTathbit: delivered %d Persian translation(s)" % delivered)
+
+
+## New cards the package carries, joined to the installed deck the same way
+## the translations were: a folder the deck lacks is copied in whole, and a
+## folder the deck already has is never touched -- so an update to the app
+## adds what is new without eating anything that is there, the same law
+## every joining in this app lives by. The deck is read after this, so the
+## day's queue offers the new cards on the same breath the deck grows. In a
+## browser the package carries the deck's text but no audio, so a card
+## folder there is its words -- exactly what a new card is.
+func _deliver_cards() -> void:
+        var delivered := 0
+        for folder in DirAccess.get_directories_at(BUNDLED_DECK):
+                if not folder.is_valid_int():
+                        continue
+                var into := USER_DECK.path_join(folder)
+                if DirAccess.dir_exists_absolute(into):
+                        continue
+                var from := BUNDLED_DECK.path_join(folder)
+                var made := DirAccess.make_dir_recursive_absolute(into)
+                if made != OK:
+                        push_error("QuranTathbit: cannot create %s" % into)
+                        continue
+                for entry in DirAccess.get_files_at(from):
+                        var target := into.path_join(entry)
+                        var data := FileAccess.get_file_as_bytes(from.path_join(entry))
+                        var file := FileAccess.open(target, FileAccess.WRITE)
+                        if file == null:
+                                push_error("QuranTathbit: cannot write %s" % target)
+                                continue
+                        file.store_buffer(data)
+                        file.close()
+                        delivered += 1
+        if delivered > 0:
+                print("QuranTathbit: delivered %d new card file(s)" % delivered)
 
 
 # --- screens -------------------------------------------------------------------

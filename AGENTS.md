@@ -65,7 +65,15 @@ Windows, web) in Godot 4.7 with GDScript only.
   offers the code to type. Text explains only what a picture cannot.
 - **Numbers die with the world, not on it**: what matters continuously — how
   many are due, how many learned — is stated once, plainly, on the home
-  card.
+  card. The deck's whole holding is the one number no pill below says, so
+  it stands alone on the card; the day's own story (due, new, learned)
+  lives only in the pills, never said a second time above them.
+- **Every size goes through fs()**: the font scale multiplies only the
+  words, so every size a control displays — and every size a measurement
+  takes beside it (a pill measured from its widest line, a mirror kept on
+  the engine's own pitch, the ink's room) — is said through theme.gd's
+  fs(), once, at the derivation. A size baked into a control at build time
+  and a size measured at the same number must never drift apart.
 
 ## Engineering
 

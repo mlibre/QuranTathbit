@@ -15,7 +15,7 @@ extends SceneTree
 const MainScript := preload("res://scripts/main.gd")
 const DeckZipScript := preload("res://scripts/data/deck_zip.gd")
 
-const SHOTS := 25
+const SHOTS := 29
 
 var _out := "/tmp/shots"
 var _saved := 0
@@ -126,8 +126,50 @@ func _init() -> void:
                 )
                 await create_timer(0.5).timeout
                 await _shot("reading")
+        # The display card: the two sizes a reader sizes the app by, as
+        # steppers of the same shape the pace already speaks, their values
+        # said in percentages in the reader's own digits.
+        var display: Control = settings_screen.get_node_or_null("Margin/Scroll/Wrap/Column/Display")
+        if display != null:
+                scroll.scroll_vertical = int(
+                        maxf(0.0, display.get_global_rect().position.y - scroll.get_global_rect().position.y)
+                )
+                await create_timer(0.5).timeout
+                await _shot("display_card")
+                # The whole interface, one step larger; then the words, a step
+                # larger still inside it -- the page rebuilt in its own new
+                # size, the window re-flowed under the new factor.
+                var ui_more: Button = settings_screen.get_node_or_null(
+                        "Margin/Scroll/Wrap/Column/Display/Padding/Box/UiScale/Stepper/StepMore"
+                )
+                if ui_more != null:
+                        ui_more.pressed.emit()
+                        await create_timer(0.4).timeout
+                var text_more: Button = settings_screen.get_node_or_null(
+                        "Margin/Scroll/Wrap/Column/Display/Padding/Box/TextScale/Stepper/StepMore"
+                )
+                if text_more != null:
+                        text_more.pressed.emit()
+                        await create_timer(0.6).timeout
+                        await _shot("display_stepped")
         main.get_node("Settings").closed.emit()
         await create_timer(0.6).timeout
+        # Home again, wearing the two sizes: every card and margin a step
+        # larger, the words a step larger still inside them.
+        await _shot("home_scaled")
+        # And back to the size the app has always been, before the rest of
+        # the film reads on at it: the settings page has already gone, so
+        # the choice is said the way its handler says it, without the page.
+        main._settings.ui_scale = 1.0
+        main._settings.font_scale = 1.0
+        main._settings.save()
+        (load("res://scripts/ui/theme.gd") as GDScript).set_ui_scale(1.0)
+        (load("res://scripts/ui/theme.gd") as GDScript).set_font_scale(1.0)
+        await create_timer(0.3).timeout
+        # The standing home was built at the larger size, so it is said again
+        # the way every page is: rebuilt in the size now worn.
+        main._apply_language("en")
+        await create_timer(0.8).timeout
         await _shot("home_again")
         # The library: the deck as a book, a row opening its own page.
         main._on_browse_pressed()
@@ -154,6 +196,26 @@ func _init() -> void:
                 search.text = ""
                 browse._on_search_changed("")
                 await create_timer(0.4).timeout
+        # The deck's own extension: Al-Baqarah 94-145, text-only. A card
+        # without recitation audio offers no Listen buttons, carries the
+        # mushaf's own section mark where the source has it, and still names
+        # its source at the page's foot -- this frame keeps one of them open
+        # on the shelf (2:106, the hizb mark and all).
+        search.text = "2:106"
+        browse._on_search_changed("2:106")
+        await create_timer(0.8).timeout
+        var extension_entry: VBoxContainer = null
+        for child in list.get_children():
+                if child.name.begins_with("Entry"):
+                        extension_entry = child
+                        break
+        if extension_entry != null:
+                (extension_entry.get_node("Row") as Button).pressed.emit()
+                await create_timer(0.7).timeout
+                await _shot("extension_card")
+        search.text = ""
+        browse._on_search_changed("")
+        await create_timer(0.4).timeout
         browse.closed.emit()
         await create_timer(0.6).timeout
         await _shot("home_third")

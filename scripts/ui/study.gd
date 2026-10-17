@@ -663,7 +663,7 @@ func _show_done() -> void:
                 grades.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
                 grades.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 grades.add_theme_font_override("normal_font", ThemeScript.vazir(ThemeScript.CAPTION))
-                grades.add_theme_font_size_override("normal_font_size", ThemeScript.CAPTION)
+                grades.add_theme_font_size_override("normal_font_size", ThemeScript.fs(ThemeScript.CAPTION))
                 grades.text = "[center]" + grades_line + "[/center]"
                 summary.add_child(grades)
 
@@ -770,7 +770,7 @@ func _face_row(key: String, on: bool) -> Button:
         sample.text = "بِسْمِ اللَّهِ"
         sample.text_direction = TextDirection.TEXT_DIRECTION_AUTO
         sample.add_theme_font_override("font", ThemeScript.ayah_face_for(key))
-        sample.add_theme_font_size_override("font_size", 19)
+        sample.add_theme_font_size_override("font_size", ThemeScript.fs(19))
         sample.add_theme_color_override("font_color", ThemeScript.INK)
         row.add_child(sample)
         ThemeScript.pressable(button)

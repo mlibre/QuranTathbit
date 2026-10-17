@@ -10,6 +10,12 @@ const BackupPickerScript := preload("res://scripts/ui/backup_picker.gd")
 const VersionScript := preload("res://scripts/data/version.gd")
 const I18nScript := preload("res://scripts/ui/i18n.gd")
 
+## The two ladders a size is stepped along: the interface in wider steps
+## (it moves everything, so a small step is a big step) and the words in
+## narrower ones (a verse must never outgrow the card it is read on).
+const UI_SCALE_STEPS := [0.85, 1.0, 1.15, 1.3]
+const FONT_SCALE_STEPS := [0.9, 1.0, 1.1, 1.2]
+
 ## Settings is short on purpose: connect GitHub, name the repo, sync. The
 ## deck itself is edited as files -- in any editor, on any machine -- so
 ## there is deliberately nothing here to build a card with. What is here
@@ -137,6 +143,7 @@ func _build() -> void:
         column.add_child(_deck_body())
         column.add_child(_backup_body())
         column.add_child(_reading_body())
+        column.add_child(_display_body())
         column.add_child(_github_body())
         column.add_child(_source_body())
         column.add_child(_about())
@@ -200,7 +207,7 @@ func _text(what: String, color: Color, size: int, center := false, bold := false
                 # reading's start under either layout (see _card_header).
                 label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
         label.add_theme_font_override("normal_font", ThemeScript.vazir(size, bold))
-        label.add_theme_font_size_override("normal_font_size", size)
+        label.add_theme_font_size_override("normal_font_size", ThemeScript.fs(size))
         label.add_theme_color_override("default_color", color)
         label.add_theme_color_override("selection_color", ThemeScript.SELECT)
         label.text = what
@@ -361,7 +368,7 @@ func _github_body() -> Control:
         # what is typed stays as it is written, Latin or otherwise.
         token.alignment = HORIZONTAL_ALIGNMENT_LEFT
         token.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION))
-        token.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+        token.add_theme_font_size_override("font_size", ThemeScript.fs(ThemeScript.CAPTION))
         _style_field(token)
         _paste_on_hold(token)
         token.text_submitted.connect(func(_text: String) -> void: _save_token())
@@ -401,7 +408,7 @@ func _github_body() -> Control:
         # The reading's own edge, under either layout (see _card_header).
         repo.alignment = HORIZONTAL_ALIGNMENT_LEFT
         repo.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY))
-        repo.add_theme_font_size_override("font_size", ThemeScript.BODY)
+        repo.add_theme_font_size_override("font_size", ThemeScript.fs(ThemeScript.BODY))
         _style_field(repo)
         repo.text_submitted.connect(_save_repo)
         box.add_child(repo)
@@ -618,7 +625,7 @@ func _ayah_font_segment(key: String, label: String, on: bool) -> Button:
         sample.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         sample.text_direction = TextDirection.TEXT_DIRECTION_AUTO
         sample.add_theme_font_override("font", ThemeScript.ayah_face_for(key))
-        sample.add_theme_font_size_override("font_size", 19)
+        sample.add_theme_font_size_override("font_size", ThemeScript.fs(19))
         sample.add_theme_color_override("font_color", ThemeScript.INK)
         stack.add_child(sample)
         var pad := MarginContainer.new()
@@ -743,6 +750,143 @@ func _ask_deck_push() -> void:
                 # The engine's Timer has no restart(); a stopped start is one.
                 _choice_push.stop()
                 _choice_push.start()
+
+
+# --- how the app sizes itself ------------------------------------------------------
+
+## Two ways to size the app for the eyes in front of it: the whole interface
+## at once, or the words alone. Both take hold the moment they are stepped --
+## the interface because the window re-flows everything under the new factor,
+## the words because the theme wears the new factor from that breath on and
+## this page is said again in it. Both are this device's own comfort; unlike
+## the pace, the face and the tongue, neither travels with the deck.
+func _display_body() -> Control:
+        var parts := _card("Display")
+        var card: PanelContainer = parts[0]
+        var box: VBoxContainer = parts[1]
+        _card_header(box, I18nScript.t("Display"))
+
+        box.add_child(_scale_row(
+                "UiScale",
+                I18nScript.t("Interface scale"),
+                I18nScript.t("Shrink the interface one step"),
+                I18nScript.t("Grow the interface one step"),
+                ThemeScript.ui_scale(),
+                _step_ui_scale
+        ))
+        box.add_child(_caption_line(I18nScript.t(
+                "Scales the whole interface — cards, pills and words together — the way a phone's display-size setting does."
+        )))
+
+        box.add_child(ThemeScript.hairline())
+
+        box.add_child(_scale_row(
+                "TextScale",
+                I18nScript.t("Text scale"),
+                I18nScript.t("Shrink the text one step"),
+                I18nScript.t("Grow the text one step"),
+                ThemeScript.font_scale(),
+                _step_font_scale
+        ))
+        box.add_child(_caption_line(I18nScript.t(
+                "Scales the words only — verses, translations and messages — leaving the layout where it is."
+        )))
+        return card
+
+## One scale, one row: a field's label, the stepper the pace already speaks,
+## and the standing value as a percentage in the reader's own digits. The
+## value the theme wears is the value the row says, whatever this device
+## booted with -- the page builds before its setup() arrives, and the theme
+## was dressed at boot.
+func _scale_row(row_name: String, label_text: String, less_tip: String, more_tip: String, value: float, on_step: Callable) -> Control:
+        var wrap := VBoxContainer.new()
+        wrap.name = row_name
+        wrap.add_theme_constant_override("separation", 8)
+        wrap.add_child(_field_label(label_text))
+        var stepper := HBoxContainer.new()
+        stepper.name = "Stepper"
+        stepper.add_theme_constant_override("separation", 10)
+        wrap.add_child(stepper)
+        var less := ThemeScript.ghost_button("-", ThemeScript.GREEN_DEEP, 44)
+        less.name = "StepLess"
+        less.tooltip_text = less_tip
+        less.custom_minimum_size = Vector2(52, 44)
+        less.pressed.connect(func() -> void: on_step.call(-1))
+        stepper.add_child(less)
+        var value_chip := PanelContainer.new()
+        value_chip.name = "Chip"
+        value_chip.custom_minimum_size = Vector2(72, 44)
+        value_chip.add_theme_stylebox_override(
+                "panel", ThemeScript.soft_stylebox(ThemeScript.GOLD_SOFT, 14)
+        )
+        var value_label := Label.new()
+        value_label.name = "StepValue"
+        value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+        value_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        ThemeScript.dress(value_label, ThemeScript.BODY + 2, ThemeScript.GOLD_DEEP, true)
+        value_label.text = _percent(value)
+        value_chip.add_child(value_label)
+        stepper.add_child(value_chip)
+        var more := ThemeScript.ghost_button("+", ThemeScript.GREEN_DEEP, 44)
+        more.name = "StepMore"
+        more.tooltip_text = more_tip
+        more.custom_minimum_size = Vector2(52, 44)
+        more.pressed.connect(func() -> void: on_step.call(1))
+        stepper.add_child(more)
+        return wrap
+
+## A percentage, said in the reader's own digits: 85% reads as ۸۵٪ in Persian,
+## the way every number the app says about itself does.
+static func _percent(value: float) -> String:
+        return I18nScript.num("%d%%" % [int(round(value * 100.0))])
+
+## Where a step lands: the ladder's own rung nearest the standing value, one
+## rung along in the direction asked, and no further than the ladder goes.
+static func _stepped(current: float, delta: int, ladder: Array) -> float:
+        var at := 0
+        for i in ladder.size():
+                if absf(float(ladder[i]) - current) < absf(float(ladder[at]) - current):
+                        at = i
+        return float(ladder[clampi(at + delta, 0, ladder.size() - 1)])
+
+## The interface, one step larger or smaller: remembered on this device, and
+## worn by the window at once -- every card, pill and margin grows together
+## and the layout re-flows under the new factor, so there is nothing to say
+## again and the chip is the only thing that moves.
+func _step_ui_scale(delta: int) -> void:
+        var value := _stepped(ThemeScript.ui_scale(), delta, UI_SCALE_STEPS)
+        if is_equal_approx(value, ThemeScript.ui_scale()):
+                return
+        _settings.ui_scale = value
+        _settings.save()
+        ThemeScript.set_ui_scale(value)
+        _say_scale_value("UiScale", value)
+
+## The words, one step larger or smaller: remembered on this device, worn by
+## the theme from this breath on, and said again wherever they were already
+## standing -- this page rebuilt in its own new size, the window's tooltip
+## theme re-dressed (a Theme holds only what it is given), and every page
+## built afterwards dresses itself at the new size without being asked.
+func _step_font_scale(delta: int) -> void:
+        var value := _stepped(ThemeScript.font_scale(), delta, FONT_SCALE_STEPS)
+        if is_equal_approx(value, ThemeScript.font_scale()):
+                return
+        _settings.font_scale = value
+        _settings.save()
+        ThemeScript.set_font_scale(value)
+        get_window().theme = ThemeScript.tooltip_theme()
+        _say_scale_value("TextScale", value)
+        _rebuild()
+
+## The chip says the new size without the page being rebuilt: a step is a
+## small thing, and the row it was made on should answer it in place.
+func _say_scale_value(row_name: String, value: float) -> void:
+        var label: Label = get_node_or_null(
+                "Margin/Scroll/Wrap/Column/Display/Padding/Box/%s/Stepper/Chip/StepValue" % row_name
+        )
+        if label != null:
+                label.text = _percent(value)
 
 # --- the deck as one file ----------------------------------------------------------
 
@@ -902,7 +1046,7 @@ func _source_body() -> Control:
                 "The deck's verses, Persian translation and recitations come from [url=https://quran.makarem.ir/]quran.makarem.ir[/url], carried unchanged from the deck package."
         )
         what.add_theme_font_override("normal_font", ThemeScript.vazir(ThemeScript.CAPTION))
-        what.add_theme_font_size_override("normal_font_size", ThemeScript.CAPTION)
+        what.add_theme_font_size_override("normal_font_size", ThemeScript.fs(ThemeScript.CAPTION))
         what.add_theme_color_override("default_color", ThemeScript.INK)
         # Selection lets a user copy the line; the link opens in the browser.
         what.selection_enabled = true
@@ -942,7 +1086,7 @@ func _about() -> Control:
         arabic.text = "تثبيت القرآن"
         arabic.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         arabic.add_theme_font_override("font", ThemeScript.amiri(16))
-        arabic.add_theme_font_size_override("font_size", 16)
+        arabic.add_theme_font_size_override("font_size", ThemeScript.fs(16))
         arabic.add_theme_color_override("font_color", ThemeScript.GOLD)
         box.add_child(arabic)
         var label := _text(I18nScript.t("QuranTathbit v%s") % VersionScript.VERSION, ThemeScript.INK_SOFT, ThemeScript.CAPTION, true)

@@ -147,7 +147,7 @@ func _search_field() -> Control:
         field.clear_button_enabled = true
         field.text_direction = TextDirection.TEXT_DIRECTION_LTR
         field.add_theme_font_override("font", ThemeScript.vazir(15))
-        field.add_theme_font_size_override("font_size", 15)
+        field.add_theme_font_size_override("font_size", ThemeScript.fs(15))
         field.add_theme_color_override("font_color", ThemeScript.INK)
         field.add_theme_color_override("font_placeholder_color", ThemeScript.INK_SOFT)
         field.add_theme_color_override("caret_color", ThemeScript.GREEN_DEEP)
@@ -262,7 +262,7 @@ func _dress_pill(pill: Button, on: bool) -> void:
         pill.add_theme_stylebox_override("focus", wash)
         pill.add_theme_stylebox_override("disabled", rest)
         pill.add_theme_font_override("font", ThemeScript.vazir(14, on))
-        pill.add_theme_font_size_override("font_size", 14)
+        pill.add_theme_font_size_override("font_size", ThemeScript.fs(14))
         var tone := ThemeScript.GREEN_DEEP if on else ThemeScript.INK_SOFT
         pill.add_theme_color_override("font_color", tone)
         pill.add_theme_color_override("font_hover_color", ThemeScript.GREEN_DEEP if on else ThemeScript.INK)
@@ -354,7 +354,7 @@ func _build_sticky() -> Control:
         _sticky_name.name = "Name"
         _sticky_name.text_direction = TextDirection.TEXT_DIRECTION_AUTO
         _sticky_name.add_theme_font_override("font", ThemeScript.font_for("arabic", 17, true))
-        _sticky_name.add_theme_font_size_override("font_size", 17)
+        _sticky_name.add_theme_font_size_override("font_size", ThemeScript.fs(17))
         _sticky_name.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP)
         row.add_child(_sticky_name)
         _sticky_count = Label.new()
@@ -639,7 +639,7 @@ func _surah_header(surah: String, of_card: String) -> Control:
         label.add_theme_font_override("font", ThemeScript.font_for(
                 ThemeScript.reference_script(surah), 23, true
         ))
-        label.add_theme_font_size_override("font_size", 23)
+        label.add_theme_font_size_override("font_size", ThemeScript.fs(23))
         label.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP)
         line.add_child(label)
         var count := Label.new()
@@ -731,7 +731,7 @@ func _entry(card: CardScript, reference: String) -> Control:
                 preview.clip_text = true
                 var preview_script := ThemeScript.script_of(preview_text)
                 var preview_face: Font = ThemeScript.verse_face(preview_script)
-                var preview_size := 27 if preview_script == "arabic" else 15
+                var preview_size := ThemeScript.fs(27 if preview_script == "arabic" else 15)
                 preview.add_theme_font_override("font", preview_face)
                 preview.add_theme_font_size_override("font_size", preview_size)
                 preview.add_theme_color_override("font_color", ThemeScript.INK)
@@ -781,7 +781,7 @@ func _entry(card: CardScript, reference: String) -> Control:
         ref_label.text_direction = TextDirection.TEXT_DIRECTION_AUTO
         var script := ThemeScript.reference_script(reference)
         ref_label.add_theme_font_override("font", ThemeScript.font_for(script, 15, true))
-        ref_label.add_theme_font_size_override("font_size", 15 if script == "arabic" else 13)
+        ref_label.add_theme_font_size_override("font_size", ThemeScript.fs(15 if script == "arabic" else 13))
         ref_label.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP)
         meta.add_child(ref_label)
 

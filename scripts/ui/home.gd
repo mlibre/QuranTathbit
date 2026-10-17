@@ -87,7 +87,7 @@ func setup(deck: DeckScript, counts: Dictionary, sync_line: String, sync_state :
                 next_up.text = reference
                 var script := ThemeScript.reference_script(reference)
                 next_up.add_theme_font_override("font", ThemeScript.font_for(script, ThemeScript.BODY))
-                next_up.add_theme_font_size_override("font_size", _size_for(script))
+                next_up.add_theme_font_size_override("font_size", ThemeScript.fs(_size_for(script)))
                 next_up.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
 
 ## The three numbers and the one button, said once: setup() and refresh()
@@ -104,7 +104,7 @@ func _apply_counts(counts: Dictionary) -> void:
         ThemeScript.count_up(due_pill, int(counts["due"]))
         ThemeScript.count_up(new_pill, int(counts["new"]))
         ThemeScript.count_up(learned_pill, int(counts["learned"]))
-        _apply_deck_chips(counts)
+        _apply_deck_chips()
         var study: Button = get_node("Margin/Column/Study")
         if counts["due"] + counts["new"] == 0:
                 study.text = I18nScript.t("All caught up")
@@ -121,28 +121,23 @@ func _apply_counts(counts: Dictionary) -> void:
                 study.text = I18nScript.t("Study") if counts["due"] > 0 else I18nScript.t("Learn new cards")
                 study.disabled = false
 
-## The deck's own account, said as figures rather than a sentence: the whole
-## holding, what is already learned, and what waits for today -- each as its
-## own small chip, the number bold in its own colour and the word quiet
-## beside it, the way the pills below already speak. A line of prose made a
-## reader parse it; three chips let them glance it. The chips stand in the
-## reading's own order, so a Persian page counts from the right.
-func _apply_deck_chips(counts: Dictionary) -> void:
+## The deck's own account, said as one figure rather than a sentence: the
+## whole holding, as its own small chip -- the number bold in its own colour
+## and the word quiet beside it. The learned and the waiting once stood here
+## too, but they were the pills below said a second time; the card keeps the
+## one number no pill says, and the day's own story stays where the day's
+## own work is. The chip stands in the reading's own order, so a Persian
+## page counts from the right.
+func _apply_deck_chips() -> void:
         var row: HBoxContainer = get_node_or_null("Margin/Column/DeckCard/Pad/Box/Chips")
         if row == null:
                 return
         for child in row.get_children():
                 row.remove_child(child)
                 child.queue_free()
-        var waiting: int = int(counts["due"]) + int(counts["new"])
         var figures := [
                 [I18nScript.num(_deck_of_last_setup.cards.size()) if _deck_of_last_setup != null else "…", I18nScript.t("cards"), ThemeScript.INK, ThemeScript.INK_SOFT],
-                [I18nScript.num(int(counts["learned"])), I18nScript.t("Learned"), ThemeScript.GREEN_DEEP, ThemeScript.GREEN_SOFT],
         ]
-        if waiting > 0:
-                figures.append([
-                        I18nScript.num(waiting), I18nScript.t("waiting"), ThemeScript.GOLD_DEEP, ThemeScript.GOLD_SOFT,
-                ])
         if I18nScript.is_rtl():
                 figures.reverse()
         for figure in figures:
@@ -167,7 +162,7 @@ func _deck_chip(number: String, word: String, tone: Color, wash: Color) -> Contr
         label.autowrap_mode = TextServer.AUTOWRAP_OFF
         label.text_direction = TextDirection.TEXT_DIRECTION_AUTO
         label.add_theme_font_override("normal_font", ThemeScript.vazir(13))
-        label.add_theme_font_size_override("normal_font_size", 13)
+        label.add_theme_font_size_override("normal_font_size", ThemeScript.fs(13))
         label.add_theme_color_override("default_color", ThemeScript.INK_SOFT)
         label.text = "[b][color=#%s]%s[/color][/b] %s" % [tone.to_html(false), number, word]
         pad.add_child(label)
@@ -356,7 +351,7 @@ func _wordmark() -> Control:
         arabic.text = "تثبيت القرآن"
         arabic.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         arabic.add_theme_font_override("font", ThemeScript.amiri(17))
-        arabic.add_theme_font_size_override("font_size", 17)
+        arabic.add_theme_font_size_override("font_size", ThemeScript.fs(17))
         arabic.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP)
         stack.add_child(arabic)
         var label := Label.new()
@@ -524,7 +519,7 @@ func _fit_sync_line() -> void:
                 widest = maxf(
                         widest,
                         font.get_string_size(
-                                text_line, HORIZONTAL_ALIGNMENT_LEFT, -1, ThemeScript.CAPTION
+                                text_line, HORIZONTAL_ALIGNMENT_LEFT, -1, ThemeScript.fs(ThemeScript.CAPTION)
                         ).x
                 )
         var avail := maxf(size.x - 120.0, 140.0)

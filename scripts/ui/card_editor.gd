@@ -139,7 +139,7 @@ func _dress_mode_buttons() -> void:
                 button.add_theme_stylebox_override("focus", rest)
                 button.add_theme_stylebox_override("disabled", rest)
                 button.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.CAPTION, on))
-                button.add_theme_font_size_override("font_size", ThemeScript.CAPTION)
+                button.add_theme_font_size_override("font_size", ThemeScript.fs(ThemeScript.CAPTION))
                 button.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP if on else ThemeScript.INK_SOFT)
                 button.add_theme_color_override("font_hover_color", ThemeScript.GOLD_DEEP if on else ThemeScript.INK)
                 button.add_theme_color_override("font_pressed_color", ThemeScript.GOLD_DEEP if on else ThemeScript.INK)
@@ -170,7 +170,7 @@ func _build_reference() -> Control:
         _reference.text_direction = TextDirection.TEXT_DIRECTION_AUTO
         var script := ThemeScript.reference_script(_reference.text)
         _reference.add_theme_font_override("font", ThemeScript.font_for(script, 14))
-        _reference.add_theme_font_size_override("font_size", 14)
+        _reference.add_theme_font_size_override("font_size", ThemeScript.fs(14))
         _reference.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP)
         return _reference
 

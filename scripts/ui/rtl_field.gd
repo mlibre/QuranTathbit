@@ -39,6 +39,13 @@ signal advance_requested  # Enter in a one-line field: the next field is waiting
 const SIZE := 15
 const PITCH := 4  # the engine's line spacing and the mirror's, kept equal
 
+## The size both layers wear, said once: the input engine's invisible lines,
+## the mirror's visible words and the room they ask for all read this one
+## number, and it goes through fs() (theme.gd) so the text scale reaches the
+## field without ever letting the two layers disagree -- a caret placed by
+## one size over ink drawn at another is the lie this field exists to stop.
+var _size := SIZE
+
 var one_line := false  # a reference is one line; Enter hands the keyboard on
 
 # The hand the field writes in. Both layers must wear the same one -- the
@@ -87,6 +94,7 @@ func face() -> Font:
         return _face if _face != null else ThemeScript.vazir(SIZE)
 
 func _ready() -> void:
+        _size = ThemeScript.fs(SIZE)
         var wash := ThemeScript.SELECT
         _wash = "%02X%02X%02X%02X" % [
                 int(round(wash.r * 255.0)), int(round(wash.g * 255.0)),
@@ -119,7 +127,7 @@ func _ready() -> void:
         _editor.text_direction = Control.TEXT_DIRECTION_AUTO
         _editor.scroll_fit_content_height = true
         _editor.add_theme_font_override("font", face())
-        _editor.add_theme_font_size_override("font_size", SIZE)
+        _editor.add_theme_font_size_override("font_size", _size)
         _editor.add_theme_color_override("font_color", Color(0, 0, 0, 0))
         _editor.add_theme_color_override("caret_color", Color(0, 0, 0, 0))
         _editor.add_theme_color_override("selection_color", Color(0, 0, 0, 0))
@@ -279,7 +287,7 @@ func _rebuild() -> void:
                 if line >= line_count:
                         continue
                 for part in _editor.get_line_wrapped_text(line):
-                        var part_room := ThemeScript.ink_room(part, face(), SIZE)
+                        var part_room := ThemeScript.ink_room(part, face(), _size)
                         _room = maxi(_room, maxi(part_room.x, part_room.y))
         _lines.add_theme_constant_override("separation", PITCH - 2 * _room)
         for line in maxi(line_count, 1):
@@ -313,7 +321,7 @@ func _line_label(part: String, start: int, line: int, from_line: int, from_col: 
         label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
         label.mouse_filter = Control.MOUSE_FILTER_IGNORE
         label.add_theme_font_override("normal_font", face())
-        label.add_theme_font_size_override("normal_font_size", SIZE)
+        label.add_theme_font_size_override("normal_font_size", _size)
         # The room each line carries inside itself, so the marks that stand
         # past the font's box are drawn -- and the separation above gives it
         # back, so the lines stay on the engine's own pitch.

@@ -58,7 +58,7 @@ func _ready() -> void:
         arabic.text = "تثبيت القرآن"
         arabic.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         arabic.add_theme_font_override("font", ThemeScript.amiri(17))
-        arabic.add_theme_font_size_override("font_size", 17)
+        arabic.add_theme_font_size_override("font_size", ThemeScript.fs(17))
         arabic.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP)
         box.add_child(arabic)
         var latin := Label.new()
@@ -120,7 +120,7 @@ func _language_button(code: String) -> Button:
         button.add_theme_stylebox_override("pressed", held)
         button.add_theme_stylebox_override("focus", wash)
         button.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY + 2, true))
-        button.add_theme_font_size_override("font_size", ThemeScript.BODY + 2)
+        button.add_theme_font_size_override("font_size", ThemeScript.fs(ThemeScript.BODY + 2))
         button.add_theme_color_override("font_color", ThemeScript.INK)
         button.add_theme_color_override("font_hover_color", ThemeScript.GREEN_DEEP)
         button.add_theme_color_override("font_pressed_color", ThemeScript.GREEN_DEEP)

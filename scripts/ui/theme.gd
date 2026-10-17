@@ -58,6 +58,55 @@ const AYAH_FACES := [
 static var _ayah_face := "amiri_quran"
 
 
+## Two ways for a reader to make the app their own size, chosen in Settings
+## and remembered on this device (a desk and a phone want different sizes,
+## so neither travels with the deck). The interface scale multiplies the
+## window's own content scale -- every card, pill and margin grows together
+## and the layout re-flows, the way a phone's display-size setting does.
+## The font scale multiplies only the words: every size the app says, on
+## every surface, goes through fs(), so a verse, a caption and a measured
+## pill all grow by the same factor and nothing drifts out of alignment --
+## the size a control displays and the size a measurement takes must be
+## the same number, and fs() is the one place that says it.
+static var _ui_scale := 1.0
+static var _font_scale := 1.0
+
+
+## The interface scale, applied to the window the moment it is asked: the
+## engine re-flows every container under the new factor, so one call
+## dresses the whole app at once. 1.0 is the engine's own default, so a
+## reader who has never chosen keeps exactly the app they had.
+static func set_ui_scale(factor: float) -> void:
+        _ui_scale = clampf(factor, 0.5, 2.0)
+        var tree := Engine.get_main_loop() as SceneTree
+        if tree != null and tree.root != null:
+                tree.root.content_scale_factor = _ui_scale
+
+
+static func ui_scale() -> float:
+        return _ui_scale
+
+
+## The font scale, remembered here for every fs() that follows. A change
+## only re-dresses the pages built after it, so the caller that changes it
+## re-says the pages already standing (the same way a tongue change does).
+static func set_font_scale(factor: float) -> void:
+        _font_scale = clampf(factor, 0.5, 2.0)
+
+
+static func font_scale() -> float:
+        return _font_scale
+
+
+## One size, said once: every font size the app applies -- an override on a
+## label, a button, a mirror's line -- and every size a measurement takes
+## beside it, passes through here, so the font scale reaches every word and
+## every word is measured at the size it is drawn. Never below 1: a size
+## is a whole number of pixels, and a word nobody could read serves nobody.
+static func fs(size: int) -> int:
+        return maxi(1, roundi(float(size) * _font_scale))
+
+
 static func set_ayah_face(key: String) -> void:
         for face in AYAH_FACES:
                 if str(face["key"]) == key:
@@ -1083,7 +1132,7 @@ static func primary_button(label_text: String, height := 56) -> Button:
         button.text = label_text
         button.custom_minimum_size = Vector2(0, height)
         button.add_theme_font_override("font", vazir(BODY + 2, true))
-        button.add_theme_font_size_override("font_size", BODY + 2)
+        button.add_theme_font_size_override("font_size", fs(BODY + 2))
         button.add_theme_color_override("font_color", Color.WHITE)
         button.add_theme_color_override("font_hover_color", Color.WHITE)
         button.add_theme_color_override("font_pressed_color", Color.WHITE)
@@ -1107,7 +1156,7 @@ static func ghost_button(label_text: String, tone: Color, height := 46, radius :
         button.text = label_text
         button.custom_minimum_size = Vector2(0, height)
         button.add_theme_font_override("font", vazir(BODY))
-        button.add_theme_font_size_override("font_size", BODY)
+        button.add_theme_font_size_override("font_size", fs(BODY))
         button.add_theme_color_override("font_color", tone)
         button.add_theme_color_override("font_hover_color", tone)
         button.add_theme_color_override("font_pressed_color", tone)
@@ -1155,7 +1204,7 @@ static func apply_mark_styles(button: Button, styles: Dictionary) -> void:
 ## call -- so no screen's body text drifts from another's.
 static func dress(label: Label, size: int, color: Color, bold := false) -> Label:
         label.add_theme_font_override("font", vazir(size, bold))
-        label.add_theme_font_size_override("font_size", size)
+        label.add_theme_font_size_override("font_size", fs(size))
         label.add_theme_color_override("font_color", color)
         return label
 
@@ -1187,7 +1236,7 @@ static func top_bar(title_text: String, rtl := false) -> Dictionary:
         title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         title.add_theme_font_override("font", vazir(TITLE, true))
-        title.add_theme_font_size_override("font_size", TITLE)
+        title.add_theme_font_size_override("font_size", fs(TITLE))
         title.add_theme_color_override("font_color", GREEN_DEEP)
         row.add_child(title)
 
@@ -1269,7 +1318,7 @@ static func key_chip(label_text: String) -> PanelContainer:
         var label := Label.new()
         label.text = label_text
         label.add_theme_font_override("font", vazir(12, true))
-        label.add_theme_font_size_override("font_size", 12)
+        label.add_theme_font_size_override("font_size", fs(12))
         label.add_theme_color_override("font_color", INK_SOFT)
         chip.add_child(label)
         return chip
@@ -1413,7 +1462,7 @@ static func editor_face_for(script: String) -> Font:
 static func tooltip_theme() -> Theme:
         var theme := Theme.new()
         theme.set_font("font", "TooltipLabel", vazir(13))
-        theme.set_font_size("font_size", "TooltipLabel", 13)
+        theme.set_font_size("font_size", "TooltipLabel", fs(13))
         theme.set_color("font_color", "TooltipLabel", INK)
         theme.set_color("font_shadow_color", "TooltipLabel", Color(0, 0, 0, 0))
         var panel := StyleBoxFlat.new()

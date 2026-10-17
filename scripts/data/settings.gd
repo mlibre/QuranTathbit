@@ -37,6 +37,15 @@ var ayah_font := ""
 ## travels with the deck the same way, and stays empty until the reader
 ## answers the app's first question (or picks one in Settings).
 var ui_lang := ""
+## Two ways to size the app for the eyes in front of it, chosen in Settings.
+## The interface scale multiplies the window's own content scale (everything
+## grows together, the layout re-flows); the font scale multiplies only the
+## words (theme.gd's fs()). Both are this device's own comfort -- a desk and
+## a phone read at different distances -- so unlike the pace, the face and
+## the tongue they stay here and never travel with the deck. 1.0 is the
+## size the app has always been.
+var ui_scale := 1.0
+var font_scale := 1.0
 
 
 static func load_settings():
@@ -47,7 +56,7 @@ static func load_settings():
         if typeof(data) != TYPE_DICTIONARY:
                 push_warning("Settings: %s unreadable; using defaults" % PATH)
                 return s
-        for key in ["token", "owner", "repo", "deck_folder", "last_sync", "setup_done", "auto_sync", "volume", "new_per_day", "ayah_font", "ui_lang"]:
+        for key in ["token", "owner", "repo", "deck_folder", "last_sync", "setup_done", "auto_sync", "volume", "new_per_day", "ayah_font", "ui_lang", "ui_scale", "font_scale"]:
                 if not data.has(key):
                         continue
                 # JSON reads every number back as a float, and every saved int
@@ -86,6 +95,8 @@ func save() -> bool:
                                 "new_per_day": new_per_day,
                                 "ayah_font": ayah_font,
                                 "ui_lang": ui_lang,
+                                "ui_scale": ui_scale,
+                                "font_scale": font_scale,
                         },
                         "\t"
                 )
