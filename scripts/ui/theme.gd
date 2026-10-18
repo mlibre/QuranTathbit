@@ -484,31 +484,27 @@ class TypeMark extends Control:
                 )
 
 
-## The rule the volume's page is built around: a bookmark's ribbon hung
-## from a gold rod across the head of the page, the way a mushaf's own
-## ribbon holds a reader's place. The forked tail points at the loudness,
-## the fill rises from the rule's foot to the tail's own corners, and the
-## hand drags the ribbon up and down the whole height of the rule --
-## anywhere the page is touched, the level comes to the touch, so a thumb
-## never has to aim for the silk. Ticks every tenth down the reading side,
-## gold and a breath longer at the two ends and the middle; a finial
-## diamond under the foot; the rod carries round caps at its ends. A
-## ribbon shorter than its own width is a nub no eye can hold, so near the
-## head the tail rests at its own least length while the fill beneath
-## still says the exact level -- the figure above says the number, the
-## fill says it again, and the ribbon is the handle, not the word.
-class RibbonRule extends Control:
-        ## Every nudge of the ribbon, live -- the hand hears the change as
+## The rule the volume's page is built around: one tall bar the whole
+## height of the page, the fill rising from the rule's foot to the level
+## and a round knob standing on the level -- the handle a thumb cannot
+## miss. Anywhere the page is touched, the level comes to the touch, so
+## the thumb never has to aim for the knob. Ticks every tenth down the
+## reading side, gold and a breath longer at the two ends and the middle.
+## The knob never leaves its own page: near the head it rests at its own
+## least height while the fill beneath still says the exact level -- the
+## figure above says the number, the fill says it again, and the knob is
+## the handle, not the word.
+class LevelRule extends Control:
+        ## Every nudge of the rule, live -- the hand hears the change as
         ## it makes it.
         signal value_changed(value: float)
 
         ## The rule's own coordinates, the mockup's own page: the head
-        ## where fullness lives, the foot where silence does, the rod the
-        ## ribbon hangs from across the head. Drawn, not typed.
+        ## where fullness lives, the foot where silence does. Drawn, not
+        ## typed.
         const HEAD := 10.0
         const FOOT := 210.0
-        const RIBBON_TOP := 6.0
-        const RIBBON_LEAST := 26.0
+        const KNOB := 19.0
 
         var value := 1.0:
                 set(v):
@@ -541,33 +537,8 @@ class RibbonRule extends Control:
                 value = said
                 queue_redraw()
 
-        ## One colour said the way draw_polygon asks for it: a whole array
-        ## of it, as many entries as the polygon has corners.
-        func _flat(count: int, color: Color) -> PackedColorArray:
-                var out := PackedColorArray()
-                for i in count:
-                        out.append(color)
-                return out
-
         func _draw() -> void:
                 var level := FOOT - value * (FOOT - HEAD)
-
-                # The rod across the head: gold lit from above and held
-                # down by its own deep end, one vertex-coloured quad with
-                # round caps at its ends.
-                draw_polygon(
-                        PackedVector2Array([
-                                Vector2(15.0, 2.0), Vector2(135.0, 2.0),
-                                Vector2(135.0, 8.0), Vector2(15.0, 8.0),
-                        ]),
-                        PackedColorArray([
-                                Color("#D9B45C"), Color("#D9B45C"),
-                                GOLD_DEEP, GOLD_DEEP,
-                        ]),
-                        PackedVector2Array(), null
-                )
-                draw_circle(Vector2(15.0, 5.0), 5.0, GOLD)
-                draw_circle(Vector2(135.0, 5.0), 5.0, GOLD)
 
                 # The rule's track, and the fill rising from the foot to
                 # the level -- a capsule, so a short fill keeps its own
@@ -578,62 +549,33 @@ class RibbonRule extends Control:
                         _fill.set_corner_radius_all(int(minf(8.0, h / 2.0)))
                         draw_style_box(_fill, Rect2(67.0, level, 16.0, h))
 
-                # The finial diamond under the foot, where the ribbon of a
-                # reader at rest would come to rest.
-                var finial := GOLD
-                finial.a = 0.85
-                draw_polygon(
-                        PackedVector2Array([
-                                Vector2(75.0, 218.0), Vector2(81.0, 224.0),
-                                Vector2(75.0, 230.0), Vector2(69.0, 224.0),
-                        ]),
-                        _flat(4, finial),
-                        PackedVector2Array(), null
-                )
-
                 # Ticks down the reading side: a quiet mark every tenth,
                 # gold and a breath longer at the two ends and the middle.
                 for k in range(1, 10):
                         var at := FOOT - 0.1 * k * (FOOT - HEAD)
                         if k == 5:
                                 continue
-                        draw_line(Vector2(90.0, at), Vector2(96.0, at),
+                        draw_line(Vector2(94.0, at), Vector2(100.0, at),
                                 Color(INK_SOFT.r, INK_SOFT.g, INK_SOFT.b, 0.35), 1.5, true)
                 for at in [HEAD, (HEAD + FOOT) / 2.0, FOOT]:
-                        draw_line(Vector2(90.0, at), Vector2(98.0, at), GOLD, 1.8, true)
+                        draw_line(Vector2(94.0, at), Vector2(102.0, at), GOLD, 1.8, true)
 
-                # The ribbon: its shadow first, then the silk, then the
-                # gold trims down its sides and the pale fold down its
-                # middle. Never shorter than its own width -- near the head
-                # the tail rests at its least length while the fill says
-                # the exact level beneath it.
-                var tail := maxf(level, RIBBON_TOP + RIBBON_LEAST)
-                var body := PackedVector2Array([
-                        Vector2(62.0, RIBBON_TOP), Vector2(88.0, RIBBON_TOP),
-                        Vector2(88.0, tail), Vector2(75.0, tail - 12.0),
-                        Vector2(62.0, tail),
-                ])
+                # The knob: its shadow first, then the disc, then a
+                # hairline of its own colour over the edge -- the way every
+                # arc in this app is softened. It stands on the level and
+                # never leaves its own page: near the head it rests at its
+                # own least height while the fill says the exact level
+                # beneath it.
+                var grip := maxf(level, KNOB)
                 var shadow_color := Color("#30230A")
                 shadow_color.a = 0.28
-                var shadow := PackedVector2Array()
-                for p in body:
-                        shadow.append(p + Vector2(1.0, 1.5))
-                draw_polygon(shadow, _flat(5, shadow_color), PackedVector2Array(), null)
-                draw_polygon(body, _flat(5, GREEN_DEEP), PackedVector2Array(), null)
-                # The fork's two diagonals, softened the way every arc in
-                # this app is: a hairline of the same silk over the edge.
-                var edge := body.duplicate()
-                edge.append(body[0])
-                draw_polyline(edge, GREEN_DEEP, 1.0, true)
-                var trim := Color(GOLD.r, GOLD.g, GOLD.b, 0.65)
-                draw_line(Vector2(63.5, RIBBON_TOP + 1.0), Vector2(63.5, tail - 2.0), trim, 1.5, true)
-                draw_line(Vector2(86.5, RIBBON_TOP + 1.0), Vector2(86.5, tail - 2.0), trim, 1.5, true)
-                draw_line(Vector2(75.0, RIBBON_TOP + 6.0), Vector2(75.0, tail - 16.0),
-                        Color(1.0, 1.0, 1.0, 0.14), 3.0, true)
+                draw_circle(Vector2(76.0, grip + 1.5), KNOB, shadow_color)
+                draw_circle(Vector2(75.0, grip), KNOB, GREEN_DEEP)
+                draw_arc(Vector2(75.0, grip), KNOB, 0.0, TAU, 40, GREEN_DEEP, 1.0, true)
 
         ## The whole page answers the hand: a touch anywhere on the rule
         ## brings the level to the touch, and the drag carries it -- the
-        ## ribbon is a handle a thumb cannot miss. Touch and mouse both,
+        ## knob is a handle a thumb cannot miss. Touch and mouse both,
         ## because a reader's phone speaks either.
         func _gui_input(event: InputEvent) -> void:
                 if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
@@ -666,13 +608,13 @@ class RibbonRule extends Control:
 ## name centered under flanking gold rules (the unwan a Persian page dresses
 ## its headings in), beneath it the page's one number -- large, centered,
 ## changing with every breath of the hand -- and under both the tower the
-## ribbon hangs in: the loud speaker at its head, one press for the
-## fullness the rule can hold; the rule the hand drags, the bookmark's
-## ribbon pointing at the loudness and the fill rising from the foot to
-## meet it; the quiet speaker at its foot, one press for silence, one press
-## back for the loudness silence replaced. Both places that play a
-## recitation (a session and the browser) open the same page, so loudness
-## is one idea everywhere it can be changed.
+## rule stands in: the loud speaker at its head, one press for the
+## fullness the rule can hold; the rule the hand drags, the knob standing
+## on the loudness and the fill rising from the foot to meet it; the quiet
+## speaker at its foot, one press for silence, one press back for the
+## loudness silence replaced. Both places that play a recitation (a session
+## and the browser) open the same page, so loudness is one idea everywhere
+## it can be changed.
 class VolumePopover extends Popover:
         ## Every nudge of the rule, live -- the hand hears the change as it
         ## makes it.
@@ -681,7 +623,7 @@ class VolumePopover extends Popover:
         ## screen persists.
         signal committed(value: float)
 
-        var _rule: RibbonRule
+        var _rule: LevelRule
         var _quiet_mark: VolumeMark
         var _loud_mark: VolumeMark
         var _readout: Label
@@ -718,7 +660,7 @@ class VolumePopover extends Popover:
                 # The figure: the page's own hero, centered in the page's
                 # width and given room of its own, so the eye that opens the
                 # page reads the loudness before the hand reaches for the
-                # ribbon -- and reads its every change while the hand drags
+                # rule -- and reads its every change while the hand drags
                 # it. A floor under its box keeps the page itself from
                 # swaying as the digits change.
                 _readout = Label.new()
@@ -733,16 +675,16 @@ class VolumePopover extends Popover:
 
                 # The tower: the loud speaker standing at the rule's head,
                 # the rule between, the quiet speaker breathing under the
-                # finial -- one centered column, the way a page centers its
-                # own margin.
+                # rule's foot -- one centered column, the way a page centers
+                # its own margin.
                 var tower := VBoxContainer.new()
                 tower.name = "Tower"
                 column.add_child(tower)
 
                 # The loud speaker at the head: one press for the fullness
                 # the rule can hold -- the speaker with both its breaths of
-                # sound, the state the page is named for, standing where the
-                # rod is hung.
+                # sound, the state the page is named for, standing at the
+                # rule's own head.
                 var full := Button.new()
                 full.name = "Loud"
                 full.custom_minimum_size = Vector2(40, 40)
@@ -761,25 +703,25 @@ class VolumePopover extends Popover:
                 full.pressed.connect(_full)
                 tower.add_child(full)
 
-                # The rule the page is named for: the rod, the ribbon, the
-                # fill -- the hand's own handle, between the two speakers.
-                _rule = RibbonRule.new()
+                # The rule the page is named for: the track, the fill, the
+                # knob -- the hand's own handle, between the two speakers.
+                _rule = LevelRule.new()
                 _rule.name = "Rule"
                 _rule.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
                 _rule.value_changed.connect(_on_dragged)
                 tower.add_child(_rule)
 
-                # A breath between the finial and the quiet speaker, the
-                # mockup's own gap.
+                # A breath between the rule's foot and the quiet speaker,
+                # the mockup's own gap.
                 var breath := Control.new()
                 breath.custom_minimum_size = Vector2(0, 10)
                 breath.mouse_filter = Control.MOUSE_FILTER_IGNORE
                 tower.add_child(breath)
 
-                # The quiet speaker under the finial: one press for silence,
-                # one press back for the loudness silence replaced. A speaker
-                # with no breath of sound -- the horn alone, and a line
-                # through it when the page is silent.
+                # The quiet speaker under the rule's foot: one press for
+                # silence, one press back for the loudness silence replaced.
+                # A speaker with no breath of sound -- the horn alone, and a
+                # line through it when the page is silent.
                 var mute := Button.new()
                 mute.name = "Mute"
                 mute.custom_minimum_size = Vector2(40, 40)

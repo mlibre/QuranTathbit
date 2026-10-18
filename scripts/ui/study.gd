@@ -301,41 +301,38 @@ func _answers() -> Control:
         grid.custom_minimum_size = Vector2(0, 72)
         return grid
 
-## The footer's own row: the way forward and the way out, side by side. The
-## way forward -- "Show answer" -- is the page's one loud word; the way out
-## -- "Not today", the card put back in its basket until tomorrow -- is a
-## quiet ghost beside it, because it must be found when it is wanted and
-## never stumbled into. It stands only on the question side: once the
-## answer is seen, the card is answered, not put back. At the end the row
-## carries one word only. The pair answers the reading's own direction,
-## the way the volume band does, so the way forward stands at the reading's
-## start and the quiet escape beside it.
+## The footer's own column: the way forward and the way out, one above the
+## other. The way forward -- "Show answer" -- is the page's one loud word,
+## standing at the column's full width; the way out -- "Not today", the
+## card put back in its basket until tomorrow -- is a quiet ghost beneath
+## it, centred and a breath shorter, because it must be found when it is
+## wanted and never stumbled into. It stands only on the question side:
+## once the answer is seen, the card is answered, not put back. At the end
+## the column carries one word only.
 func _footer() -> Control:
         var row := CenterContainer.new()
         row.name = "Footer"
 
-        var pair := HBoxContainer.new()
-        pair.name = "Pair"
-        pair.add_theme_constant_override("separation", 10)
-        if I18nScript.is_rtl():
-                pair.layout_direction = Control.LAYOUT_DIRECTION_RTL
-        row.add_child(pair)
+        var stack := VBoxContainer.new()
+        stack.name = "Stack"
+        stack.add_theme_constant_override("separation", 10)
+        row.add_child(stack)
 
         var show := ThemeScript.primary_button(I18nScript.t("Show answer"), 58)
         show.name = "ShowAnswer"
         show.custom_minimum_size = Vector2(320, 58)
         show.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         show.pressed.connect(_reveal)
-        pair.add_child(show)
+        stack.add_child(show)
 
-        var put_back := ThemeScript.ghost_button(I18nScript.t("Not today"), ThemeScript.INK_SOFT, 58, 22)
+        var put_back := ThemeScript.ghost_button(I18nScript.t("Not today"), ThemeScript.INK_SOFT, 48, 24)
         put_back.name = "PutBack"
-        put_back.custom_minimum_size = Vector2(138, 58)
+        put_back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         put_back.tooltip_text = I18nScript.t(
                 "Put this card back — it returns with tomorrow's new cards."
         )
         put_back.pressed.connect(_put_back)
-        pair.add_child(put_back)
+        stack.add_child(put_back)
 
         var done := ThemeScript.ghost_button(I18nScript.t("Done"), ThemeScript.GREEN, 58)
         done.name = "Done"
@@ -343,7 +340,7 @@ func _footer() -> Control:
         done.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         done.visible = false
         done.pressed.connect(func() -> void: closed.emit())
-        pair.add_child(done)
+        stack.add_child(done)
         return row
 
 func _layout() -> void:
@@ -378,20 +375,19 @@ func _layout() -> void:
         # The centre the question side needs: the filler is never shorter than
         # the surface, so a short card floats in the middle of the page.
         fill.custom_minimum_size.y = surface.size.y
-        # The footer's row: one measure, shared. The pair never runs past the
-        # window's own margins and never past the measure the primary word
-        # deserves; within it the way forward takes what is left once the
-        # quiet escape has its own room -- a phone trims both, the escape
-        # first, so neither button is ever asked to hold more words than
-        # its width can carry.
-        var pair: HBoxContainer = get_node("Margin/Column/Footer/Pair")
+        # The footer's stack: one measure, shared. The stack never runs
+        # past the window's own margins and never past the measure the
+        # primary word deserves; the way forward takes the whole measure
+        # and the quiet escape a centred breath of it beneath -- a phone
+        # trims both, so neither button is ever asked to hold more words
+        # than its width can carry.
+        var stack: VBoxContainer = get_node("Margin/Column/Footer/Stack")
         var room := maxf(minf(size.x - 48.0, 470.0), 240.0)
-        pair.custom_minimum_size = Vector2(room, 0)
-        var escape_w := 138.0 if size.x >= 470.0 else 112.0
-        (pair.get_node("PutBack") as Button).custom_minimum_size = Vector2(escape_w, 58.0)
-        var forward_w := maxf(room - escape_w - 10.0, 150.0)
-        (pair.get_node("ShowAnswer") as Button).custom_minimum_size = Vector2(forward_w, 58.0)
-        (pair.get_node("Done") as Button).custom_minimum_size = Vector2(forward_w, 58.0)
+        stack.custom_minimum_size = Vector2(room, 0)
+        var escape_w := 150.0 if size.x >= 470.0 else 126.0
+        (stack.get_node("PutBack") as Button).custom_minimum_size = Vector2(escape_w, 48.0)
+        (stack.get_node("ShowAnswer") as Button).custom_minimum_size = Vector2(room, 58.0)
+        (stack.get_node("Done") as Button).custom_minimum_size = Vector2(room, 58.0)
         # The small pages that hang from the header's coins stay hung: the
         # window may move under them, and the pages follow the coins the
         # bar keeps in its corner.
@@ -426,9 +422,9 @@ func _show_front(incoming := false) -> void:
         progress.text = I18nScript.f("%d of %d", [_index + 1, _cards.size()])
         _tween_bar(100.0 * float(_index) / float(_cards.size()))
         _view.show_text(card.front, card.folder, true)
-        get_node("Margin/Column/Footer/Pair/ShowAnswer").visible = true
-        get_node("Margin/Column/Footer/Pair/PutBack").visible = true
-        get_node("Margin/Column/Footer/Pair/Done").visible = false
+        get_node("Margin/Column/Footer/Stack/ShowAnswer").visible = true
+        get_node("Margin/Column/Footer/Stack/PutBack").visible = true
+        get_node("Margin/Column/Footer/Stack/Done").visible = false
         _clear_answers()
         _settle_card(incoming)
 
@@ -455,10 +451,10 @@ func _reveal() -> void:
         _view.show_text(card.back, card.folder, false, _reference_of(card), true)
         var scroll: ScrollContainer = get_node("Margin/Column/Surface")
         scroll.scroll_vertical = 0
-        get_node("Margin/Column/Footer/Pair/ShowAnswer").visible = false
+        get_node("Margin/Column/Footer/Stack/ShowAnswer").visible = false
         # The escape belongs to the question alone: once the answer is seen,
         # the card is answered, not put back.
-        get_node("Margin/Column/Footer/Pair/PutBack").visible = false
+        get_node("Margin/Column/Footer/Stack/PutBack").visible = false
 
         _clear_answers()
         _options = SchedulerScript.options(SchedulerScript.id_seed(card.id), card.state, int(Time.get_unix_time_from_system()))
@@ -622,7 +618,7 @@ func _settle_card(incoming: bool) -> void:
                 panel.pivot_offset = panel.size / 2.0
         if not incoming:
                 ThemeScript.settle_in(_view)
-                ThemeScript.settle_in(get_node("Margin/Column/Footer/Pair/ShowAnswer"), 0.06)
+                ThemeScript.settle_in(get_node("Margin/Column/Footer/Stack/ShowAnswer"), 0.06)
                 _busy = false
                 return
         panel.modulate.a = 0.0
@@ -739,9 +735,9 @@ func _show_done() -> void:
         summary.add_child(rest)
 
         ThemeScript.stagger_in(summary, 0.09, 0.3)
-        get_node("Margin/Column/Footer/Pair/ShowAnswer").visible = false
-        get_node("Margin/Column/Footer/Pair/PutBack").visible = false
-        get_node("Margin/Column/Footer/Pair/Done").visible = true
+        get_node("Margin/Column/Footer/Stack/ShowAnswer").visible = false
+        get_node("Margin/Column/Footer/Stack/PutBack").visible = false
+        get_node("Margin/Column/Footer/Stack/Done").visible = true
 
 # --- the card, editable on the spot --------------------------------------------------
 

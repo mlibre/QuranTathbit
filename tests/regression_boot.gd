@@ -244,6 +244,27 @@ func _check_study_session(main: Node) -> void:
 
         var view = study.get_node("Margin/Column/Surface/Fill/CardPanel/Padding/View")
         _ok(view.get_child_count() >= 1, "the card's question is on screen")
+        # The way out stands beneath the way forward: "Not today" is a quiet
+        # ghost centred under the page's one loud word -- never beside it --
+        # so the thumb that wants to go on meets one word first, and the
+        # thumb that wants out finds it without aiming.
+        var forward: Button = study.get_node_or_null("Margin/Column/Footer/Stack/ShowAnswer")
+        var escape: Button = study.get_node_or_null("Margin/Column/Footer/Stack/PutBack")
+        _ok(
+                forward != null and escape != null,
+                "the question side carries the way forward and the way out"
+        )
+        if forward != null and escape != null:
+                var forward_rect := forward.get_global_rect()
+                var escape_rect := escape.get_global_rect()
+                _ok(
+                        escape_rect.position.y >= forward_rect.end.y - 1.0,
+                        "the way out stands beneath the way forward"
+                )
+                _ok(
+                        absf(escape_rect.get_center().x - forward_rect.get_center().x) < 3.0,
+                        "the way out is centred under the way forward"
+                )
         # The recitation's loudness lives in the header's free corner: a coin
         # beside the way back, and under it a rule the hand can drag.
         var volume_coin: Button = study.get_node_or_null("Margin/Column/TopBar/Right/Pair/Volume")
@@ -284,7 +305,7 @@ func _check_study_session(main: Node) -> void:
                 )
                 # The page centers on its one number: the quiet name above,
                 # the live figure large beneath it, and under both the tower
-                # the ribbon hangs in -- the loud speaker at its head, the rule
+                # the rule stands in -- the loud speaker at its head, the rule
                 # the hand drags between, the quiet speaker at its foot.
                 var readout: Label = volume_popup.get_node_or_null("Sheet/Pad/Column/Readout")
                 _ok(
@@ -305,8 +326,8 @@ func _check_study_session(main: Node) -> void:
                 _is(study.volume, 0.5, "the rule sets the loudness it says")
                 _ok(absf(study._player.volume_db - linear_to_db(0.5)) < 0.01, "the player obeys the rule")
                 # The rule a thumb actually wants: the height of its own page,
-                # not its width -- the ribbon hangs the whole height of the
-                # tower, so the thumb never has to aim for the silk.
+                # not its width -- the rule runs the whole height of the
+                # tower, so the thumb never has to aim for the knob.
                 _ok(
                         rule.size.y >= 200.0,
                         "the rule runs the height of the page, tall enough for a thumb"
@@ -315,7 +336,7 @@ func _check_study_session(main: Node) -> void:
                         volume_popup.get_node_or_null("Sheet/Pad/Column/Tower/Mute") != null,
                         "the quiet speaker anchors the rule at its foot"
                 )
-                # The hand drags the ribbon: a touch low on the page is a
+                # The hand drags the rule: a touch low on the page is a
                 # whisper, a touch high a fullness -- anywhere the page is
                 # touched, the level comes to the touch.
                 rule._hand(160.0)
@@ -326,7 +347,7 @@ func _check_study_session(main: Node) -> void:
                         "25%",
                         "the figure says the whisper the touch asked for"
                 )
-                # The speaker under the finial is the mute: one press for
+                # The speaker at the rule's foot is the mute: one press for
                 # silence, one press back for the loudness silence replaced.
                 (volume_popup.get_node("Sheet/Pad/Column/Tower/Mute") as Button).pressed.emit()
                 await create_timer(0.2).timeout
