@@ -136,9 +136,7 @@ Windows, web) in Godot 4.7 with GDScript only.
 
 ## Learning and maintaining knowledge
 
-Write it down only when the work reveals something durable — a project principle, a reusable technique, a corrected fact, or an operational lesson. Update the project's `AGENTS.md` for rules and principles, the relevant `docs` for technical documentation, the `README` for usage, and the relevant `skill` for lessons that belong to its domain — not whichever skill or document you happened to be using.
-
-The app's technical documentation lives in `docs/`: `TEXT.md` (type, RTL, and the page's chrome), `INPUT.md` (the writing field, touch scrolling, the back key), `DECK.md` (folders, the package's audio, the repair), and `WEB.md` (the web build's pipeline). Engine-generic lessons live in the godot skill at `.agents/skills/godot/`.
+Write it down only when the work reveals something durable — a project principle, a reusable technique, a corrected fact, or an operational lesson. Update the project’s `AGENTS.md` for rules and principles, the relevant `docs` for technical documentation, the `README` for usage, and the relevant `skill` for lessons and skills — each in the domain it belongs to, not in whichever skill or document you happened to be using.
 
 Be sparing. Keep docs and skills concise and deduplicated. Most things are not worth recording. If a lesson will not matter in a week, or you are not sure it is true, leave it out. A short file that is read is worth more than a long one that is ignored.
 
