@@ -399,9 +399,9 @@ const STRINGS := {
                 "fa": "یک کارت تازه بیشتر در روز",
                 "ar": "بطاقة جديدة أكثر كل يوم",
         },
-        "How many unseen cards a day offers — 0 studies only reviews. Carried\nwith your deck, so every device paces the day the same.": {
-                "fa": "هر روز چند کارت ندیده پیشنهاد می‌شود — صفر یعنی فقط مرور.\nهمراه مجموعهٔ شما می‌آید، تا هر دستگاه هم‌پایِ دیگری گام بردارد.",
-                "ar": "كم بطاقة جديدة يعرضها اليوم — صفر يعني المراجعات فقط.\nتُحمل مع مجموعتك، فيسير كل جهاز على الوتيرة نفسها.",
+        "How many new cards a day offers — 0 studies only reviews.": {
+                "fa": "هر روز چند کارت جدید پیشنهاد شود — صفر یعنی فقط مرور.",
+                "ar": "كم بطاقة جديدة يعرضها اليوم — صفر يعني المراجعات فقط.",
         },
         "Data source": {"fa": "سرچشمهٔ داده", "ar": "مصدر البيانات"},
         "The deck's verses, Persian translation and recitations come from [url=https://quran.makarem.ir/]quran.makarem.ir[/url], carried unchanged from the deck package.": {

@@ -552,7 +552,7 @@ func _deck_body() -> Control:
         more.pressed.connect(_step_new_per_day.bind(1))
         stepper.add_child(more)
         var pace := _text(
-                I18nScript.t("How many unseen cards a day offers — 0 studies only reviews. Carried\nwith your deck, so every device paces the day the same."),
+                I18nScript.t("How many new cards a day offers — 0 studies only reviews."),
                 ThemeScript.INK_SOFT, 12
         )
         pace.name = "Pace"
