@@ -279,18 +279,26 @@ func _check_study_session(main: Node) -> void:
                         "the page's roof points up at its coin"
                 )
                 _ok(
-                        volume_popup.get_node_or_null("Sheet/Pad/Column/Head/Title") != null,
+                        volume_popup.get_node_or_null("Sheet/Pad/Column/Title") != null,
                         "the page says what it is for before it asks for a number"
                 )
-                # The page is one setting row said twice: the quiet name with
-                # the live figure at the row's far end, and beneath it the
-                # mute anchoring one rule the width of the page -- the way
-                # every volume rule the reader has ever dragged behaves, the
-                # box the reader twice called wrong being neither.
-                var readout: Label = volume_popup.get_node_or_null("Sheet/Pad/Column/Head/Readout")
+                # The page centers on its one number: the quiet name above,
+                # the live figure large beneath it, and under both the mute
+                # anchoring one rule the width of the page -- the way every
+                # volume rule the reader has ever dragged behaves, the box
+                # the reader twice called wrong being neither.
+                var readout: Label = volume_popup.get_node_or_null("Sheet/Pad/Column/Readout")
                 _ok(
                         readout != null and readout.text.length() > 0,
-                        "the figure stands in the row's head, at the far end"
+                        "the figure stands centered, the page's own hero"
+                )
+                _ok(
+                        readout != null
+                                and absf(
+                                        (readout.get_global_rect().get_center().x
+                                        - volume_popup.get_global_rect().get_center().x)
+                                ) < 2.0,
+                        "the figure stands at the page's own centre"
                 )
                 var slider: HSlider = volume_popup.get_node("Sheet/Pad/Column/Band/Slider")
                 slider.value = 0.5
@@ -316,9 +324,9 @@ func _check_study_session(main: Node) -> void:
                 await create_timer(0.2).timeout
                 _is(study.volume, 0.5, "pressing it again unmutes to what was")
                 _is(
-                        (volume_popup.get_node("Sheet/Pad/Column/Head/Readout") as Label).text,
+                        (volume_popup.get_node("Sheet/Pad/Column/Readout") as Label).text,
                         "50%",
-                        "the figure says the loudness from the row's own head"
+                        "the figure says the loudness from the page's own centre"
                 )
                 volume_coin.pressed.emit()
                 await create_timer(0.1).timeout

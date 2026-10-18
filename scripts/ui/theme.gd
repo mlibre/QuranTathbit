@@ -472,15 +472,16 @@ class TypeMark extends Control:
                 )
 
 
-## The volume's own small page, drawn as the app draws its own setting rows:
-## a quiet name with the live figure standing at the row's far end, and under
-## it the one control -- the mute anchoring a rule wide enough for a thumb,
-## the rule's fill growing from the reading's own edge in a right-reading
-## tongue, exactly the way every volume rule the reader has ever dragged
-## behaves. A page the size of the question it answers, hung from the coin
-## that opens it; both places that play a recitation (a session and the
-## browser) open the same page, so loudness is one idea everywhere it can be
-## changed.
+## The volume's own small page: a quiet name said once at the top, and under
+## it the live figure -- large, centered, the page's one number said the way
+## a number wants to be read, changing with every breath of the hand. Under
+## both stands the one control: the mute anchoring a rule wide enough for a
+## thumb, the rule's fill growing from the reading's own edge in a
+## right-reading tongue, exactly the way every volume rule the reader has
+## ever dragged behaves. A centered page, because a loudness is one number
+## between two silences; both places that play a recitation (a session and
+## the browser) open the same page, so loudness is one idea everywhere it can
+## be changed.
 class VolumePopover extends Popover:
         ## Every nudge of the rule, live -- the hand hears the change as it
         ## makes it.
@@ -499,44 +500,39 @@ class VolumePopover extends Popover:
                 super(340.0)
                 name = "VolumePopup"
 
-                var pad := content(18, 14, 18, 16)
+                var pad := content(20, 16, 20, 18)
                 var column := VBoxContainer.new()
                 column.name = "Column"
-                column.add_theme_constant_override("separation", 10)
+                column.add_theme_constant_override("separation", 8)
                 pad.add_child(column)
 
-                # The row's own head: the page's quiet name at the reading's
-                # start, the live figure at the row's far end -- a setting row
-                # says what it holds before it asks for a hand.
-                var head := HBoxContainer.new()
-                head.name = "Head"
-                head.add_theme_constant_override("separation", 8)
-                column.add_child(head)
+                # The page's quiet name, centered over everything it names:
+                # a small word above a large number, the way a caption stands
+                # over a figure. The popover rides a page whose root does not
+                # turn, so the tongue says its own alignment and needs none.
                 var title := Label.new()
                 title.name = "Title"
                 title.text = I18N.t("Recitation volume")
+                title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-                title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-                # The popover rides a page whose root does not turn, so the
-                # tongue says the edge in so many words.
-                title.horizontal_alignment = (
-                        HORIZONTAL_ALIGNMENT_RIGHT if I18N.is_rtl()
-                        else HORIZONTAL_ALIGNMENT_LEFT
-                )
-                THEME.dress(title, 12, INK_SOFT, true)
+                THEME.dress(title, 12, INK_SOFT)
+                column.add_child(title)
+
+                # The figure: the page's own hero, centered in the page's
+                # width and given room of its own, so the eye that opens the
+                # page reads the loudness before the hand reaches for it --
+                # and reads its every change while the hand drags the rule.
+                # A floor under its width keeps the page itself from swaying
+                # as the digits change.
                 _readout = Label.new()
                 _readout.name = "Readout"
                 _readout.text = "100%"
-                _readout.custom_minimum_size = Vector2(46, 0)
+                _readout.custom_minimum_size = Vector2(76, 0)
                 _readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                _readout.size_flags_horizontal = Control.SIZE_EXPAND_FILL
                 _readout.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-                THEME.dress(_readout, 16, GREEN_DEEP, true)
-                if I18N.is_rtl():
-                        head.add_child(_readout)
-                        head.add_child(title)
-                else:
-                        head.add_child(title)
-                        head.add_child(_readout)
+                THEME.dress(_readout, 30, GREEN_DEEP, true)
+                column.add_child(_readout)
 
                 # The band: the mute anchoring one rule the width of the page.
                 var band := HBoxContainer.new()
@@ -551,10 +547,11 @@ class VolumePopover extends Popover:
                 column.add_child(band)
 
                 # The speaker is also the mute: one press for silence, one
-                # press for the loudness silence replaced.
+                # press for the loudness silence replaced. A round coin the
+                # band's own height, so the row it anchors stands level.
                 var mute := Button.new()
                 mute.name = "Mute"
-                mute.custom_minimum_size = Vector2(40, 40)
+                mute.custom_minimum_size = Vector2(44, 44)
                 mute.tooltip_text = I18N.t("Mute or unmute")
                 THEME.apply_mark_styles(mute, THEME.mark_button_styles(GREEN, true))
                 _mark = VolumeMark.new(GREEN_DEEP)
@@ -570,9 +567,12 @@ class VolumePopover extends Popover:
                 band.add_child(mute)
 
                 # The rule: everything the band has left, tall enough that a
-                # thumb finds it without aiming, its fill rounded and quiet,
-                # its grabber a drawn knob. No ticks: the figure above says
-                # the number, the ear says the rest.
+                # thumb finds it without aiming. A track with real weight
+                # against a knob that stays a knob -- the two in proportion,
+                # so neither becomes the page's whole conversation. Its fill
+                # rounded and quiet, its grabber a drawn disc in a ring. No
+                # ticks: the figure above says the number, the ear says the
+                # rest.
                 _slider = HSlider.new()
                 _slider.name = "Slider"
                 _slider.min_value = 0.0
@@ -581,21 +581,21 @@ class VolumePopover extends Popover:
                 _slider.custom_minimum_size = Vector2(0, 44)
                 _slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
                 var track := StyleBoxFlat.new()
-                track.bg_color = Color("#E6DFCE")
+                track.bg_color = LINE
                 track.set_corner_radius_all(99)
-                track.content_margin_top = 3
-                track.content_margin_bottom = 3
+                track.content_margin_top = 4
+                track.content_margin_bottom = 4
                 var filled := StyleBoxFlat.new()
                 filled.bg_color = GREEN
                 filled.set_corner_radius_all(99)
-                filled.content_margin_top = 3
-                filled.content_margin_bottom = 3
+                filled.content_margin_top = 4
+                filled.content_margin_bottom = 4
                 _slider.add_theme_stylebox_override("slider", track)
                 _slider.add_theme_stylebox_override("grabber_area", filled)
                 _slider.add_theme_stylebox_override("grabber_area_highlight", filled)
-                _slider.add_theme_icon_override("grabber", THEME.knob_icon(22, GREEN_DEEP))
-                _slider.add_theme_icon_override("grabber_highlight", THEME.knob_icon(26, GREEN_DEEP))
-                _slider.add_theme_icon_override("grabber_disabled", THEME.knob_icon(22, Color("#9AA79E")))
+                _slider.add_theme_icon_override("grabber", THEME.knob_icon(26, GREEN_DEEP))
+                _slider.add_theme_icon_override("grabber_highlight", THEME.knob_icon(30, GREEN_DEEP))
+                _slider.add_theme_icon_override("grabber_disabled", THEME.knob_icon(26, Color("#9AA79E")))
                 _slider.value_changed.connect(_on_dragged)
                 band.add_child(_slider)
                 _say(1.0)
@@ -739,23 +739,31 @@ class VolumeRig extends RefCounted:
                 return null
 
 
-## A round grabber for a slider, drawn rather than typed: a white disc in a
-## coloured ring, at 4x and scaled down so its edge lands soft. The engine's
-## own grabber is a grey plastic bead from another app.
+## A round grabber for a slider, drawn rather than typed: no icon font in
+## this app, and the engine's default grabber is a grey plastic bead from
+## another app. A white disc in a coloured ring, lifted off the page by a
+## breath of shadow -- a white disc on a white page, ring or no ring, reads
+## as a hole rather than a handle. Drawn at 4x and scaled down, so every
+## edge lands soft instead of stair-stepped.
 static func knob_icon(diameter: int, ring_color: Color) -> ImageTexture:
         var scale := 4
         var side := diameter * scale
         var image := Image.create(side, side, false, Image.FORMAT_RGBA8)
         var c := Vector2(side, side) / 2.0
-        var r_outer := float(side) / 2.0 - float(scale)
-        var r_ring := r_outer - 2.4 * float(scale)
+        var r_shade := float(side) / 2.0 - 0.5 * float(scale)
+        var r_ring := r_shade - 2.4 * float(scale)
+        var r_disc := r_ring - 2.2 * float(scale)
         for y in side:
                 for x in side:
                         var d := Vector2(x + 0.5, y + 0.5).distance_to(c)
-                        if d > r_outer:
+                        if d > r_shade:
                                 continue
                         var col := Color(1, 1, 1, 1)
                         if d > r_ring:
+                                # The breath of shadow under the knob: deepest
+                                # at the ring's foot, gone at its outer edge.
+                                col = Color(0, 0, 0, 0.16 * (r_shade - d) / (r_shade - r_ring))
+                        elif d > r_disc:
                                 col = ring_color
                         image.set_pixel(x, y, col)
         return ImageTexture.create_from_image(image)
