@@ -283,10 +283,9 @@ func _check_study_session(main: Node) -> void:
                         "the page says what it is for before it asks for a number"
                 )
                 # The page centers on its one number: the quiet name above,
-                # the live figure large beneath it, and under both the mute
-                # anchoring one rule the width of the page -- the way every
-                # volume rule the reader has ever dragged behaves, the box
-                # the reader twice called wrong being neither.
+                # the live figure large beneath it, and under both the tower
+                # the ribbon hangs in -- the loud speaker at its head, the rule
+                # the hand drags between, the quiet speaker at its foot.
                 var readout: Label = volume_popup.get_node_or_null("Sheet/Pad/Column/Readout")
                 _ok(
                         readout != null and readout.text.length() > 0,
@@ -300,37 +299,49 @@ func _check_study_session(main: Node) -> void:
                                 ) < 2.0,
                         "the figure stands at the page's own centre"
                 )
-                var slider: HSlider = volume_popup.get_node("Sheet/Pad/Column/Band/Slider")
-                slider.value = 0.5
+                var rule = volume_popup.get_node("Sheet/Pad/Column/Tower/Rule")
+                rule.value = 0.5
                 await create_timer(0.7).timeout
                 _is(study.volume, 0.5, "the rule sets the loudness it says")
                 _ok(absf(study._player.volume_db - linear_to_db(0.5)) < 0.01, "the player obeys the rule")
-                # The rule a thumb actually wants: everything the band holds
-                # after the mute, which is the width of the page.
+                # The rule a thumb actually wants: the height of its own page,
+                # not its width -- the ribbon hangs the whole height of the
+                # tower, so the thumb never has to aim for the silk.
                 _ok(
-                        slider.size.x >= 240.0,
-                        "the rule runs the width of the page, wide enough for a thumb"
+                        rule.size.y >= 200.0,
+                        "the rule runs the height of the page, tall enough for a thumb"
                 )
                 _ok(
-                        volume_popup.get_node_or_null("Sheet/Pad/Column/Band/Mute") != null,
-                        "the mute anchors the rule at the reading's start"
+                        volume_popup.get_node_or_null("Sheet/Pad/Column/Tower/Mute") != null,
+                        "the quiet speaker anchors the rule at its foot"
                 )
-                # The speaker in the band is the mute: one press for silence,
-                # one press back for the loudness silence replaced.
-                (volume_popup.get_node("Sheet/Pad/Column/Band/Mute") as Button).pressed.emit()
+                # The hand drags the ribbon: a touch low on the page is a
+                # whisper, a touch high a fullness -- anywhere the page is
+                # touched, the level comes to the touch.
+                rule._hand(160.0)
                 await create_timer(0.2).timeout
-                _is(study.volume, 0.0, "pressing the speaker mutes the recitation")
-                (volume_popup.get_node("Sheet/Pad/Column/Band/Mute") as Button).pressed.emit()
-                await create_timer(0.2).timeout
-                _is(study.volume, 0.5, "pressing it again unmutes to what was")
+                _is(study.volume, 0.25, "a touch near the foot asks for a whisper")
                 _is(
                         (volume_popup.get_node("Sheet/Pad/Column/Readout") as Label).text,
-                        "50%",
+                        "25%",
+                        "the figure says the whisper the touch asked for"
+                )
+                # The speaker under the finial is the mute: one press for
+                # silence, one press back for the loudness silence replaced.
+                (volume_popup.get_node("Sheet/Pad/Column/Tower/Mute") as Button).pressed.emit()
+                await create_timer(0.2).timeout
+                _is(study.volume, 0.0, "pressing the speaker mutes the recitation")
+                (volume_popup.get_node("Sheet/Pad/Column/Tower/Mute") as Button).pressed.emit()
+                await create_timer(0.2).timeout
+                _is(study.volume, 0.25, "pressing it again unmutes to what was")
+                _is(
+                        (volume_popup.get_node("Sheet/Pad/Column/Readout") as Label).text,
+                        "25%",
                         "the figure says the loudness from the page's own centre"
                 )
-                # The loud mark keeps its promise: one press, and the rule
+                # The loud speaker keeps its promise: one press, and the rule
                 # holds everything it can.
-                (volume_popup.get_node("Sheet/Pad/Column/Band/Loud") as Button).pressed.emit()
+                (volume_popup.get_node("Sheet/Pad/Column/Tower/Loud") as Button).pressed.emit()
                 await create_timer(0.2).timeout
                 _is(study.volume, 1.0, "pressing the loud mark fills the rule")
                 _is(

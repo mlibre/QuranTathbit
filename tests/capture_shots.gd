@@ -59,8 +59,9 @@ func _init() -> void:
         await _shot("study_two")
         # The recitation's own control, open under its coin: the popover is
         # part of the page a person sees, so the film keeps a frame of it --
-        # said at a middling loudness, so the frame shows the rule partly
-        # filled and the direction the fill grows in, not only a full page.
+        # said at a middling loudness, so the frame shows the ribbon partway
+        # down the rule and the fill rising from the foot to meet it, not
+        # only a full page.
         study._rig.apply(0.6)
         study._rig.toggle()
         await create_timer(0.5).timeout
@@ -247,9 +248,9 @@ func _init() -> void:
                 await create_timer(0.9).timeout
                 await _shot("study_fa_back")
                 # The recitation's own page, said in Persian: the quiet name
-                # and the large figure centered, the mute anchoring a rule
-                # that fills from the right -- said at a middling loudness,
-                # so the frame shows the fill's own direction.
+                # and the large figure centered, the ribbon hanging from the
+                # rod and the fill rising from the foot -- said at a middling
+                # loudness, so the frame shows the fill's own direction.
                 study_fa._rig.apply(0.6)
                 study_fa._rig.toggle()
                 await create_timer(0.5).timeout

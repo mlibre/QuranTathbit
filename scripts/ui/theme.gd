@@ -484,17 +484,195 @@ class TypeMark extends Control:
                 )
 
 
+## The rule the volume's page is built around: a bookmark's ribbon hung
+## from a gold rod across the head of the page, the way a mushaf's own
+## ribbon holds a reader's place. The forked tail points at the loudness,
+## the fill rises from the rule's foot to the tail's own corners, and the
+## hand drags the ribbon up and down the whole height of the rule --
+## anywhere the page is touched, the level comes to the touch, so a thumb
+## never has to aim for the silk. Ticks every tenth down the reading side,
+## gold and a breath longer at the two ends and the middle; a finial
+## diamond under the foot; the rod carries round caps at its ends. A
+## ribbon shorter than its own width is a nub no eye can hold, so near the
+## head the tail rests at its own least length while the fill beneath
+## still says the exact level -- the figure above says the number, the
+## fill says it again, and the ribbon is the handle, not the word.
+class RibbonRule extends Control:
+        ## Every nudge of the ribbon, live -- the hand hears the change as
+        ## it makes it.
+        signal value_changed(value: float)
+
+        ## The rule's own coordinates, the mockup's own page: the head
+        ## where fullness lives, the foot where silence does, the rod the
+        ## ribbon hangs from across the head. Drawn, not typed.
+        const HEAD := 10.0
+        const FOOT := 210.0
+        const RIBBON_TOP := 6.0
+        const RIBBON_LEAST := 26.0
+
+        var value := 1.0:
+                set(v):
+                        var said := clampf(v, 0.0, 1.0)
+                        if is_equal_approx(said, value):
+                                return
+                        value = said
+                        queue_redraw()
+                        value_changed.emit(said)
+
+        var _dragging := false
+        var _track := StyleBoxFlat.new()
+        var _fill := StyleBoxFlat.new()
+
+        func _init() -> void:
+                custom_minimum_size = Vector2(150, 240)
+                mouse_filter = Control.MOUSE_FILTER_STOP
+                _track.bg_color = LINE
+                _track.set_corner_radius_all(8)
+                _fill.bg_color = GREEN
+                _fill.set_corner_radius_all(8)
+
+        ## A value said without saying it out loud: the rule moves to it
+        ## and no signal leaves -- for a screen restating what it already
+        ## knows.
+        func set_value_no_signal(v: float) -> void:
+                var said := clampf(v, 0.0, 1.0)
+                if is_equal_approx(said, value):
+                        return
+                value = said
+                queue_redraw()
+
+        ## One colour said the way draw_polygon asks for it: a whole array
+        ## of it, as many entries as the polygon has corners.
+        func _flat(count: int, color: Color) -> PackedColorArray:
+                var out := PackedColorArray()
+                for i in count:
+                        out.append(color)
+                return out
+
+        func _draw() -> void:
+                var level := FOOT - value * (FOOT - HEAD)
+
+                # The rod across the head: gold lit from above and held
+                # down by its own deep end, one vertex-coloured quad with
+                # round caps at its ends.
+                draw_polygon(
+                        PackedVector2Array([
+                                Vector2(15.0, 2.0), Vector2(135.0, 2.0),
+                                Vector2(135.0, 8.0), Vector2(15.0, 8.0),
+                        ]),
+                        PackedColorArray([
+                                Color("#D9B45C"), Color("#D9B45C"),
+                                GOLD_DEEP, GOLD_DEEP,
+                        ]),
+                        PackedVector2Array(), null
+                )
+                draw_circle(Vector2(15.0, 5.0), 5.0, GOLD)
+                draw_circle(Vector2(135.0, 5.0), 5.0, GOLD)
+
+                # The rule's track, and the fill rising from the foot to
+                # the level -- a capsule, so a short fill keeps its own
+                # rounded ends instead of a square stub.
+                draw_style_box(_track, Rect2(67.0, HEAD, 16.0, FOOT - HEAD))
+                if value > 0.004:
+                        var h := FOOT - level
+                        _fill.set_corner_radius_all(int(minf(8.0, h / 2.0)))
+                        draw_style_box(_fill, Rect2(67.0, level, 16.0, h))
+
+                # The finial diamond under the foot, where the ribbon of a
+                # reader at rest would come to rest.
+                var finial := GOLD
+                finial.a = 0.85
+                draw_polygon(
+                        PackedVector2Array([
+                                Vector2(75.0, 218.0), Vector2(81.0, 224.0),
+                                Vector2(75.0, 230.0), Vector2(69.0, 224.0),
+                        ]),
+                        _flat(4, finial),
+                        PackedVector2Array(), null
+                )
+
+                # Ticks down the reading side: a quiet mark every tenth,
+                # gold and a breath longer at the two ends and the middle.
+                for k in range(1, 10):
+                        var at := FOOT - 0.1 * k * (FOOT - HEAD)
+                        if k == 5:
+                                continue
+                        draw_line(Vector2(90.0, at), Vector2(96.0, at),
+                                Color(INK_SOFT.r, INK_SOFT.g, INK_SOFT.b, 0.35), 1.5, true)
+                for at in [HEAD, (HEAD + FOOT) / 2.0, FOOT]:
+                        draw_line(Vector2(90.0, at), Vector2(98.0, at), GOLD, 1.8, true)
+
+                # The ribbon: its shadow first, then the silk, then the
+                # gold trims down its sides and the pale fold down its
+                # middle. Never shorter than its own width -- near the head
+                # the tail rests at its least length while the fill says
+                # the exact level beneath it.
+                var tail := maxf(level, RIBBON_TOP + RIBBON_LEAST)
+                var body := PackedVector2Array([
+                        Vector2(62.0, RIBBON_TOP), Vector2(88.0, RIBBON_TOP),
+                        Vector2(88.0, tail), Vector2(75.0, tail - 12.0),
+                        Vector2(62.0, tail),
+                ])
+                var shadow_color := Color("#30230A")
+                shadow_color.a = 0.28
+                var shadow := PackedVector2Array()
+                for p in body:
+                        shadow.append(p + Vector2(1.0, 1.5))
+                draw_polygon(shadow, _flat(5, shadow_color), PackedVector2Array(), null)
+                draw_polygon(body, _flat(5, GREEN_DEEP), PackedVector2Array(), null)
+                # The fork's two diagonals, softened the way every arc in
+                # this app is: a hairline of the same silk over the edge.
+                var edge := body.duplicate()
+                edge.append(body[0])
+                draw_polyline(edge, GREEN_DEEP, 1.0, true)
+                var trim := Color(GOLD.r, GOLD.g, GOLD.b, 0.65)
+                draw_line(Vector2(63.5, RIBBON_TOP + 1.0), Vector2(63.5, tail - 2.0), trim, 1.5, true)
+                draw_line(Vector2(86.5, RIBBON_TOP + 1.0), Vector2(86.5, tail - 2.0), trim, 1.5, true)
+                draw_line(Vector2(75.0, RIBBON_TOP + 6.0), Vector2(75.0, tail - 16.0),
+                        Color(1.0, 1.0, 1.0, 0.14), 3.0, true)
+
+        ## The whole page answers the hand: a touch anywhere on the rule
+        ## brings the level to the touch, and the drag carries it -- the
+        ## ribbon is a handle a thumb cannot miss. Touch and mouse both,
+        ## because a reader's phone speaks either.
+        func _gui_input(event: InputEvent) -> void:
+                if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+                        if event.pressed:
+                                _dragging = true
+                                _hand(event.position.y)
+                        else:
+                                _dragging = false
+                        accept_event()
+                elif event is InputEventMouseMotion and _dragging:
+                        _hand(event.position.y)
+                        accept_event()
+                elif event is InputEventScreenTouch:
+                        _dragging = event.pressed
+                        if event.pressed:
+                                _hand(event.position.y)
+                        accept_event()
+                elif event is InputEventScreenDrag and _dragging:
+                        _hand(event.position.y)
+                        accept_event()
+
+        ## A y on the page said as a loudness: the level a touch asks for,
+        ## kept to the rule's own step so the figure above never stutters
+        ## between two neighbouring pixels.
+        func _hand(y: float) -> void:
+                value = snappedf(clampf((FOOT - y) / (FOOT - HEAD), 0.0, 1.0), 0.01)
+
+
 ## The volume's own small page, as a manuscript says its chapter: the quiet
 ## name centered under flanking gold rules (the unwan a Persian page dresses
 ## its headings in), beneath it the page's one number -- large, centered,
-## changing with every breath of the hand -- and under both the one control:
-## a rule the width of the page, anchored at its ends by the two states it
-## travels between, the quiet mark (one press for silence) and the loud mark
-## (one press for full), the fill growing from the reading's own edge in a
-## right-reading tongue, exactly the way every volume rule the reader has
-## ever dragged behaves. Both places that play a recitation (a session and
-## the browser) open the same page, so loudness is one idea everywhere it
-## can be changed.
+## changing with every breath of the hand -- and under both the tower the
+## ribbon hangs in: the loud speaker at its head, one press for the
+## fullness the rule can hold; the rule the hand drags, the bookmark's
+## ribbon pointing at the loudness and the fill rising from the foot to
+## meet it; the quiet speaker at its foot, one press for silence, one press
+## back for the loudness silence replaced. Both places that play a
+## recitation (a session and the browser) open the same page, so loudness
+## is one idea everywhere it can be changed.
 class VolumePopover extends Popover:
         ## Every nudge of the rule, live -- the hand hears the change as it
         ## makes it.
@@ -503,7 +681,7 @@ class VolumePopover extends Popover:
         ## screen persists.
         signal committed(value: float)
 
-        var _slider: HSlider
+        var _rule: RibbonRule
         var _quiet_mark: VolumeMark
         var _loud_mark: VolumeMark
         var _readout: Label
@@ -511,10 +689,10 @@ class VolumePopover extends Popover:
         var _loud := 1.0  # the last loudness above silence, for unmuting
 
         func _init() -> void:
-                super(380.0)
+                super(300.0)
                 name = "VolumePopup"
 
-                var pad := content(18, 16, 18, 18)
+                var pad := content(20, 18, 20, 18)
                 var column := VBoxContainer.new()
                 column.name = "Column"
                 column.add_theme_constant_override("separation", 8)
@@ -539,103 +717,38 @@ class VolumePopover extends Popover:
 
                 # The figure: the page's own hero, centered in the page's
                 # width and given room of its own, so the eye that opens the
-                # page reads the loudness before the hand reaches for it --
-                # and reads its every change while the hand drags the rule.
-                # A floor under its width keeps the page itself from swaying
-                # as the digits change.
+                # page reads the loudness before the hand reaches for the
+                # ribbon -- and reads its every change while the hand drags
+                # it. A floor under its box keeps the page itself from
+                # swaying as the digits change.
                 _readout = Label.new()
                 _readout.name = "Readout"
                 _readout.text = "100%"
-                _readout.custom_minimum_size = Vector2(80, 46)
+                _readout.custom_minimum_size = Vector2(96, 52)
                 _readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 _readout.size_flags_horizontal = Control.SIZE_EXPAND_FILL
                 _readout.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-                THEME.dress(_readout, 30, GREEN_DEEP, true)
+                THEME.dress(_readout, 36, GREEN_DEEP, true)
                 column.add_child(_readout)
 
-                # The band: one rule the width of the page, anchored at its
-                # ends by the two states the rule travels between.
-                var band := HBoxContainer.new()
-                band.name = "Band"
-                band.add_theme_constant_override("separation", 6)
-                # A right-reading page reads its rule from the right: the
-                # container turns, so the quiet mark stands at the reading's
-                # start and the rule's fill grows from it -- measured, the
-                # engine mirrors a slider's fill under a right-reading layout.
-                if I18N.is_rtl():
-                        band.layout_direction = Control.LAYOUT_DIRECTION_RTL
-                column.add_child(band)
+                # The tower: the loud speaker standing at the rule's head,
+                # the rule between, the quiet speaker breathing under the
+                # finial -- one centered column, the way a page centers its
+                # own margin.
+                var tower := VBoxContainer.new()
+                tower.name = "Tower"
+                column.add_child(tower)
 
-                # The quiet mark anchors the rule's start: one press for
-                # silence, one press for the loudness silence replaced. A
-                # speaker with no breath of sound -- the horn alone, and a
-                # line through it when the page is silent.
-                var mute := Button.new()
-                mute.name = "Mute"
-                mute.custom_minimum_size = Vector2(24, 44)
-                mute.tooltip_text = I18N.t("Mute or unmute")
-                THEME.apply_mark_styles(mute, THEME.mark_button_styles(GREEN, false))
-                _quiet_mark = VolumeMark.new(GREEN_DEEP, false)
-                _quiet_mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                var mute_center := CenterContainer.new()
-                mute_center.name = "Centre"
-                mute_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-                mute_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                mute_center.add_child(_quiet_mark)
-                mute.add_child(mute_center)
-                THEME.pressable(mute)
-                mute.pressed.connect(_toggle_mute)
-                band.add_child(mute)
-
-                # The rule breathes inside the two marks: a spacer each side
-                # gives the knob's overhang at the extremes somewhere to
-                # rest, so at silence the knob comes home to the quiet mark
-                # without sitting on it.
-                band.add_child(_band_spacer())
-
-                # The rule: everything the band has left, tall enough that a
-                # thumb finds it without aiming. A track with real weight
-                # against a knob that stays a knob -- the two in proportion,
-                # so neither becomes the page's whole conversation. Its fill
-                # rounded and quiet, its grabber a drawn disc in a ring on a
-                # breath of shadow. No ticks: the figure above says the
-                # number, the ear says the rest.
-                _slider = HSlider.new()
-                _slider.name = "Slider"
-                _slider.min_value = 0.0
-                _slider.max_value = 1.0
-                _slider.step = 0.01
-                _slider.custom_minimum_size = Vector2(0, 44)
-                _slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-                var track := StyleBoxFlat.new()
-                track.bg_color = LINE
-                track.set_corner_radius_all(99)
-                track.content_margin_top = 4
-                track.content_margin_bottom = 4
-                var filled := StyleBoxFlat.new()
-                filled.bg_color = GREEN
-                filled.set_corner_radius_all(99)
-                filled.content_margin_top = 4
-                filled.content_margin_bottom = 4
-                _slider.add_theme_stylebox_override("slider", track)
-                _slider.add_theme_stylebox_override("grabber_area", filled)
-                _slider.add_theme_stylebox_override("grabber_area_highlight", filled)
-                _slider.add_theme_icon_override("grabber", THEME.knob_icon(26, GREEN_DEEP))
-                _slider.add_theme_icon_override("grabber_highlight", THEME.knob_icon(30, GREEN_DEEP))
-                _slider.add_theme_icon_override("grabber_disabled", THEME.knob_icon(26, Color("#9AA79E")))
-                _slider.value_changed.connect(_on_dragged)
-                band.add_child(_slider)
-
-                band.add_child(_band_spacer())
-
-                # The loud mark anchors the rule's end: one press for the
-                # fullness the rule can hold -- the speaker with both its
-                # breaths of sound, the state the page is named for.
+                # The loud speaker at the head: one press for the fullness
+                # the rule can hold -- the speaker with both its breaths of
+                # sound, the state the page is named for, standing where the
+                # rod is hung.
                 var full := Button.new()
                 full.name = "Loud"
-                full.custom_minimum_size = Vector2(24, 44)
+                full.custom_minimum_size = Vector2(40, 40)
                 full.tooltip_text = I18N.t("Full loudness")
-                THEME.apply_mark_styles(full, THEME.mark_button_styles(GREEN, false))
+                THEME.apply_mark_styles(full, THEME.mark_button_styles(GREEN, true))
+                full.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
                 _loud_mark = VolumeMark.new(GREEN_DEEP, true)
                 _loud_mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
                 var full_center := CenterContainer.new()
@@ -646,7 +759,44 @@ class VolumePopover extends Popover:
                 full.add_child(full_center)
                 THEME.pressable(full)
                 full.pressed.connect(_full)
-                band.add_child(full)
+                tower.add_child(full)
+
+                # The rule the page is named for: the rod, the ribbon, the
+                # fill -- the hand's own handle, between the two speakers.
+                _rule = RibbonRule.new()
+                _rule.name = "Rule"
+                _rule.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+                _rule.value_changed.connect(_on_dragged)
+                tower.add_child(_rule)
+
+                # A breath between the finial and the quiet speaker, the
+                # mockup's own gap.
+                var breath := Control.new()
+                breath.custom_minimum_size = Vector2(0, 10)
+                breath.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                tower.add_child(breath)
+
+                # The quiet speaker under the finial: one press for silence,
+                # one press back for the loudness silence replaced. A speaker
+                # with no breath of sound -- the horn alone, and a line
+                # through it when the page is silent.
+                var mute := Button.new()
+                mute.name = "Mute"
+                mute.custom_minimum_size = Vector2(40, 40)
+                mute.tooltip_text = I18N.t("Mute or unmute")
+                THEME.apply_mark_styles(mute, THEME.mark_button_styles(GREEN, true))
+                mute.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+                _quiet_mark = VolumeMark.new(GREEN_DEEP, false)
+                _quiet_mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                var mute_center := CenterContainer.new()
+                mute_center.name = "Centre"
+                mute_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+                mute_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                mute_center.add_child(_quiet_mark)
+                mute.add_child(mute_center)
+                THEME.pressable(mute)
+                mute.pressed.connect(_toggle_mute)
+                tower.add_child(mute)
                 _say(1.0)
 
         ## One hairline of gold beside the title, reaching from the title's
@@ -662,20 +812,12 @@ class VolumePopover extends Popover:
                 rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
                 return rule
 
-        ## The spacer beside the rule: nothing, of the exact nothing the
-        ## knob's overhang needs at the rule's extremes.
-        func _band_spacer() -> Control:
-                var spacer := Control.new()
-                spacer.custom_minimum_size = Vector2(8, 0)
-                spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                return spacer
-
         ## Say a loudness without saying it out loud: the rule, the mark and
         ## the number move to it, and no signal leaves -- for a screen
         ## restating what it already knows.
         func set_volume(v: float) -> void:
-                _slider.set_value_no_signal(clampf(v, 0.0, 1.0))
-                _say(_slider.value)
+                _rule.set_value_no_signal(v)
+                _say(_rule.value)
 
         func _on_dragged(v: float) -> void:
                 _say(v)
@@ -684,25 +826,25 @@ class VolumePopover extends Popover:
 
         func _toggle_mute() -> void:
                 var v := 0.0
-                if _slider.value <= 0.005:
+                if _rule.value <= 0.005:
                         v = _loud if _loud > 0.005 else 1.0
-                _slider.set_value_no_signal(v)
+                _rule.set_value_no_signal(v)
                 _say(v)
                 changed.emit(v)
                 committed.emit(v)
 
-        ## The loud mark keeps its promise: one press, and the rule holds
-        ## everything it can.
+        ## The loud speaker keeps its promise: one press, and the rule
+        ## holds everything it can.
         func _full() -> void:
-                _slider.set_value_no_signal(1.0)
+                _rule.set_value_no_signal(1.0)
                 _say(1.0)
                 changed.emit(1.0)
                 committed.emit(1.0)
 
-        ## What the page says about a loudness: the quiet mark wears its line
-        ## at silence, the number keeps the number's own place, its own colour
-        ## and its own script -- 50% in green for an English reader, ۵۰٪ for
-        ## a Persian one, and silence said softly.
+        ## What the page says about a loudness: the quiet speaker wears its
+        ## line at silence, the number keeps the number's own place, its own
+        ## colour and its own script -- 50% in green for an English reader,
+        ## ۵۰٪ for a Persian one, and silence said softly.
         func _say(v: float) -> void:
                 if v > 0.005:
                         _loud = v
@@ -724,7 +866,7 @@ class VolumePopover extends Popover:
                         return
                 tree.create_timer(0.45).timeout.connect(func() -> void:
                         if ticket == _ticket:
-                                committed.emit(_slider.value)
+                                committed.emit(_rule.value)
                 )
 
 
