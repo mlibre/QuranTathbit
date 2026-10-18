@@ -328,6 +328,16 @@ func _check_study_session(main: Node) -> void:
                         "50%",
                         "the figure says the loudness from the page's own centre"
                 )
+                # The loud mark keeps its promise: one press, and the rule
+                # holds everything it can.
+                (volume_popup.get_node("Sheet/Pad/Column/Band/Loud") as Button).pressed.emit()
+                await create_timer(0.2).timeout
+                _is(study.volume, 1.0, "pressing the loud mark fills the rule")
+                _is(
+                        (volume_popup.get_node("Sheet/Pad/Column/Readout") as Label).text,
+                        "100%",
+                        "the figure says a full rule in its own round way"
+                )
                 volume_coin.pressed.emit()
                 await create_timer(0.1).timeout
                 _ok(not volume_popup.visible, "pressing the coin again closes the page")

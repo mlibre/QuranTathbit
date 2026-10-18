@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="512" height="512">
+  <!-- The maskable PWA icon: green to every edge (no transparent corners a
+       launcher's circle could crop into white), the art scaled to 0.9 so
+       its furthest corner (46.1) rests inside the maskable safe circle
+       (radius 51.2 at this scale) every shape of home screen respects. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1E6B52"/>
+      <stop offset="1" stop-color="#14513D"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" fill="url(#bg)"/>
+  <g transform="translate(64 64) scale(0.9) translate(-64 -64)">
+    <g fill="none" stroke="#C29A3B" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M33 100 L33 56 Q33 33 64 25 Q95 33 95 56 L95 100"/>
+      <path d="M30 100 L98 100" stroke-width="2.6"/>
+    </g>
+    <path d="M62 68 C56 63 46 62 39 65 L39 86 C46 83 56 84 62 90 Z" fill="#F6EDD8"/>
+    <path d="M66 68 C72 63 82 62 89 65 L89 86 C82 83 72 84 66 90 Z" fill="#E9DDC0"/>
+    <g fill="none" stroke="#C29A3B" stroke-width="2.5" stroke-linecap="round">
+      <path d="M44 72 Q51 69.5 58 73"/>
+      <path d="M44 78 Q51 75.5 58 79"/>
+      <path d="M84 72 Q77 69.5 70 73"/>
+      <path d="M84 78 Q77 75.5 70 79"/>
+    </g>
+    <g fill="none" stroke="#C29A3B" stroke-width="2.4" stroke-linejoin="round">
+      <rect x="57.5" y="37.5" width="13" height="13"/>
+      <rect x="57.5" y="37.5" width="13" height="13" transform="rotate(45 64 44)"/>
+    </g>
+  </g>
+</svg>

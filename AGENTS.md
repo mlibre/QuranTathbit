@@ -91,14 +91,16 @@ Windows, web) in Godot 4.7 with GDScript only.
   card as surely as a reader hunting by words. The line comes from the
   card's own back (the first Persian text block), never from a table.
 - **A rule a thumb drags runs the width of its page.** The volume popover
-  was the app's worst box twice over — first a narrow slip, then a page of
-  parts (a big number on its own line, a ticked rule) the reader still
-  called wrong. It is one setting row said twice now: the quiet name with
-  the live figure at the row's far end, and beneath it the mute anchoring
-  one rule as wide as the page, its fill growing from the reading's own
-  edge — the shape every volume rule the reader has ever dragged already
-  taught their hand, because a control a hand rests on is sized for the
-  hand, not for the panel it came in.
+  was the app's worst box three times over — a narrow slip, then a page of
+  parts, then a lopsided row — before it settled. It centers on its one
+  number now: the quiet name under flanking gold rules (the manuscript's
+  own way of heading a chapter), the live figure large beneath it, and one
+  rule as wide as the page anchored at its ends by the two states it
+  travels between — the quiet mark (a press for silence) and the loud mark
+  (a press for full), the fill growing from the reading's own edge — the
+  shape every volume rule the reader has ever dragged already taught their
+  hand, because a control a hand rests on is sized for the hand, not for
+  the panel it came in.
 
 ## Engineering
 

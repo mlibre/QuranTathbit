@@ -152,10 +152,13 @@ jobs:
       # criteria ask for a 192px icon beside the 512px one and a short_name
       # for the label under it. The exporter writes neither, so both are
       # patched in here -- the icon from the same PNG the Android launcher
-      # uses, the label the app's own name.
+      # uses, the label the app's own name. A maskable icon rides along:
+      # green to every edge and the art inside the safe circle, so a home
+      # screen's round mask never crops into white corners.
       - name: Make the app installable
         run: |
           cp assets/icons/icon_192.png builds/web/index.192x192.png
+          cp assets/icons/icon_maskable_512.png builds/web/index.512x512.maskable.png
           python3 - <<'PY'
           import json
           path = "builds/web/index.manifest.json"
@@ -165,14 +168,20 @@ jobs:
           # the way the Android build does (its export preset locks portrait).
           manifest["orientation"] = "portrait"
           manifest["description"] = "A calm app for memorising the Qur'an."
-          manifest["icons"] = [{"sizes": "192x192", "src": "index.192x192.png", "type": "image/png"}] + [
-              i for i in manifest["icons"] if i.get("sizes") != "192x192"
+          manifest["icons"] = [
+              {"sizes": "192x192", "src": "index.192x192.png", "type": "image/png"},
+              {"sizes": "512x512", "src": "index.512x512.maskable.png", "type": "image/png", "purpose": "maskable"},
+          ] + [
+              i for i in manifest["icons"]
+              if i.get("sizes") != "192x192" and "maskable" not in str(i.get("purpose", ""))
           ]
           json.dump(manifest, open(path, "w"), separators=(",", ":"))
           print("manifest:", open(path).read())
           PY
           test -f builds/web/index.192x192.png
+          test -f builds/web/index.512x512.maskable.png
           grep -q "index.192x192.png" builds/web/index.manifest.json
+          grep -q "maskable" builds/web/index.manifest.json
 
       # The .pck must carry the deck's text and none of its audio -- a 13 MB
       # smaller download before the first card is even seen -- and the audio
@@ -241,12 +250,19 @@ jobs:
           # open the log the page kept from its first breath -- environment,
           # every error, a loading heartbeat -- copyable in one press, so a
           # reader on a phone the app cannot start on can hand the developer
-          # the whole story. The marker alone would pass even if the watch
-          # arrived truncated, so its working parts are demanded too.
+          # the whole story. The taps are counted from pointerdown in the
+          # capture phase, because the engine's canvas swallows the touches
+          # (preventDefault, and on Firefox Android the click that would
+          # follow never fires); the app itself says when loading truly ends
+          # (__qtAppStarted), so a page stuck past the loader still answers.
+          # The marker alone would pass even if the watch arrived truncated,
+          # so its working parts are demanded too.
           grep -q "qt-debug-log" builds/web/index.html
           grep -q "__qtDebugLog" builds/web/index.html
           grep -q "__qtDebugShow" builds/web/index.html
           grep -q "execCommand" builds/web/index.html
+          grep -q "pointerdown" builds/web/index.html
+          grep -q "__qtAppStarted" builds/web/index.html
           python3 - <<'PY'
           import sys
           data = open("builds/web/index.pck", "rb").read()
