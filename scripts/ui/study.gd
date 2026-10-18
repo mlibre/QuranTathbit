@@ -20,6 +20,10 @@ const I18nScript := preload("res://scripts/ui/i18n.gd")
 
 signal closed
 signal answered(card: CardScript, button: String)
+## A card taken out of the day and put back in the initial basket: not an
+## answer, nothing graded -- the reader is not ready for this ayah now,
+## and the card returns with tomorrow's new cards.
+signal deferred(card: CardScript)
 signal volume_changed(value: float)
 signal edited(card: CardScript)
 ## The verses' hand, chosen where they are read: main hears it, remembers
@@ -139,6 +143,7 @@ func _key_hints() -> Control:
                 row.add_child(label)
         hint.call("Space", I18nScript.t("reveal"))
         hint.call("1–4", I18nScript.t("answer"))
+        hint.call("S", I18nScript.t("Not today"))
         hint.call("Esc", I18nScript.t("close"))
         return row
 
@@ -296,22 +301,49 @@ func _answers() -> Control:
         grid.custom_minimum_size = Vector2(0, 72)
         return grid
 
+## The footer's own row: the way forward and the way out, side by side. The
+## way forward -- "Show answer" -- is the page's one loud word; the way out
+## -- "Not today", the card put back in its basket until tomorrow -- is a
+## quiet ghost beside it, because it must be found when it is wanted and
+## never stumbled into. It stands only on the question side: once the
+## answer is seen, the card is answered, not put back. At the end the row
+## carries one word only. The pair answers the reading's own direction,
+## the way the volume band does, so the way forward stands at the reading's
+## start and the quiet escape beside it.
 func _footer() -> Control:
         var row := CenterContainer.new()
         row.name = "Footer"
 
+        var pair := HBoxContainer.new()
+        pair.name = "Pair"
+        pair.add_theme_constant_override("separation", 10)
+        if I18nScript.is_rtl():
+                pair.layout_direction = Control.LAYOUT_DIRECTION_RTL
+        row.add_child(pair)
+
         var show := ThemeScript.primary_button(I18nScript.t("Show answer"), 58)
         show.name = "ShowAnswer"
         show.custom_minimum_size = Vector2(320, 58)
+        show.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         show.pressed.connect(_reveal)
-        row.add_child(show)
+        pair.add_child(show)
+
+        var put_back := ThemeScript.ghost_button(I18nScript.t("Not today"), ThemeScript.INK_SOFT, 58, 22)
+        put_back.name = "PutBack"
+        put_back.custom_minimum_size = Vector2(138, 58)
+        put_back.tooltip_text = I18nScript.t(
+                "Put this card back — it returns with tomorrow's new cards."
+        )
+        put_back.pressed.connect(_put_back)
+        pair.add_child(put_back)
 
         var done := ThemeScript.ghost_button(I18nScript.t("Done"), ThemeScript.GREEN, 58)
         done.name = "Done"
         done.custom_minimum_size = Vector2(320, 58)
+        done.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         done.visible = false
         done.pressed.connect(func() -> void: closed.emit())
-        row.add_child(done)
+        pair.add_child(done)
         return row
 
 func _layout() -> void:
@@ -346,11 +378,20 @@ func _layout() -> void:
         # The centre the question side needs: the filler is never shorter than
         # the surface, so a short card floats in the middle of the page.
         fill.custom_minimum_size.y = surface.size.y
-        # The footer's two buttons share one width: capped at their own
-        # measure, never wider than the window, so a phone holds them whole.
-        var avail := minf(320.0, size.x - 48.0)
-        (get_node("Margin/Column/Footer/ShowAnswer") as Button).custom_minimum_size = Vector2(avail, 58.0)
-        (get_node("Margin/Column/Footer/Done") as Button).custom_minimum_size = Vector2(avail, 58.0)
+        # The footer's row: one measure, shared. The pair never runs past the
+        # window's own margins and never past the measure the primary word
+        # deserves; within it the way forward takes what is left once the
+        # quiet escape has its own room -- a phone trims both, the escape
+        # first, so neither button is ever asked to hold more words than
+        # its width can carry.
+        var pair: HBoxContainer = get_node("Margin/Column/Footer/Pair")
+        var room := maxf(minf(size.x - 48.0, 470.0), 240.0)
+        pair.custom_minimum_size = Vector2(room, 0)
+        var escape_w := 138.0 if size.x >= 470.0 else 112.0
+        (pair.get_node("PutBack") as Button).custom_minimum_size = Vector2(escape_w, 58.0)
+        var forward_w := maxf(room - escape_w - 10.0, 150.0)
+        (pair.get_node("ShowAnswer") as Button).custom_minimum_size = Vector2(forward_w, 58.0)
+        (pair.get_node("Done") as Button).custom_minimum_size = Vector2(forward_w, 58.0)
         # The small pages that hang from the header's coins stay hung: the
         # window may move under them, and the pages follow the coins the
         # bar keeps in its corner.
@@ -385,8 +426,9 @@ func _show_front(incoming := false) -> void:
         progress.text = I18nScript.f("%d of %d", [_index + 1, _cards.size()])
         _tween_bar(100.0 * float(_index) / float(_cards.size()))
         _view.show_text(card.front, card.folder, true)
-        get_node("Margin/Column/Footer/ShowAnswer").visible = true
-        get_node("Margin/Column/Footer/Done").visible = false
+        get_node("Margin/Column/Footer/Pair/ShowAnswer").visible = true
+        get_node("Margin/Column/Footer/Pair/PutBack").visible = true
+        get_node("Margin/Column/Footer/Pair/Done").visible = false
         _clear_answers()
         _settle_card(incoming)
 
@@ -413,7 +455,10 @@ func _reveal() -> void:
         _view.show_text(card.back, card.folder, false, _reference_of(card), true)
         var scroll: ScrollContainer = get_node("Margin/Column/Surface")
         scroll.scroll_vertical = 0
-        get_node("Margin/Column/Footer/ShowAnswer").visible = false
+        get_node("Margin/Column/Footer/Pair/ShowAnswer").visible = false
+        # The escape belongs to the question alone: once the answer is seen,
+        # the card is answered, not put back.
+        get_node("Margin/Column/Footer/Pair/PutBack").visible = false
 
         _clear_answers()
         _options = SchedulerScript.options(SchedulerScript.id_seed(card.id), card.state, int(Time.get_unix_time_from_system()))
@@ -535,6 +580,20 @@ func _answer(button: String) -> void:
         _grade_counts[button] = int(_grade_counts.get(button, 0)) + 1
         _advance(str(button) == "again")
 
+
+## The card leaves without being answered: it goes back in the initial
+## basket and waits out the day, and the page hands itself to whatever
+## comes next the way a finished card does -- it is leaving, not staying
+## to return. The session's own count never hears of it: nothing was
+## answered, and tomorrow's fresh cards will say the card again.
+func _put_back() -> void:
+        if _busy or _index >= _cards.size() or _revealed:
+                return
+        var card: CardScript = _cards[_index]
+        deferred.emit(card)
+        _advance(false)
+
+
 ## The card itself answers too: one that returns swells and fades in place --
 ## it is not going anywhere -- and one that is finished with recedes, handing
 ## the page to whatever comes next. Then the next card settles into place,
@@ -563,7 +622,7 @@ func _settle_card(incoming: bool) -> void:
                 panel.pivot_offset = panel.size / 2.0
         if not incoming:
                 ThemeScript.settle_in(_view)
-                ThemeScript.settle_in(get_node("Margin/Column/Footer/ShowAnswer"), 0.06)
+                ThemeScript.settle_in(get_node("Margin/Column/Footer/Pair/ShowAnswer"), 0.06)
                 _busy = false
                 return
         panel.modulate.a = 0.0
@@ -680,8 +739,9 @@ func _show_done() -> void:
         summary.add_child(rest)
 
         ThemeScript.stagger_in(summary, 0.09, 0.3)
-        get_node("Margin/Column/Footer/ShowAnswer").visible = false
-        get_node("Margin/Column/Footer/Done").visible = true
+        get_node("Margin/Column/Footer/Pair/ShowAnswer").visible = false
+        get_node("Margin/Column/Footer/Pair/PutBack").visible = false
+        get_node("Margin/Column/Footer/Pair/Done").visible = true
 
 # --- the card, editable on the spot --------------------------------------------------
 
@@ -901,6 +961,11 @@ func _input(event: InputEvent) -> void:
                                         get_viewport().set_input_as_handled()
                                 elif _options.size() >= 3 and not _busy:
                                         _answer("good")
+                                        get_viewport().set_input_as_handled()
+                        KEY_S:
+                                # The quiet way out, on the question side only.
+                                if not _revealed and not _busy:
+                                        _put_back()
                                         get_viewport().set_input_as_handled()
                         KEY_1:
                                 if _revealed and not _busy:

@@ -407,6 +407,7 @@ func _start_session() -> void:
         _swap(study)
         study.start(cards)
         study.answered.connect(_on_answered)
+        study.deferred.connect(_on_deferred)
         study.edited.connect(_on_card_edited)
         study.closed.connect(_on_session_closed)
         study.volume_changed.connect(_on_volume_changed)
@@ -451,6 +452,17 @@ func _on_session_closed() -> void:
 
 func _on_answered(card: CardScript, button: String) -> void:
         _deck.answer(card, button, _now())
+        _deck.save_progress()
+        _answers_waiting += 1
+
+
+## A card put back in the initial basket: not an answer, but progress all
+## the same -- the day has claimed the card, and every device the deck
+## reaches must pass over it until tomorrow returns it as new. It rides
+## the same door an answer rides, so the deck says so to GitHub when the
+## session closes, without the reader being asked to remember it.
+func _on_deferred(card: CardScript) -> void:
+        _deck.defer(card, _now())
         _deck.save_progress()
         _answers_waiting += 1
 

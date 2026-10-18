@@ -10,6 +10,14 @@ extends RefCounted
 ## lapsed card relearns at 10m and returns at one day; easy skips a day
 ## further still.
 ##
+## A card the reader is not ready for can be taken out of the day and put
+## back in the initial basket -- deferred, not answered (deferred_state
+## below). It waits out the rest of its day as a new card the queue will
+## not offer, and the next day it is simply new again, offered among the
+## day's own fresh cards as though nothing had happened. Deferring is the
+## reader's own move, never the algorithm's: no ease moves, no interval
+## grows.
+##
 ## Days are counted with a rollover: a day flips at 04:00, so a session after
 ## midnight still belongs to the evening before. The index is measured from
 ## the Unix epoch, which keeps it identical on every platform and timezone --
@@ -75,7 +83,30 @@ static func new_state() -> Dictionary:
                 "reps": 0,
                 "lapses": 0,
                 "mod": 0,
+                "defer_day": 0,  # the day a defer is waiting out; 0 never waited
         }
+
+
+## The initial basket, put back for a day: everything a new card starts
+## with, stamped with the day whose remaining offer it is waiting out. A
+## card carried to this state today is invisible to today's queue and
+## today's counts; tomorrow the day has moved past the stamp and the card
+## is new again, offered with the day's own fresh cards. Whatever the card
+## had learned before is given back -- the reader asked for the initial
+## basket, not a shorter version of the old one.
+static func deferred_state(now: int) -> Dictionary:
+        var state := new_state()
+        state["defer_day"] = today(now)
+        return state
+
+
+## Is this state a card today's offer passes over? Only a new card can be
+## waiting out a defer, and only while its day has not yet passed.
+static func is_deferred(state: Dictionary, now: int) -> bool:
+        return (
+                str(state.get("status", "new")) == "new"
+                and int(state.get("defer_day", 0)) >= today(now)
+        )
 
 # --- the queue -----------------------------------------------------------------
 
@@ -99,7 +130,11 @@ static func queue(deck, now: int, new_per_day := NEW_PER_DAY) -> Array:
                                 if int(state["due_day"]) <= today_idx:
                                         due.append(card)
                         _:
-                                if new_left > 0:
+                                # A card deferred today is not the day's to
+                                # offer: it stands aside without spending the
+                                # day's own count, so the next unseen card
+                                # takes its place.
+                                if new_left > 0 and not is_deferred(state, now):
                                         fresh.append(card)
                                         new_left -= 1
         due.sort_custom(func(a, b) -> bool:
@@ -134,7 +169,9 @@ static func counts(deck, now: int, new_per_day := NEW_PER_DAY) -> Dictionary:
                                 else:
                                         learned += 1
                         _:
-                                if new_left > 0:
+                                # The queue and the counts agree on what the
+                                # day offers: a deferred card is not among it.
+                                if new_left > 0 and not is_deferred(state, now):
                                         fresh += 1
                                         new_left -= 1
         # The cap rides along for the callers that fill the queue the same way

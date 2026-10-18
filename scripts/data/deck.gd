@@ -146,12 +146,20 @@ func _load_progress() -> void:
                         state["relearning"] = bool((saved as Dictionary).relearning)
                 card.state = state
 
+
 func save_progress() -> bool:
         var entries: Dictionary = {}
         for card in cards:
                 var state: Dictionary = card.state
-                if state["status"] == "new" and int(state.get("reps", 0)) == 0:
-                        continue  # untouched cards stay out of the file
+                # Untouched cards stay out of the file -- but a defer is a
+                # touch the deck must remember: the card is new and unanswer,
+                # yet its day is spoken for until tomorrow carries it back.
+                if (
+                        state["status"] == "new"
+                        and int(state.get("reps", 0)) == 0
+                        and int(state.get("defer_day", 0)) == 0
+                ):
+                        continue
                 entries[card.id] = canonical_state(state)
         var file := FileAccess.open(progress_path, FileAccess.WRITE)
         if file == null:
@@ -210,4 +218,13 @@ static func canonical_state(state: Dictionary) -> Dictionary:
 
 func answer(card: CardScript, button: String, now: int) -> void:
         card.state = SchedulerScript.apply(SchedulerScript.id_seed(card.id), card.state, button, now)
+        dirty = true
+
+
+## A card the reader put back in the initial basket for the rest of the day:
+## not an answer, nothing learned and nothing scheduled -- only the day's
+## own stamp, which the queue and the counts both pass over until tomorrow
+## returns the card as new.
+func defer(card: CardScript, now: int) -> void:
+        card.state = SchedulerScript.deferred_state(now)
         dirty = true

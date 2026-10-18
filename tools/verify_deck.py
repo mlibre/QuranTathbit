@@ -5,7 +5,10 @@ Re-extracts quran-cards-2026-10-14.apkg into a scratch directory with the
 same code path tools/apkg_to_deck.py uses, then compares every file with
 assets/decks/quran:
 
-  front.md / back.md / *.mp3   must be byte-identical
+  front.md / back.md / *.mp3   must be identical after the reader's
+                               punctuation pass (every ';' and '؛' read
+                               as ':', v1.0.30) -- the deck's own edit,
+                               applied to both sides before comparing
   deck.json                    may differ only in the deck *name* label
                                ("Default" in the package -> the app's name)
                                and key order; the recorded source URL must
@@ -65,6 +68,17 @@ def is_translation(name: str) -> bool:
     return name.endswith("-fa.mp3")
 
 
+def punctuation_pass(data: bytes) -> bytes:
+    """The reader's own edit of the deck's words, v1.0.30: every semicolon
+    -- the ASCII ';' the package's translation carried between its clauses
+    and the Arabic '؛' two verses used -- reads as a colon, the punctuation
+    the deck's own quotations already use. The proof compares both sides
+    after the same pass, so it still catches every drift that is not this
+    one deliberate edit.
+    """
+    return data.replace(b";", b":").replace("\u061b".encode(), b":")
+
+
 def is_extension_card(rel: Path, fresh_card_ids: set[str]) -> bool:
     """A file that belongs to a card folder the package never carried.
 
@@ -113,6 +127,9 @@ def compare_filesets(fresh: Path, shipped: Path) -> list[str]:
     for rel in sorted(fresh_files & shipped_files):
         a = (fresh / rel).read_bytes()
         b = (shipped / rel).read_bytes()
+        if rel.name in ("front.md", "back.md"):
+            a = punctuation_pass(a)
+            b = punctuation_pass(b)
         if a == b:
             continue
         if rel.name == "deck.json":

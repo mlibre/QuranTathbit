@@ -193,6 +193,11 @@ const STRINGS := {
         "%d of %d": {"fa": "%d از %d", "ar": "%d من %d"},
         "Show answer": {"fa": "نمایش پاسخ", "ar": "إظهار الجواب"},
         "Done": {"fa": "تمام", "ar": "تم"},
+        "Not today": {"fa": "نه امروز", "ar": "ليس اليوم"},
+        "Put this card back — it returns with tomorrow's new cards.": {
+                "fa": "این کارت کنار می‌رود — فردا همراه کارت‌های تازه برمی‌گردد.",
+                "ar": "تُنحّى هذه البطاقة جانبًا — وتعود غدًا مع البطاقات الجديدة.",
+        },
         "complete": {"fa": "پایان", "ar": "اكتمل"},
         "Session complete": {"fa": "جلسه کامل شد", "ar": "اكتملت الجلسة"},
         "You answered %d cards in %s. Everything is saved.": {

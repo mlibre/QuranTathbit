@@ -18,6 +18,7 @@ func _init() -> void:
         _test_load()
         _test_progress_round_trip()
         _test_progress_bytes_are_stable()
+        _test_defer_round_trip()
         _test_pace_round_trip()
         _test_choice_round_trip()
         _test_broken_progress()
@@ -111,6 +112,35 @@ func _test_progress_bytes_are_stable() -> void:
         var raw := FileAccess.get_file_as_string(ROOT.path_join("progress.json"))
         _ok(not raw.contains(".0"), "whole numbers are written as ints, never as floats")
         _ok(raw.contains("\"ease\": 2.5"), "a true fraction keeps its decimals")
+
+## A card put back in the initial basket is not an answer, but the deck
+## must remember it across a reload: the day has claimed the card, the
+## queue passes over it until tomorrow, and the untouched card beside it
+## still stays out of the file.
+func _test_defer_round_trip() -> void:
+        var deck: DeckScript = DeckScript.load(ROOT)
+        var now := 1792000000
+        deck.defer(deck.cards[1], now)
+        _ok(deck.dirty, "deferring marks the deck dirty")
+        _ok(deck.save_progress(), "progress saves with a deferred card")
+        var reloaded: DeckScript = DeckScript.load(ROOT)
+        _is(reloaded.cards[1].state.status, "new", "the deferred card is new again")
+        _is(reloaded.cards[1].state.reps, 0, "nothing was answered")
+        _is(
+        int(reloaded.cards[1].state.defer_day),
+        SchedulerScript.today(now),
+        "the deferred card carries its day across a reload"
+        )
+        _ok(
+        SchedulerScript.is_deferred(reloaded.cards[1].state, now),
+        "the reloaded card is still waiting out its day"
+        )
+        _ok(
+        not SchedulerScript.is_deferred(reloaded.cards[1].state, now + SchedulerScript.DAY),
+        "tomorrow the card is new again"
+        )
+        var raw := FileAccess.get_file_as_string(ROOT.path_join("progress.json"))
+        _ok(raw.contains("\"defer_day\""), "the defer's day is written to progress.json")
 
 ## The reader's own pace rides the progress file, where sync carries it to
 ## every device the deck reaches: a deck whose file never said one says

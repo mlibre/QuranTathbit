@@ -16,6 +16,7 @@ func _init() -> void:
         _test_learning_steps()
         _test_lapse_and_relearn()
         _test_counts_and_queue()
+        _test_defer()
         if _failures > 0:
                 print("scheduler: %d FAILURE(S)" % _failures)
                 quit(1)
@@ -181,6 +182,47 @@ func _test_counts_and_queue() -> void:
         _is(first_review.state.status, "review", "easy graduates to review")
         var counts3 := SchedulerScript.counts(deck, tomorrow)
         _ok(counts3.learned >= 1, "a graduated card counts as learned")
+
+
+## The reader's own move, not the algorithm's: a card put back in the
+## initial basket waits out its day without spending the day's count, and
+## tomorrow it is new again, offered with the day's fresh cards as though
+## nothing had happened.
+func _test_defer() -> void:
+        var now := 1792000000
+        var deck = load("res://scripts/data/deck.gd").new()
+        deck.name = "defer"
+        for i in range(6):
+                deck.cards.append(load("res://scripts/data/card.gd").new(str(i), ""))
+
+        # A studied card is put back: the initial basket is given back whole.
+        deck.answer(deck.cards[0], "good", now)
+        _is(deck.cards[0].state.status, "learning", "the card answered its way into learning")
+        var deferred := SchedulerScript.deferred_state(now)
+        _is(deferred.status, "new", "a deferred card is a new card")
+        _is(deferred.reps, 0, "nothing is remembered of the old learning")
+        _is(deferred.ease, SchedulerScript.INITIAL_EASE, "the ease starts over")
+        _is(deferred.defer_day, SchedulerScript.today(now), "the day is stamped")
+        _ok(SchedulerScript.is_deferred(deferred, now), "the state is deferred today")
+
+        # Today the queue passes over the deferred card without paying for it.
+        deck.cards[0].state = deferred.duplicate(true)
+        var counts := SchedulerScript.counts(deck, now)
+        var queue := SchedulerScript.queue(deck, now)
+        _is(counts.new, SchedulerScript.NEW_PER_DAY, "a deferred card does not spend the day's count")
+        _is(counts.due, 0, "a deferred card is not due")
+        _is(counts.learned, 0, "a deferred card is not learned")
+        _is(queue.size(), SchedulerScript.NEW_PER_DAY, "the day still offers its own count")
+        _ok(queue[0].id != "0", "the deferred card is not offered today")
+
+        # Tomorrow the card is new again, first among the day's fresh cards.
+        var day_after := now + SchedulerScript.DAY
+        var next_queue := SchedulerScript.queue(deck, day_after)
+        _is(next_queue[0].id, "0", "tomorrow the card leads the day's fresh cards")
+        _ok(
+                not SchedulerScript.is_deferred(deck.cards[0].state, day_after),
+                "the defer has passed"
+        )
 
 func _days_of(opts: Array, button: String) -> int:
         for opt in opts:
