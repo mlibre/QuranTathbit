@@ -556,6 +556,11 @@ func _deck_body() -> Control:
                 ThemeScript.INK_SOFT, 12
         )
         pace.name = "Pace"
+        # The caption stands in the row of 44-tall buttons, so its one line
+        # rides the row's own middle -- the height the chip's number and
+        # the buttons' glyphs are centred at, not the row's top edge.
+        pace.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+        pace.size_flags_vertical = Control.SIZE_EXPAND_FILL
         stepper.add_child(pace)
         return card
 

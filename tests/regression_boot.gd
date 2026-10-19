@@ -901,6 +901,22 @@ func _check_settings(main: Node) -> void:
                                 and int((paced as Dictionary).get("new_per_day", -1)) == 2,
                         "a chosen pace is stamped into the deck's own progress file"
                 )
+                # The caption shares the row of 44-tall buttons, so its one
+                # line must ride the row's own middle -- the same middle the
+                # chip's number and the buttons' glyphs stand at, never the
+                # row's top edge.
+                var pace_caption: RichTextLabel = settings.get_node_or_null(
+                        "Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/NewPerDay/Pace"
+                )
+                if pace_caption != null:
+                        _ok(
+                                pace_caption.vertical_alignment == VERTICAL_ALIGNMENT_CENTER
+                                        and absf(
+                                                pace_caption.size.y
+                                                        - pace_caption.get_parent_control().size.y
+                                        ) < 1.0,
+                                "the pace caption fills its row and rides the row's middle"
+                        )
         # The deck as one file: the backup card stands in Settings, the two
         # doors out of it are wired, and the whole journey -- the real deck
         # packed, joined back, its picker pressed -- runs against the real
