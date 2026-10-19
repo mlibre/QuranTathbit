@@ -242,7 +242,7 @@ func _check_real_shelf() -> void:
         if row == null:
                 _ok(false, "the shelf carries a row under the eye")
                 return
-        await _drag_finger(row.get_global_rect().get_center(), Vector2(0, 80.0), 4)
+        await _drag_finger(row.get_global_rect().get_center(), Vector2(0, 80.0), 4, 0.25)
         await process_frame
         _ok(
                 scroll.scroll_vertical < 150.0 and scroll.scroll_vertical > 60.0,
@@ -320,8 +320,16 @@ func _tap_with_jitter(canvas_pos: Vector2) -> void:
 
 
 ## A whole drag, one press and `steps` even moves of `travel` (window
-## pixels, the way a finger reports them), a release at the end.
-func _drag_finger(canvas_pos: Vector2, travel: Vector2, steps: int) -> void:
+## pixels, the way a finger reports them), a release at the end. The
+## release may be asked to wait first: a hand still for a breath before
+## it lifts is not a flick, and the page honors that with its own grace
+## rule -- a release that comes later than it never carries the page on.
+## The wait matters because the engine may hand these drags a speed they
+## never earned: a velocity the input path stamps on events the test
+## wrote at rest, one the shelf's coast would happily spend. A check that
+## asks for the drag, not the coast, lifts after the pause; a check that
+## asks for the coast passes no pause and keeps its fast lift.
+func _drag_finger(canvas_pos: Vector2, travel: Vector2, steps: int, pause_before_lift: float = 0.0) -> void:
         _press(canvas_pos)
         var last := canvas_pos
         for step in steps:
@@ -335,6 +343,8 @@ func _drag_finger(canvas_pos: Vector2, travel: Vector2, steps: int) -> void:
                 _flush()
                 last = to
                 await process_frame
+        if pause_before_lift > 0.0:
+                await create_timer(pause_before_lift).timeout
         _release(last)
         await process_frame
 

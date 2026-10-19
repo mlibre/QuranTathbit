@@ -299,10 +299,10 @@ func _corner_coin(coin_name: String, x_range: Vector2, mark: Control, tooltip: S
         coin.pressed.connect(on_press)
         return coin
 
-## The app's name in both of its languages, and under it the ornament a
-## title page wears: the Arabic reads as the name it was given, the Latin
-## as the name it types, and the gold star between two short rules keeps
-## the wordmark from floating off the page.
+## The app's name in the script it was given, and under it the ornament
+## a title page wears: the Arabic reads as the name it was given, and the
+## gold star between two short rules keeps the wordmark from floating off
+## the page.
 func _wordmark() -> Control:
         var row := CenterContainer.new()
         row.name = "Wordmark"
@@ -318,11 +318,6 @@ func _wordmark() -> Control:
         arabic.add_theme_font_size_override("font_size", ThemeScript.fs(17))
         arabic.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP)
         stack.add_child(arabic)
-        var label := Label.new()
-        label.name = "Latin"
-        label.text = "QuranTathbit"
-        ThemeScript.dress(label, 20, ThemeScript.GREEN_DEEP, true)
-        stack.add_child(label)
         var ornament := ThemeScript.OrnamentMark.new()
         ornament.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         stack.add_child(ornament)
