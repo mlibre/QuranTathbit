@@ -114,6 +114,18 @@ jobs:
           grep -q "skipWaiting" builds/web/index.service.worker.js
           grep -q "clients.claim" builds/web/index.service.worker.js
 
+      # The npm package serves the same page the site does, so its head
+      # scripts live by the same rule: a script that cannot parse never
+      # runs, whatever its markers say (a missing </script> or a \n the
+      # config parser turned into a real line break both shipped once and
+      # left a phone at a silent loading bar). Every inline script is
+      # taken apart the way a browser reads it and handed to node --check;
+      # the worker rides the same rule.
+      - name: Every head script must parse
+        run: |
+          python3 tools/check_head_scripts.py builds/web/index.html
+          node --check builds/web/index.service.worker.js
+
       - name: Stage the npm package
         run: |
           sed -i 's/"background_color":"#000000"/"background_color":"#faf5ed","theme_color":"#14513d"/' builds/web/index.manifest.json
@@ -144,6 +156,12 @@ jobs:
           grep -q "unhandledrejection" builds/web/index.html
           grep -q "controllerchange" builds/web/index.html
           grep -q "postMessage('claim')" builds/web/index.html
+          # The SIMD guard rides the same head: a 32-bit phone Firefox has
+          # WebGL2 but no WebAssembly SIMD, and the engine cannot run there
+          # -- the same guard the Pages build carries, demanded by its
+          # working parts, as always.
+          grep -q "qt-simd-guard" builds/web/index.html
+          grep -q "__qtWasmSimdMissing" builds/web/index.html
           mkdir -p pkg
           cp builds/web/index.html builds/web/index.js builds/web/index.wasm \
                 builds/web/index.pck builds/web/index.png \

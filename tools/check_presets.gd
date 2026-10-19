@@ -1,9 +1,16 @@
 extends SceneTree
 
 ## Verify export_presets.cfg's html/head_include value is intact after the
-## guard was appended: the value parses, carries the guard's working parts,
-## and did not swallow the keys that follow it (a stray double quote would
-## terminate the value early and turn the rest of the section into garbage).
+## guards were appended: the value parses, carries every part, and did not
+## swallow the keys that follow it (a stray double quote would terminate the
+## value early and turn the rest of the section into garbage). Two shapes
+## are demanded as well, both learned from a phone that sat at a silent
+## loading bar: the value may carry no real line break (Godot's config
+## parser turns a \n escape into one, and no JS string literal may span a
+## line -- write \\n when the script means a newline), and every <script>
+## the value opens must be closed before the next opens (a missing closer
+## hands the next script's text to the JS parser, which dies on the literal
+## '<' and takes both scripts with it).
 
 func _init() -> void:
         var cfg := ConfigFile.new()
@@ -19,6 +26,8 @@ func _init() -> void:
                 "__qtWebGL2Missing",
                 "WebGL2RenderingContext",
                 "status-notice",
+                "qt-simd-guard",
+                "__qtWasmSimdMissing",
                 "qt-zip-bridge",
                 "qt-paste-bridge",
                 "qt-browser-keys",
@@ -51,6 +60,46 @@ func _init() -> void:
         var guard_at := include.find("qt-webgl2-guard")
         if not (0 <= shim_at and shim_at < guard_at):
                 push_error("the guard must be installed after the gz shim")
+                failures += 1
+        # A newline inside the value is a JS string literal asked to span a
+        # line: the config parser made it from a \n escape, and the browser
+        # answers with a SyntaxError. The value is written on one line of the
+        # cfg and must stay on one line in the page.
+        if include.contains("\n"):
+                push_error("head_include carries a real line break; a \\n escape in the cfg became one -- write \\\\n where a script means a newline")
+                failures += 1
+        # Every <script> the value opens must close before the next opens:
+        # walking the tags, the depth may never pass one and must end at zero.
+        # A missing closer merges two scripts into one (the JS then meets a
+        # literal '<'); a stray closer ends the head early.
+        var depth := 0
+        var at := 0
+        while true:
+                var opens := include.find("<script>", at)
+                var closes := include.find("</script>", at)
+                if opens == -1 and closes == -1:
+                        break
+                if closes == -1 or (opens != -1 and opens < closes):
+                        depth += 1
+                        at = opens + 8
+                        if depth > 1:
+                                push_error("head_include opens a <script> before the last one closed; a </script> went missing")
+                                failures += 1
+                else:
+                        depth -= 1
+                        at = closes + 9
+                        if depth < 0:
+                                push_error("head_include closes a </script> that was never opened")
+                                failures += 1
+        if depth != 0:
+                push_error("head_include ends with a <script> left open")
+                failures += 1
+        # The SIMD guard must sit AFTER the WebGL2 one, so a device missing
+        # both hears the WebGL2 reason (the first guard to speak wins, and
+        # the SIMD guard's say() stays quiet beside it).
+        var simd_at := include.find("qt-simd-guard")
+        if not (0 <= guard_at and guard_at < simd_at):
+                push_error("the SIMD guard must be installed after the WebGL2 guard")
                 failures += 1
         # The Android preset: both ABIs, and the version code moved.
         var v7a: bool = cfg.get_value("preset.3.options", "architectures/armeabi-v7a", false)

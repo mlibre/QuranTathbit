@@ -28,17 +28,28 @@ godot --headless --path . --script tests/regression_<name>.gd   # one suite
 Every workflow that runs the battery also runs `tools/check_presets.gd`:
 the export presets must parse, the head scripts must carry all their working
 parts, and the Android preset must ship both ABIs with a version code that
-has moved.
+has moved. The head scripts' shape is demanded too, both rules learned from
+a phone left at a silent loading bar: the value may carry no real line
+break (the config parser turns a `\n` escape into one, and no JS string
+literal may span a line), and every `<script>` the value opens must close
+before the next opens (a missing closer merges two scripts into one blob
+that dies on a literal `<`).
 
 The Pages and npm workflows lower the engine's web loader through esbuild to
 `firefox68,chrome57` — the browsers a reader keeps longest cannot parse
 optional chaining and its kin, so an unlowered loader leaves the page's bar
 motionless forever — and the build fails loudly, by token, if the lowered
 file still carries any post-2017 parse-breaker. The page's head also carries
-a WebGL2 pre-flight guard: a device that cannot run the app is told so, in
-English and Persian, and the engine-sized download never starts on it. The
-Android release ships both `armeabi-v7a` and `arm64-v8a` — an arm64-only APK
-refuses to install on the 32-bit phones a reader keeps longest.
+a WebGL2 pre-flight guard and a WebAssembly SIMD one: a device that cannot
+run the app is told so, in English and Persian, and the engine-sized
+download never starts on it (a 32-bit phone Firefox passes the WebGL2 check
+and still cannot validate the engine's SIMD-built wasm — the guard is what
+turns that silent stuck into words). After export, every inline script the
+built page carries is taken apart the way a browser reads it and handed to
+`node --check` (`tools/check_head_scripts.py`) — a head script that cannot
+parse fails the build, whatever its markers say. The Android release ships
+both `armeabi-v7a` and `arm64-v8a` — an arm64-only APK refuses to install on
+the 32-bit phones a reader keeps longest.
 
 ## Why the battery runs twice
 

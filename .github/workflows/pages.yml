@@ -183,6 +183,22 @@ jobs:
           grep -q "index.192x192.png" builds/web/index.manifest.json
           grep -q "maskable" builds/web/index.manifest.json
 
+      # A head script can carry its marker and still be dead on a reader's
+      # phone: a missing </script> hands the next script's text to the JS
+      # parser (which dies on the literal '<' and takes both scripts with
+      # it), and the config parser turns a \n escape inside the preset into
+      # a real line break no string literal may span -- both shipped once,
+      # and the phone that met them sat at a silent loading bar while the
+      # guards that should have spoken lay unparseable beside it. So every
+      # inline script the page carries is taken apart the way a browser
+      # reads it, and each body is handed to node --check: a script that
+      # cannot parse fails the build, whatever its markers say. The worker
+      # rides the same rule.
+      - name: Every head script must parse
+        run: |
+          python3 tools/check_head_scripts.py builds/web/index.html
+          node --check builds/web/index.service.worker.js
+
       # The .pck must carry the deck's text and none of its audio -- a 13 MB
       # smaller download before the first card is even seen -- and the audio
       # the app will stream must be waiting beside it. Cards reference their
@@ -236,6 +252,15 @@ jobs:
           # could never run it.
           grep -q "qt-webgl2-guard" builds/web/index.html
           grep -q "__qtWebGL2Missing" builds/web/index.html
+          # The SIMD guard rides beside the WebGL2 one: a 32-bit phone
+          # Firefox (the ARMv7 builds old devices keep) has WebGL2 but no
+          # WebAssembly SIMD, and the engine cannot run there -- the report
+          # was a loading bar that never moved and a wasm CompileError
+          # buried in the console. The marker alone would pass even if the
+          # guard arrived truncated, so its working parts are demanded too.
+          grep -q "qt-simd-guard" builds/web/index.html
+          grep -q "__qtWasmSimdMissing" builds/web/index.html
+          grep -q "WebAssembly.validate" builds/web/index.html
           # The boot watch rides the same head: a page that cannot start
           # says why (a script that never parsed, a promise nothing
           # caught), and a load gone quiet for a long spell says so too,

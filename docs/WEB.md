@@ -39,6 +39,14 @@ double-quoted config line). In order of installation:
   for choosing a `.zip`, handed to the app through the JS bridge;
 - **the WebGL2 guard** — a pre-flight that tells a device it cannot run
   (in its own tongue) instead of downloading an engine at it;
+- **the SIMD guard** (`qt-simd-guard`, new in v1.0.35) — the engine's wasm
+  is built on WebAssembly SIMD, which 32-bit browser builds cannot run
+  (an ARMv7 phone Firefox has WebGL2, DecompressionStream, everything a
+  modern page asks for — and still fails the wasm at validation, and
+  before this guard it said nothing while the loading bar stood still).
+  The guard probes with the canonical SIMD module before the engine
+  downloads, tells the reader in their own tongue, and points them at the
+  Android app (both ABIs ship, so the same phone installs it fine);
 - **the boot watch** — a page that cannot start says why (every error,
   every promise nothing caught), and a load gone quiet for a long spell
   says so too;
@@ -59,7 +67,17 @@ lowers it once through esbuild (`--target=firefox68,chrome57`) and fails
 the build loudly, by token, if any post-2017 parse-breaker survives. The
 same discipline governs the hand-written head scripts: ES5 only, verified
 in CI by marker and working parts (`check_presets.gd` before export, the
-Pages checks after it).
+Pages checks after it). And since a script can carry its marker and still
+be dead — a missing `</script>` once merged three scripts into one JS blob
+that died on a literal `<`, and a `\n` written for a JS string once became
+a real line break no literal may span (the config parser expands it), both
+leaving a phone at a silent loading bar — two further rules hold: the
+value in the preset carries no real line break (write `\\n` when a script
+means a newline) and every `<script>` it opens closes before the next
+opens (`check_presets.gd`), and after export `tools/check_head_scripts.py`
+takes the built page apart the way a browser does and hands every inline
+script to `node --check`, so a head script that cannot parse fails the
+build itself.
 
 ## The worker takes over at once
 
