@@ -108,15 +108,6 @@ func _ready() -> void:
         # The one line the release workflow's smoke test looks for: the deck is
         # installed, loaded, and the first screen is standing.
         print("QURAN_TATHBIT_BOOT_OK")
-        # The page's debug log stops counting taps the moment the app itself
-        # is standing -- until then, five taps on whatever the page shows
-        # (loader, black canvas, anything) open the log a stuck reader can
-        # copy. The flag is the page's own truth: the loader hiding its
-        # status only means the engine finished, not that the app began.
-        if OS.has_feature("web"):
-                var bridge := _bridge()
-                if bridge != null:
-                        bridge.call("eval", "window.__qtAppStarted=true")
 
 
 # --- deck installation ---------------------------------------------------------

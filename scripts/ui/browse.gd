@@ -49,7 +49,26 @@ var _sticky: PanelContainer
 var _sticky_name: Label
 var _sticky_count: Label
 
+# --- the shelf's streaming build ----------------------------------------------------
+## A shelf of a hundred-and-fifty cards is a shelf of a hundred-and-fifty
+## buttons, fonts and measured inks, and a page that lays them all in one
+## breath lays nothing for the seconds that breath takes -- the phone
+## meets a frozen opening instead of a library. So the shelf streams: the
+## opening breath lays a screenful, and the rest arrive a batch a frame
+## while the reader's eye is still settling on the first. A newer
+## question (a typed search, a chosen pill) retires the build in flight
+## by its generation, and the closing of the shelf -- the last header's
+## count, the tail, the sizing pass -- lands only when the last batch
+## has.
+const SHELF_FIRST := 14     # the opening screenful, laid in one breath
+const SHELF_BATCH := 14     # the most a streaming frame may lay
+const SHELF_SLICE_MS := 10  # the work a streaming frame may spend on rows
+var _build_gen := 0
+var _pending: Array = []
+var _shelf := {}
+
 func _ready() -> void:
+        set_process(false)
         _player = AudioStreamPlayer.new()
         _player.name = "Player"
         add_child(_player)
@@ -59,8 +78,39 @@ func _ready() -> void:
         call_deferred("_layout")
 
 func _exit_tree() -> void:
+        _build_gen += 1
+        _pending = []
+        _shelf = {}
         if _player != null and is_instance_valid(_player):
                 _player.queue_free()
+
+## The heartbeat of a streamed shelf: a slice of rows a frame -- as many
+## as a slice of milliseconds buys, never more than a batch -- so the
+## page keeps its frame rate while the shelf fills, fast machine or slow
+## phone alike. A build retired by a newer question (its generation no
+## longer the page's) stops here without touching the shelf it no longer
+## owns.
+func _process(_delta: float) -> void:
+        if _shelf.is_empty() or int(_shelf.get("gen", -1)) != _build_gen:
+                _shelf = {}
+                _pending = []
+                set_process(false)
+                return
+        var started := Time.get_ticks_msec()
+        var laid := 0
+        while not _pending.is_empty() and laid < SHELF_BATCH:
+                _lay_one()
+                laid += 1
+                if Time.get_ticks_msec() - started >= SHELF_SLICE_MS:
+                        break
+        # The rows a frame brings are sized that same frame, so the shelf
+        # never wobbles beneath the reader's eye (the pad's own signal
+        # answers every later change the same way).
+        call_deferred("_fit_rows")
+        if _pending.is_empty():
+                _close_shelf()
+                _shelf = {}
+                set_process(false)
 
 ## The deck arrives with the volume the last session chose, so the first
 ## recitation heard here already speaks at the remembered loudness.
@@ -490,6 +540,10 @@ static func _normalize_digits(text: String) -> String:
 ## air, the way a book's typesetting does.
 func _rebuild() -> void:
         _rebuild_tween = null
+        # A new question retires any build still streaming: its batches
+        # must not lay another row onto a shelf this pass has already
+        # cleared.
+        _build_gen += 1
         var column: VBoxContainer = get_node("Margin/Column/Scroll/Wrap/Column")
         for child in column.get_children():
                 column.remove_child(child)
@@ -508,41 +562,63 @@ func _rebuild() -> void:
         if asking:
                 summary.text = I18nScript.f("%d of %d cards", [shown.size(), _deck.cards.size()])
         if shown.is_empty():
+                _pending = []
+                _shelf = {}
                 column.add_child(_empty_state())
                 _update_sticky()
                 return
-        var surah := ""
-        var in_surah := 0
-        var resting := 0
-        for i in shown.size():
-                var card: CardScript = shown[i]
-                var reference := _reference_of(card)
-                var card_surah := _surah_of(reference)
-                if card_surah != surah:
-                        if not surah.is_empty():
-                                _set_header_count(column, in_surah, resting)
-                        surah = card_surah
-                        in_surah = 0
-                        resting = 0
-                        column.add_child(_surah_header(surah, card.id))
-                in_surah += 1
-                if str(card.state["status"]) == "review":
-                        resting += 1
-                column.add_child(_entry(card, reference))
-        _set_header_count(column, in_surah, resting)
+        _shelf = {"gen": _build_gen, "surah": "", "in_surah": 0, "resting": 0}
+        _pending = shown
+        # The opening breath: a screenful laid at once, so the page opens
+        # on a shelf and not on a promise -- then the rest stream in.
+        _lay_batch(SHELF_FIRST)
+        call_deferred("_fit_rows")
+        if not asking:
+                ThemeScript.stagger_in(column, minf(0.015, 0.55 / maxf(column.get_child_count(), 1.0)), 0.18)
+        if _pending.is_empty():
+                _close_shelf()
+        else:
+                set_process(true)
+        _update_sticky()
+
+## The opening breath, or any whole batch asked for at once: as many
+## cards as count says, budget or no budget.
+func _lay_batch(count: int) -> void:
+        for _i in count:
+                if _pending.is_empty():
+                        return
+                _lay_one()
+
+## One card onto the shelf: the surah's header when the cards cross into
+## it, the card's row after, and the counts the header will stand by.
+## The walk is the page's own -- only its reach is a slice's.
+func _lay_one() -> void:
+        var column: VBoxContainer = get_node("Margin/Column/Scroll/Wrap/Column")
+        var card: CardScript = _pending.pop_front()
+        var reference := _reference_of(card)
+        var card_surah := _surah_of(reference)
+        if card_surah != str(_shelf["surah"]):
+                if not str(_shelf["surah"]).is_empty():
+                        _set_header_count(column, int(_shelf["in_surah"]), int(_shelf["resting"]))
+                _shelf["surah"] = card_surah
+                _shelf["in_surah"] = 0
+                _shelf["resting"] = 0
+                column.add_child(_surah_header(card_surah, card.id))
+        _shelf["in_surah"] = int(_shelf["in_surah"]) + 1
+        if str(card.state["status"]) == "review":
+                _shelf["resting"] = int(_shelf["resting"]) + 1
+        column.add_child(_entry(card, reference))
+
+## The shelf's last word: the final header's count, the breathing room
+## under the last row, and the running head's own account of the page.
+func _close_shelf() -> void:
+        var column: VBoxContainer = get_node("Margin/Column/Scroll/Wrap/Column")
+        _set_header_count(column, int(_shelf["in_surah"]), int(_shelf["resting"]))
         var tail := Control.new()
         tail.name = "Tail"
         tail.custom_minimum_size = Vector2(0, 18)
         tail.mouse_filter = Control.MOUSE_FILTER_IGNORE
         column.add_child(tail)
-        # The reveal is a breath, whatever the shelf's length: a hundred cards
-        # stepping a fixed beat apart would keep arriving long after the eye
-        # has moved on, and a shelf half-arrived reads as a shelf half-broken.
-        if not asking:
-                ThemeScript.stagger_in(column, minf(0.015, 0.55 / maxf(column.get_child_count(), 1.0)), 0.18)
-        # The rows are sized by a pass that must see them laid out; see
-        # _fit_rows for why the number spoken at their building is not
-        # the number they stand by.
         call_deferred("_fit_rows")
         _update_sticky()
 

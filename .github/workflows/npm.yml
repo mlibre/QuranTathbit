@@ -162,6 +162,12 @@ jobs:
           # working parts, as always.
           grep -q "qt-simd-guard" builds/web/index.html
           grep -q "__qtWasmSimdMissing" builds/web/index.html
+          # The notice builder rides first in that same head: two boxes and
+          # a direct APK link when a browser cannot run the app -- the same
+          # builder the Pages build carries.
+          grep -q "qt-notice" builds/web/index.html
+          grep -q "__qtNotice" builds/web/index.html
+          grep -q "releases/latest/download/QuranTathbit-Android.apk" builds/web/index.html
           mkdir -p pkg
           cp builds/web/index.html builds/web/index.js builds/web/index.wasm \
                 builds/web/index.pck builds/web/index.png \

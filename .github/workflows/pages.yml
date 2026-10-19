@@ -271,23 +271,15 @@ jobs:
           grep -q "unhandledrejection" builds/web/index.html
           grep -q "controllerchange" builds/web/index.html
           grep -q "postMessage('claim')" builds/web/index.html
-          # The debug log rides the same head: five taps on a loading screen
-          # open the log the page kept from its first breath -- environment,
-          # every error, a loading heartbeat -- copyable in one press, so a
-          # reader on a phone the app cannot start on can hand the developer
-          # the whole story. The taps are counted from pointerdown in the
-          # capture phase, because the engine's canvas swallows the touches
-          # (preventDefault, and on Firefox Android the click that would
-          # follow never fires); the app itself says when loading truly ends
-          # (__qtAppStarted), so a page stuck past the loader still answers.
-          # The marker alone would pass even if the watch arrived truncated,
-          # so its working parts are demanded too.
-          grep -q "qt-debug-log" builds/web/index.html
-          grep -q "__qtDebugLog" builds/web/index.html
-          grep -q "__qtDebugShow" builds/web/index.html
-          grep -q "execCommand" builds/web/index.html
-          grep -q "pointerdown" builds/web/index.html
-          grep -q "__qtAppStarted" builds/web/index.html
+          # The notice builder rides first in the head: when a browser
+          # cannot run the app, the reader sees two boxes -- English and
+          # their own tongue -- and a direct link to the Android APK,
+          # never a silent loading bar. The marker alone would pass even
+          # if the builder arrived truncated, so its working parts are
+          # demanded, as always.
+          grep -q "qt-notice" builds/web/index.html
+          grep -q "__qtNotice" builds/web/index.html
+          grep -q "releases/latest/download/QuranTathbit-Android.apk" builds/web/index.html
           python3 - <<'PY'
           import sys
           data = open("builds/web/index.pck", "rb").read()

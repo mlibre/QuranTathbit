@@ -1100,6 +1100,9 @@ func _check_browse(main: Node) -> void:
                 browse.closed.emit()
                 await create_timer(0.3).timeout
                 return
+        # The shelf streams its rows in, a slice a frame: the full deck
+        # stands when the shelf says so, not when a clock does.
+        await _await_full_shelf(column, deck.cards.size())
         var rows := 0
         var headers := 0
         for child in column.get_children():
@@ -1178,6 +1181,7 @@ func _check_browse(main: Node) -> void:
                 _ok(browse.get_node_or_null("Margin/Column/Scroll/Wrap/Column/Empty") != null, "an empty search says so")
                 browse._on_search_changed("")
                 await create_timer(0.4).timeout
+                await _await_full_shelf(column, deck.cards.size())
                 rows = 0
                 for child in column.get_children():
                         if child.name.begins_with("Entry"):
@@ -1305,6 +1309,7 @@ func _check_browse(main: Node) -> void:
                         if due_pill != null:
                                 due_pill.pressed.emit()
                         await create_timer(0.4).timeout
+                        await _await_full_shelf(column, deck.cards.size())
                         var back_rows := 0
                         for child in column.get_children():
                                 if child.name.begins_with("Entry"):
@@ -1809,3 +1814,18 @@ func _remove_tree(path: String) -> void:
                 for entry in DirAccess.get_directories_at(path):
                         _remove_tree(path.path_join(entry))
                 DirAccess.remove_absolute(path)
+
+## The shelf streams its rows in, a slice a frame; a slow machine fills
+## the same shelf a slower way. This waits for the shelf's own word -- the
+## count of standing rows reaching the deck's -- rather than a clock's,
+## and gives up quietly at twenty seconds so a broken shelf still fails
+## on the count, not on a hang.
+func _await_full_shelf(column: VBoxContainer, want: int) -> void:
+        for _i in 66:
+                var stood := 0
+                for child in column.get_children():
+                        if child.name.begins_with("Entry"):
+                                stood += 1
+                if stood >= want:
+                        return
+                await create_timer(0.3).timeout

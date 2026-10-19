@@ -41,13 +41,15 @@ optional chaining and its kin, so an unlowered loader leaves the page's bar
 motionless forever — and the build fails loudly, by token, if the lowered
 file still carries any post-2017 parse-breaker. The page's head also carries
 a WebGL2 pre-flight guard and a WebAssembly SIMD one: a device that cannot
-run the app is told so, in English and Persian, and the engine-sized
-download never starts on it (a 32-bit phone Firefox passes the WebGL2 check
-and still cannot validate the engine's SIMD-built wasm — the guard is what
-turns that silent stuck into words). After export, every inline script the
-built page carries is taken apart the way a browser reads it and handed to
-`node --check` (`tools/check_head_scripts.py`) — a head script that cannot
-parse fails the build, whatever its markers say. The Android release ships
+run the app is told so through the notice builder — two boxes, English and
+Persian, one short line each, with a direct link to the Android APK — and
+the engine-sized download never starts on it (a 32-bit phone Firefox passes
+the WebGL2 check and still cannot validate the engine's SIMD-built wasm —
+the guard is what turns that silent stuck into words). After export, every
+inline script the built page carries is taken apart the way a browser reads
+it and handed to `node --check` (`tools/check_head_scripts.py`) — a head
+script that cannot parse fails the build, whatever its markers say. The
+Android release ships
 both `armeabi-v7a` and `arm64-v8a` — an arm64-only APK refuses to install on
 the 32-bit phones a reader keeps longest.
 

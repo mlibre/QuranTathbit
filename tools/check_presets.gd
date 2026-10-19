@@ -10,7 +10,9 @@ extends SceneTree
 ## line -- write \\n when the script means a newline), and every <script>
 ## the value opens must be closed before the next opens (a missing closer
 ## hands the next script's text to the JS parser, which dies on the literal
-## '<' and takes both scripts with it).
+## '<' and takes both scripts with it). The notice builder must stand first
+## among the scripts, so every later guard speaks through a builder that
+## already exists.
 
 func _init() -> void:
         var cfg := ConfigFile.new()
@@ -22,6 +24,9 @@ func _init() -> void:
         var include := str(cfg.get_value("preset.0.options", "html/head_include", ""))
         var failures := 0
         for part in [
+                "qt-notice",
+                "__qtNotice",
+                "releases/latest/download/QuranTathbit-Android.apk",
                 "qt-webgl2-guard",
                 "__qtWebGL2Missing",
                 "WebGL2RenderingContext",
@@ -36,10 +41,6 @@ func _init() -> void:
                 "unhandledrejection",
                 "controllerchange",
                 "index.wasm.gz",
-                "qt-debug-log",
-                "__qtDebugLog",
-                "__qtDebugShow",
-                "execCommand",
         ]:
                 if not include.contains(part):
                         push_error("head_include lost its part: %s" % part)
@@ -54,10 +55,16 @@ func _init() -> void:
         if int(resize) != 2:
                 push_error("canvas_resize_policy lost its value: %s" % str(resize))
                 failures += 1
-        # The guard must sit AFTER the wasm-gz shim in the string, so the
-        # guard's fetch wrapper wraps the shim's (and rejects wasm first).
+        # The notice builder must stand BEFORE every script that may speak
+        # through it (the guards and the boot watch call __qtNotice), and the
+        # WebGL2 guard must sit AFTER the wasm-gz shim, so the guard's fetch
+        # wrapper wraps the shim's (and rejects wasm first).
+        var notice_at := include.find("qt-notice")
         var shim_at := include.find("DecompressionStream")
         var guard_at := include.find("qt-webgl2-guard")
+        if not (0 <= notice_at and notice_at < shim_at):
+                push_error("the notice builder must be installed before the gz shim")
+                failures += 1
         if not (0 <= shim_at and shim_at < guard_at):
                 push_error("the guard must be installed after the gz shim")
                 failures += 1
@@ -100,6 +107,12 @@ func _init() -> void:
         var simd_at := include.find("qt-simd-guard")
         if not (0 <= guard_at and guard_at < simd_at):
                 push_error("the SIMD guard must be installed after the WebGL2 guard")
+                failures += 1
+        # The debug log is gone (v1.0.36): its five-tap overlay earned its
+        # keep diagnosing the phone that sat in silence, and was retired the
+        # release after -- nothing may quietly bring it back.
+        if include.contains("qt-debug-log") or include.contains("__qtDebugShow"):
+                push_error("the debug log was retired in v1.0.36; it must not return")
                 failures += 1
         # The Android preset: both ABIs, and the version code moved.
         var v7a: bool = cfg.get_value("preset.3.options", "architectures/armeabi-v7a", false)

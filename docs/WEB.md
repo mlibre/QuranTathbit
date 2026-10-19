@@ -23,6 +23,14 @@ origin). A fetched recitation is cached for the session.
 scripts, all hand-written ES5, single-quoted (the value lives inside a
 double-quoted config line). In order of installation:
 
+- **the notice builder** (`qt-notice`, new in v1.0.36) — the page's
+  bad-news box, installed before every script that may need it: when a
+  browser cannot run the app, the reader sees **two boxes** — English
+  (left-to-right) and Persian (right-to-left), one short line each — and
+  a direct link to the Android APK (`releases/latest/download/…`, so the
+  link never goes stale with a release). The guards and the boot watch
+  all speak through `window.__qtNotice(en, fa, {why, apk})`, so every
+  warning wears the same face;
 - **the gz shim** — swaps the engine's `fetch` of `index.wasm` for
   `index.wasm.gz` (CI gzips it; static hosts serve the wasm raw) and
   decompresses with `DecompressionStream`, falling back to the raw file;
@@ -38,27 +46,19 @@ double-quoted config line). In order of installation:
 - **the paste and zip bridges** — the page's own events for pasting and
   for choosing a `.zip`, handed to the app through the JS bridge;
 - **the WebGL2 guard** — a pre-flight that tells a device it cannot run
-  (in its own tongue) instead of downloading an engine at it;
+  (one short line, through the notice builder's two boxes and APK link)
+  instead of downloading an engine at it;
 - **the SIMD guard** (`qt-simd-guard`, new in v1.0.35) — the engine's wasm
   is built on WebAssembly SIMD, which 32-bit browser builds cannot run
   (an ARMv7 phone Firefox has WebGL2, DecompressionStream, everything a
   modern page asks for — and still fails the wasm at validation, and
   before this guard it said nothing while the loading bar stood still).
   The guard probes with the canonical SIMD module before the engine
-  downloads, tells the reader in their own tongue, and points them at the
-  Android app (both ABIs ship, so the same phone installs it fine);
+  downloads and says so through the notice builder (both ABIs ship in
+  the APK, so the same phone installs it fine);
 - **the boot watch** — a page that cannot start says why (every error,
   every promise nothing caught), and a load gone quiet for a long spell
-  says so too;
-- **the debug log** (`qt-debug-log`, new in v1.0.27) — from the page's
-  first breath it collects the environment (UA, screen, WebGL2 + GPU
-  string, wasm + wasm-SIMD, DecompressionStream, service worker state),
-  every error and rejection, `console.error`/`warn`, and a five-second
-  loading heartbeat (progress value + status visibility). Five taps on the
-  loading screen — only while it is still loading — open the whole log
-  full-screen with a Copy button (clipboard API with an `execCommand`
-  fallback for old phones). This is how a reader on a phone the app cannot
-  start on hands the developer the story; a stuck Firefox was the report.
+  says so too — all through the same two-box notice.
 
 ## The loader speaks older browsers
 

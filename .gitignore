@@ -24,3 +24,4 @@ npm-debug.log*
 
 # The skill index builder leaves these behind; the repo does not need them.
 .agents/skills/godot/scripts/__pycache__/
+tools/__pycache__/

@@ -72,11 +72,37 @@ func _check_settings(main: Node) -> void:
 
 func _check_browse(main: Node) -> void:
         main._on_browse_pressed()
-        await create_timer(0.5).timeout
+        await process_frame
         var browse: Node = main.get_node_or_null("Browse")
         _ok(browse != null, "the library opens")
         if browse == null:
                 return
+        # The shelf streams, not dumps: the opening breath lays a
+        # screenful and the rest arrive a batch a frame -- a phone meets
+        # a library, not a frozen page -- so one frame in, part of the
+        # shelf stands and the whole deck does not; and a moment later
+        # every card is there with the shelf's tail beside it.
+        var total: int = main._deck.cards.size()
+        var built := _entries_on(browse)
+        if total > 40:
+                _ok(
+                        built >= 1 and built < total,
+                        "the shelf opens on a screenful, not the whole deck (%d of %d)" % [built, total]
+                )
+        # The rest arrive frame by frame; the machine's own pace says how
+        # many frames that takes, so the test waits for the shelf's own
+        # word (every card standing, the tail beside them) rather than a
+        # clock's.
+        var waited := 0.0
+        while built < total and waited < 20.0:
+                await create_timer(0.3).timeout
+                waited += 0.3
+                built = _entries_on(browse)
+        _ok(built == total, "the streamed shelf arrives whole (%d of %d, %.1fs)" % [built, total, waited])
+        _ok(
+                browse.get_node_or_null("Margin/Column/Scroll/Wrap/Column/Tail") != null,
+                "the streamed shelf carries its tail"
+        )
         # The volume's popover closes first, the page beneath it stays.
         var popup: Node = browse.get_node_or_null("VolumePopup")
         if popup == null:
@@ -173,3 +199,14 @@ func _ok(what: bool, saying: String) -> void:
         else:
                 _failures += 1
                 print("  FAIL  %s" % saying)
+
+## The shelf's own account of how many of its rows stand.
+func _entries_on(browse: Node) -> int:
+        var column := browse.get_node_or_null("Margin/Column/Scroll/Wrap/Column")
+        if column == null:
+                return 0
+        var count := 0
+        for child in column.get_children():
+                if child.name.begins_with("Entry"):
+                        count += 1
+        return count
