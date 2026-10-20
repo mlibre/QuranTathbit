@@ -11,7 +11,9 @@ const DeckScript := preload("res://scripts/data/deck.gd")
 ##
 ## Bringing one back JOINS rather than replaces, by the same rules sync
 ## speaks: progress merges card by card (the entry with more reviews wins,
-## the later answer breaks ties), the travelling choices merge by their own
+## the later answer breaks ties, and a deliberate reset -- a defer, a
+## suspend -- is judged by its moment, newer than anything older whatever
+## the review count says), the travelling choices merge by their own
 ## moments, and files land only where the deck lacks them -- a tie keeps the
 ## local word. Importing an old backup onto a deck that studied since can
 ## therefore never take a review away; importing onto a fresh install
@@ -236,7 +238,7 @@ static func _merge_progress(deck_path: String, their_bytes: PackedByteArray) -> 
         var their_cards := _entries_of(their_doc as Dictionary)
         var merged := 0
         for card_id in their_cards.keys():
-                if not my_cards.has(card_id) or _rank(their_cards[card_id]) > _rank(my_cards[card_id]):
+                if not my_cards.has(card_id) or _state_beats(their_cards[card_id], my_cards[card_id]):
                         my_cards[card_id] = their_cards[card_id]
                         merged += 1
         var my_choices := _choices_of(my_doc)
@@ -272,6 +274,21 @@ static func _merge_progress(deck_path: String, their_bytes: PackedByteArray) -> 
 ## last answered -- the same rank the sync engine compares by.
 static func _rank(state: Dictionary) -> Array:
         return [int(state.get("reps", 0)), int(state.get("mod", 0))]
+
+
+## Does one card state outrank another, by the sync engine's own rule? Two
+## answered states compare by rank; a deliberate reset (a defer, a suspend:
+## nothing answered, yet touched at a known moment) compares by its moment
+## alone -- newer than anything older, older than anything newer, whatever
+## either side's review count says. Without this, importing a backup made
+## after a defer would hand the card back to the answers the defer was a
+## deliberate act later than.
+static func _state_beats(a: Dictionary, b: Dictionary) -> bool:
+        var a_reset := int(a.get("reps", 0)) == 0 and int(a.get("mod", 0)) > 0
+        var b_reset := int(b.get("reps", 0)) == 0 and int(b.get("mod", 0)) > 0
+        if a_reset or b_reset:
+                return int(a.get("mod", 0)) > int(b.get("mod", 0))
+        return _rank(a) > _rank(b)
 
 
 static func _read_doc(path: String) -> Dictionary:

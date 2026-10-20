@@ -24,6 +24,10 @@ signal answered(card: CardScript, button: String)
 ## answer, nothing graded -- the reader is not ready for this ayah now,
 ## and the card returns with tomorrow's new cards.
 signal deferred(card: CardScript)
+## A card taken out of the schedule for good: not an answer, nothing graded,
+## nothing remembered of what it had learned -- the reader is done being
+## asked this ayah, and the queue will never offer it again.
+signal suspended(card: CardScript)
 signal volume_changed(value: float)
 signal edited(card: CardScript)
 ## The verses' hand, chosen where they are read: main hears it, remembers
@@ -301,14 +305,15 @@ func _answers() -> Control:
         grid.custom_minimum_size = Vector2(0, 72)
         return grid
 
-## The footer's own column: the way forward and the way out, one above the
-## other. The way forward -- "Show answer" -- is the page's one loud word,
-## standing at the column's full width; the way out -- "Not today", the
-## card put back in its basket until tomorrow -- is a quiet ghost beneath
-## it, centred and a breath shorter, because it must be found when it is
-## wanted and never stumbled into. It stands only on the question side:
-## once the answer is seen, the card is answered, not put back. At the end
-## the column carries one word only.
+## The footer's own column: the way forward and the two ways out, one above
+## the other. The way forward -- "Show answer" -- is the page's one loud
+## word, standing at the column's full width; the ways out are quiet ghosts
+## beneath it, centred and a breath shorter, because they must be found
+## when they are wanted and never stumbled into. "Not today" puts the card
+## back in its basket until tomorrow; "Not at all", a breath shorter still,
+## takes it out of the schedule for good -- as though it was never started.
+## Both stand only on the question side: once the answer is seen, the card
+## is answered, not put back. At the end the column carries one word only.
 func _footer() -> Control:
         var row := CenterContainer.new()
         row.name = "Footer"
@@ -333,6 +338,19 @@ func _footer() -> Control:
         )
         put_back.pressed.connect(_put_back)
         stack.add_child(put_back)
+
+        # The quietest way out stands last and smallest: one deliberate reach
+        # further than "Not today", for the card the reader wants never to be
+        # asked again. It carries its own words, and the tooltip says exactly
+        # what it does -- there is no way back from it inside the app.
+        var take_out := ThemeScript.ghost_button(I18nScript.t("Not at all"), ThemeScript.INK_SOFT, 40, 20)
+        take_out.name = "TakeOut"
+        take_out.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        take_out.tooltip_text = I18nScript.t(
+                "Take this card out of the schedule for good — as if never studied."
+        )
+        take_out.pressed.connect(_take_out)
+        stack.add_child(take_out)
 
         var done := ThemeScript.ghost_button(I18nScript.t("Done"), ThemeScript.GREEN, 58)
         done.name = "Done"
@@ -386,6 +404,7 @@ func _layout() -> void:
         stack.custom_minimum_size = Vector2(room, 0)
         var escape_w := 150.0 if size.x >= 470.0 else 126.0
         (stack.get_node("PutBack") as Button).custom_minimum_size = Vector2(escape_w, 48.0)
+        (stack.get_node("TakeOut") as Button).custom_minimum_size = Vector2(escape_w, 40.0)
         (stack.get_node("ShowAnswer") as Button).custom_minimum_size = Vector2(room, 58.0)
         (stack.get_node("Done") as Button).custom_minimum_size = Vector2(room, 58.0)
         # The small pages that hang from the header's coins stay hung: the
@@ -424,6 +443,7 @@ func _show_front(incoming := false) -> void:
         _view.show_text(card.front, card.folder, true)
         get_node("Margin/Column/Footer/Stack/ShowAnswer").visible = true
         get_node("Margin/Column/Footer/Stack/PutBack").visible = true
+        get_node("Margin/Column/Footer/Stack/TakeOut").visible = true
         get_node("Margin/Column/Footer/Stack/Done").visible = false
         _clear_answers()
         _settle_card(incoming)
@@ -452,9 +472,10 @@ func _reveal() -> void:
         var scroll: ScrollContainer = get_node("Margin/Column/Surface")
         scroll.scroll_vertical = 0
         get_node("Margin/Column/Footer/Stack/ShowAnswer").visible = false
-        # The escape belongs to the question alone: once the answer is seen,
-        # the card is answered, not put back.
+        # The escapes belong to the question alone: once the answer is seen,
+        # the card is answered, not put back and not taken out.
         get_node("Margin/Column/Footer/Stack/PutBack").visible = false
+        get_node("Margin/Column/Footer/Stack/TakeOut").visible = false
 
         _clear_answers()
         _options = SchedulerScript.options(SchedulerScript.id_seed(card.id), card.state, int(Time.get_unix_time_from_system()))
@@ -587,6 +608,18 @@ func _put_back() -> void:
                 return
         var card: CardScript = _cards[_index]
         deferred.emit(card)
+        _advance(false)
+
+
+## The card leaves the schedule altogether: whatever it had learned is
+## given back, the door closes, and the page hands itself to whatever comes
+## next the way a finished card does. Like a defer, the session's own count
+## never hears of it -- but unlike a defer, no tomorrow brings it back.
+func _take_out() -> void:
+        if _busy or _index >= _cards.size() or _revealed:
+                return
+        var card: CardScript = _cards[_index]
+        suspended.emit(card)
         _advance(false)
 
 
@@ -737,6 +770,7 @@ func _show_done() -> void:
         ThemeScript.stagger_in(summary, 0.09, 0.3)
         get_node("Margin/Column/Footer/Stack/ShowAnswer").visible = false
         get_node("Margin/Column/Footer/Stack/PutBack").visible = false
+        get_node("Margin/Column/Footer/Stack/TakeOut").visible = false
         get_node("Margin/Column/Footer/Stack/Done").visible = true
 
 # --- the card, editable on the spot --------------------------------------------------

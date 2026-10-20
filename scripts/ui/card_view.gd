@@ -167,10 +167,10 @@ func _add_text(markdown: String, link: String, lead := false) -> void:
                 label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         var face: Font = ThemeScript.verse_face(script)
         label.add_theme_font_override("normal_font", face)
-        # The deck's emphasis marks mean a lean, and a lean needs a face that
-        # leans: the engine's [i] falls back to the upright normal when no
-        # italic is given, and the stars the author wrote would show as
-        # nothing at all. Every script gets the sheared twin of its own face.
+        # A hand-written [i] in a card still leans in the line's own face:
+        # the engine's [i] falls back to the upright normal when no italic is
+        # given. Nothing the app itself writes leans -- the author's stars are
+        # stars -- but a card is plain text a hand may dress any way it likes.
         var bold_face: Font = ThemeScript.verse_face(script, true)
         label.add_theme_font_override("bold_font", bold_face)
         label.add_theme_font_override("italics_font", ThemeScript.leaning(face))
@@ -557,13 +557,13 @@ static func _bbcode(markdown: String, _script := "plain") -> String:
         var text := markdown
         text = _links(text)
         text = _bold(text)
-        # The author's asterisks are emphasis, and emphasis is honoured in
-        # every script. Neither Amiri nor Vazirmatn ships an italic, so the
-        # engine tilts them by force -- and that lean is the voice the deck's
-        # author asked for when they wrapped the bismillah in stars. Stripping
-        # the marks instead made the emphasis vanish entirely, and the author
-        # asked, four exclamation marks deep, where their stars had gone.
-        return _italic(text)
+        # The author's asterisks are the author's asterisks: a star written
+        # on either side of a word is shown on either side of the word, a
+        # character like any other. The deck's author wrapped the bismillah
+        # in stars to see them, not to lean the words between them -- the
+        # emphasis reading was the app's own, and the author asked for it
+        # to stop.
+        return text
 
 
 ## Markdown links become clickable BBCode. Images are skipped -- the view's
@@ -575,10 +575,6 @@ static func _links(text: String) -> String:
 static func _bold(text: String) -> String:
         var re := RegEx.create_from_string("\\*\\*(?P<inner>[^*]+)\\*\\*")
         return re.sub(text, "[b]$1[/b]", true)
-
-static func _italic(text: String) -> String:
-        var re := RegEx.create_from_string("(?<!\\*)\\*(?P<inner>[^*]+)\\*(?!\\*)")
-        return re.sub(text, "[i]$1[/i]", true)
 
 func _clear() -> void:
         _stop_audio()

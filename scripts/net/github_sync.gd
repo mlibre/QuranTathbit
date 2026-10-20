@@ -18,10 +18,12 @@ const GitHubAuthScript := preload("res://scripts/net/github_auth.gd")
 ##                                                     -> per-card merge (progress)
 ##
 ## progress.json merges card by card: the entry with more reviews wins, the
-## later answer breaks ties. Two devices can study offline and both keep
-## their work when they meet. It also goes out when local study moved it past
-## the bytes the repo last saw -- one device studying, then syncing, is the
-## common case, and it must reach the other machines.
+## later answer breaks ties -- and a deliberate reset (a defer, a suspend)
+## is judged by its moment, newer than anything older whatever the review
+## count says. Two devices can study offline and both keep their work when
+## they meet. It also goes out when local study moved it past the bytes the
+## repo last saw -- one device studying, then syncing, is the common case,
+## and it must reach the other machines.
 ##
 ## What there is to send is sent as ONE commit: the files' blobs upload
 ## first, a handful at a time, and then a single tree, commit and ref update
@@ -501,11 +503,14 @@ static func _commit_message(sends: Array, deletes: Array) -> String:
 ## from the others.
 const CHOICE_KEYS := ["new_per_day", "ayah_font", "ui_lang"]
 
-## Card by card: more reviews wins, then the later answer. The reader's
-## own choices ride the same merge: the choice made later wins, the way a
-## later answer breaks a card's tie. The file goes to the repo when the
-## merge changed it or when local study moved it past the bytes the repo
-## last saw.
+## Card by card: more reviews wins, then the later answer -- unless one
+## side is a deliberate reset (a defer, a suspend: nothing answered, yet
+## touched at a known moment), which is judged by its moment alone, newer
+## than anything older and older than anything newer, whatever either
+## side's review count says. The reader's own choices ride the same merge:
+## the choice made later wins, the way a later answer breaks a card's tie.
+## The file goes to the repo when the merge changed it or when local study
+## moved it past the bytes the repo last saw.
 func _merge_progress(deck_path: String, remote: Dictionary, manifest: Dictionary) -> Dictionary:
         var local_path := deck_path.path_join("progress.json")
         var remote_sha := str(remote.get("progress.json", ""))
@@ -535,7 +540,7 @@ func _merge_progress(deck_path: String, remote: Dictionary, manifest: Dictionary
                 if not mine.has(card_id):
                         mine[card_id] = their_state
                         merged += 1
-                elif _progress_rank(their_state) > _progress_rank(mine[card_id]):
+                elif _state_beats(their_state, mine[card_id]):
                         mine[card_id] = their_state
                         merged += 1
         for key in CHOICE_KEYS:
@@ -576,6 +581,23 @@ static func _progress_needs_push(local_path: String, manifest: Dictionary) -> bo
 
 static func _progress_rank(state: Dictionary) -> Array:
         return [int(state.get("reps", 0)), int(state.get("mod", 0))]
+
+
+## Does one card state outrank another? Two answered states are compared
+## the way they always were: more reviews wins, then the later answer. A
+## deliberate reset -- nothing answered, yet touched at a known moment (a
+## defer put the card back in the initial basket; a suspend took it out of
+## the schedule altogether) -- is judged by its moment alone: it outranks
+## anything older, whatever that side's review count says, and anything
+## newer outranks it. Without this, a defer would lose the merge to the
+## very answers it was a deliberate act later than, and the card the
+## reader put back would return as though they had never said "not today".
+static func _state_beats(a: Dictionary, b: Dictionary) -> bool:
+        var a_reset := int(a.get("reps", 0)) == 0 and int(a.get("mod", 0)) > 0
+        var b_reset := int(b.get("reps", 0)) == 0 and int(b.get("mod", 0)) > 0
+        if a_reset or b_reset:
+                return int(a.get("mod", 0)) > int(b.get("mod", 0))
+        return _progress_rank(a) > _progress_rank(b)
 
 static func _progress_entries(body: PackedByteArray) -> Dictionary:
         if body.is_empty():

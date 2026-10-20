@@ -58,8 +58,10 @@ its fill growing from the right.
   overridden, the run falls to the theme's default face at the theme's
   default size, which carried no Arabic letters at all. Every run the
   bbcode can reach must find a face and a size the app chose (`card_view`
-  dresses all four faces and all four sizes; italics get the sheared twin
-  of the same face — neither Amiri nor Vazirmatn ships an italic).
+  dresses all four faces and all four sizes; a hand-written `[i]` gets the
+  sheared twin of the same face — neither Amiri nor Vazirmatn ships an
+  italic). The deck's own single stars are never `[i]`: a star the author
+  wrote is a star the reader sees (`**` still means weight).
 - The engine's own chrome still wears the app's hand: a tooltip is raised
   by the engine and dressed by the theme alone, so the window's theme
   (`ThemeScript.tooltip_theme()`) carries a Vazirmatn `TooltipLabel` and

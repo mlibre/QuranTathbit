@@ -22,6 +22,7 @@ func _init() -> void:
         await _test_second_device_pulls()
         await _test_local_edit_wins()
         await _test_progress_merges()
+        await _test_defer_survives_the_merge()
         await _test_local_progress_pushes()
         await _test_pace_travels_with_progress()
         await _test_quiet_sync_transfers_nothing()
@@ -302,6 +303,54 @@ func _test_progress_merges() -> void:
         var cards: Dictionary = (merged as Dictionary).cards
         _is(cards["001"].reps, 9, "the deeper study wins the merge")
         _is(cards["002"].reps, 1, "the local study the remote never saw is kept")
+
+## A defer or a suspend is a deliberate act, later than any answer before
+## it -- and the merge must see that, or the card the reader put back
+## returns with the very answers the defer was later than. The repo holds
+## the card answered; the reader defers or suspends it here; the sync that
+## follows must keep the reader's act, and the repo must carry it away.
+## An answer that arrives from another device AFTER the act is newer
+## learning, and wins -- the card returns to study, as it should.
+func _test_defer_survives_the_merge() -> void:
+        _write_deck({"001": ["Q1", "A1"], "002": ["Q2", "A2"]})
+        var fake := FakeGitHub.new()
+        var sync := _make_sync(fake)
+        # Both cards were studied and pushed: the repo holds them answered.
+        _write_progress({
+                "001": {"status": "review", "ivl": 4, "ease": 2.5, "reps": 3, "lapses": 0, "mod": 1000, "due_day": 100, "step": 0, "relearning": false, "due_ts": 0},
+                "002": {"status": "review", "ivl": 4, "ease": 2.5, "reps": 2, "lapses": 0, "mod": 1100, "due_day": 100, "step": 0, "relearning": false, "due_ts": 0},
+        })
+        await sync.sync(DECK)
+        # The reader defers 001 and takes 002 out altogether -- both later
+        # than anything the repo knows, both with nothing answered.
+        _write_progress({
+                "001": {"status": "new", "reps": 0, "mod": 5000, "defer_day": 60, "suspended": false},
+                "002": {"status": "new", "reps": 0, "mod": 5100, "defer_day": 0, "suspended": true},
+        })
+        var result: Dictionary = await sync.sync(DECK)
+        _ok(bool(result.get("ok", false)), "a sync after a defer and a suspend succeeds")
+        var merged: Variant = JSON.parse_string(_read(DECK.path_join("progress.json")))
+        var cards: Dictionary = (merged as Dictionary).cards
+        _is(str(cards["001"].get("status", "")), "new", "the deferred card keeps its defer through the merge")
+        _is(int(cards["001"].get("defer_day", 0)), 60, "the defer's day survives the merge")
+        _is(int(cards["001"].get("reps", 0)), 0, "the deferred card's reset survives the merge")
+        _ok(bool(cards["002"].get("suspended", false)), "the suspended card keeps its suspension through the merge")
+        # The reader's acts reach the repo, so the next device honours them.
+        if fake.files.has("progress.json"):
+                var pushed: Variant = JSON.parse_string(fake.files["progress.json"].content.get_string_from_utf8())
+                var pushed_cards: Dictionary = (pushed as Dictionary).get("cards", {})
+                _is(str(pushed_cards["001"].get("status", "")), "new", "the defer is pushed to the repo")
+                _ok(bool(pushed_cards["002"].get("suspended", false)), "the suspension is pushed to the repo")
+        # An answer that arrives after the act is newer learning: the card
+        # returns to study, and the later word wins.
+        fake.commit_change("progress.json", (JSON.stringify({"format": 1, "cards": {
+                "001": {"status": "review", "ivl": 4, "ease": 2.5, "reps": 3, "lapses": 0, "mod": 6000, "due_day": 100, "step": 0, "relearning": false, "due_ts": 0},
+        }}) + "\n"))
+        var later: Dictionary = await sync.sync(DECK)
+        _ok(bool(later.get("ok", false)), "a sync against a later answer succeeds")
+        var after: Variant = JSON.parse_string(_read(DECK.path_join("progress.json")))
+        var after_cards: Dictionary = (after as Dictionary).cards
+        _is(int(after_cards["001"].get("reps", 0)), 3, "an answer later than a defer returns the card to study")
 
 ## Local study must reach the repo even when the remote never moved: that is
 ## the common case -- one device studies, then syncs.

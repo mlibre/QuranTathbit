@@ -25,6 +25,7 @@ func _init() -> void:
         _test_find_backups()
         _test_fresh_arrival()
         _test_merge_precedence()
+        _test_reset_survives_import()
         _test_choices_by_moment()
         _test_additive_content()
         _test_wrapped_zip()
@@ -225,6 +226,43 @@ func _test_merge_precedence() -> void:
         _is(deck.cards[0].state.reps, 5, "the backup's fuller history on 001 arrives")
         _is(deck.cards[1].state.reps, 4, "local's fuller history on 002 stays")
         _is(deck.cards[2].state.reps, 1, "a card the backup never met keeps local's word")
+
+## A defer or a suspend is a deliberate act, later than any answer before
+## it: a backup that still holds the answered card must not drag it back
+## into the schedule when it is joined. The reader's own acts -- putting a
+## card back for the day, taking another out for good -- are newer than
+## anything the backup knows, and they survive the join.
+func _test_reset_survives_import() -> void:
+        _teardown()
+        # The backup: both cards answered, before the reader's acts.
+        _write_deck(ROOT, ["001", "002"],
+                {"001": _state(3, 1790001000), "002": _state(2, 1790000900)},
+                {})
+        DirAccess.make_dir_recursive_absolute(OUT)
+        var target := OUT.path_join("reset.zip")
+        _ok(bool(DeckZipScript.export_deck(ROOT, target).get("ok", false)), "the answered deck packs")
+
+        # This deck: 001 deferred and 002 suspended, both later than the
+        # backup's answers, both with nothing answered.
+        var deferred := SchedulerScript.new_state()
+        deferred["defer_day"] = SchedulerScript.today(1790005000)
+        deferred["mod"] = 1790005000
+        var suspended := SchedulerScript.new_state()
+        suspended["suspended"] = true
+        suspended["mod"] = 1790006000
+        _write_deck(OTHER, ["001", "002"],
+                {"001": deferred, "002": suspended},
+                {})
+        var result: Dictionary = DeckZipScript.import_deck(OTHER, target)
+        _ok(bool(result.get("ok", false)), "the join runs")
+        _is(int(result.get("merged", 0)), 0, "the backup's older answers do not arrive (got %d)" % int(result.get("merged", 0)))
+        var deck: DeckScript = DeckScript.load(OTHER)
+        if deck == null:
+                _ok(false, "the joined deck loads")
+                return
+        _ok(SchedulerScript.is_deferred(deck.cards[0].state, 1790005000), "the defer survives the join")
+        _ok(SchedulerScript.is_suspended(deck.cards[1].state), "the suspension survives the join")
+        _is(deck.cards[0].state.reps, 0, "nothing of the backup's answer returns with the defer")
 
 ## The choices merge by their own moments, the way the sync engine merges
 ## them: a later choice wins wherever it was made, an earlier one does not

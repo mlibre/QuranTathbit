@@ -124,6 +124,27 @@ func _init() -> void:
         if code < 13:
                 push_error("the Android version code must move past 12")
                 failures += 1
+        # Every place a version lives must say the same word: the runtime's
+        # own number, the desktop builds' product_version, the Android
+        # version/name (the string a phone's Settings page shows -- it sat
+        # seven releases behind before this check was born), and the npm
+        # package. A number that forgot to move fails here, loudly.
+        var VersionScript := load("res://scripts/data/version.gd")
+        var version := str(VersionScript.VERSION)
+        for preset_i in [1, 2]:
+                var product := str(cfg.get_value("preset.%d.options" % preset_i, "application/product_version", ""))
+                if product != version:
+                        push_error("preset.%d product_version is %s; the app says %s" % [preset_i, product, version])
+                        failures += 1
+        var name_version := str(cfg.get_value("preset.3.options", "version/name", ""))
+        if name_version != version:
+                push_error("Android version/name is %s; the app says %s" % [name_version, version])
+                failures += 1
+        var pkg: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://package.json"))
+        var pkg_version := str((pkg as Dictionary).get("version", "")) if typeof(pkg) == TYPE_DICTIONARY else ""
+        if pkg_version != version:
+                push_error("package.json says %s; the app says %s" % [pkg_version, version])
+                failures += 1
         print("export_presets.cfg: %s (guard at %d of %d chars; android code %d)" % [
                 "OK" if failures == 0 else "BROKEN", guard_at, include.length(), code,
         ])

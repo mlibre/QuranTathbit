@@ -399,6 +399,7 @@ func _start_session() -> void:
         study.start(cards)
         study.answered.connect(_on_answered)
         study.deferred.connect(_on_deferred)
+        study.suspended.connect(_on_suspended)
         study.edited.connect(_on_card_edited)
         study.closed.connect(_on_session_closed)
         study.volume_changed.connect(_on_volume_changed)
@@ -454,6 +455,17 @@ func _on_answered(card: CardScript, button: String) -> void:
 ## session closes, without the reader being asked to remember it.
 func _on_deferred(card: CardScript) -> void:
         _deck.defer(card, _now())
+        _deck.save_progress()
+        _answers_waiting += 1
+
+
+## A card taken out of the schedule for good: not an answer, but a change
+## every device the deck reaches must honour -- as though the card was
+## never started at all. It rides the same door an answer rides, so the
+## deck says so to GitHub when the session closes, without the reader
+## being asked to remember it.
+func _on_suspended(card: CardScript) -> void:
+        _deck.suspend(card, _now())
         _deck.save_progress()
         _answers_waiting += 1
 

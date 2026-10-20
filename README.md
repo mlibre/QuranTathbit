@@ -5,8 +5,10 @@
 <img src="docs/media/qurantathbit_banner.svg" alt="QuranTathbit — a calm app for memorizing the Qur'an" width="800"/>
 
 [![Play in your browser](https://img.shields.io/badge/%E2%96%B6%EF%B8%8F%20Play%20in%20your%20browser-GitHub%20Pages-1E6B52?style=for-the-badge&labelColor=14513D)](https://mlibre.github.io/QuranTathbit/)
-[![Download](https://img.shields.io/badge/Download-Releases-C29A3B?style=for-the-badge&labelColor=14513D)](https://github.com/mlibre/QuranTathbit/releases)
+[![Download APK](https://img.shields.io/badge/Download-Android%20APK-C29A3B?style=for-the-badge&labelColor=14513D)](https://github.com/mlibre/QuranTathbit/releases/latest/download/QuranTathbit-Android.apk)
 ![Made with Godot](https://img.shields.io/badge/made%20with-Godot%204.7-478cbf?style=for-the-badge&labelColor=14513D)
+
+**English** · [فارسی](README.fa.md) · [العربية](README.ar.md)
 
 </div>
 
@@ -31,7 +33,25 @@ first visit. To keep it on your phone like a normal app, use your
 browser's menu: **Install app** (Chrome, Edge) or **Add to Home Screen**
 (Safari).
 
-## ⬇️ Download it instead
+## 📱 Put it on your phone (Android)
+
+The app ships as a plain APK — no store, no account, no install wizard:
+
+### **[⬇️ Download QuranTathbit-Android.apk](https://github.com/mlibre/QuranTathbit/releases/latest/download/QuranTathbit-Android.apk)**
+
+(Android 5.0 or newer; the one file carries both 32- and 64-bit phones.)
+
+1. Open the link on your phone — the file downloads.
+2. Tap it (or open it from Downloads). Android asks to *allow installs
+   from this source* once — allow it.
+3. Install, open. That is the whole app; it works offline from the first
+   run, and it never asks for an account.
+
+Prefer a browser instead? The [web app](https://mlibre.github.io/QuranTathbit/)
+installs the same way — **Install app** in Chrome/Edge or **Add to Home
+Screen** in Safari.
+
+## ⬇️ Desktop builds
 
 Grab a build from the [**Releases**](https://github.com/mlibre/QuranTathbit/releases) page:
 
@@ -39,7 +59,6 @@ Grab a build from the [**Releases**](https://github.com/mlibre/QuranTathbit/rele
 | ----------- | ------------------------------------------------ | ---------------------------------------------------- |
 | **Windows** | `QuranTathbit-Windows.zip` → `QuranTathbit.exe`  | unzip anywhere, double-click                         |
 | **Linux**   | `QuranTathbit-Linux.zip` → `QuranTathbit.x86_64` | `chmod +x`, then run                                 |
-| **Android** | `QuranTathbit-Android.apk`                       | sideload; allow installs from this source when asked |
 
 No installer, no dependencies. The download *is* the app.
 
@@ -54,7 +73,12 @@ No installer, no dependencies. The download *is* the app.
    each verse can be played — in Arabic, or spoken in Persian. Four
    buttons ask how it went: **Again**, **Hard**, **Good**, **Easy**. Each
    button says when the card will come back.
-4. When the queue is empty, the app says so. Come back tomorrow.
+4. Two quiet ways out wait under **Show answer**, for the question side
+   only: **Not today** puts the card back until tomorrow's new cards, and
+   **Not at all** takes it out of the schedule for good — as if you never
+   started studying it. (To bring a "not at all" card back, delete its
+   entry from `progress.json`.)
+5. When the queue is empty, the app says so. Come back tomorrow.
 
 A few quiet extras:
 
@@ -70,8 +94,9 @@ A few quiet extras:
   page asks its questions from the right too: the search line waits at the
   right edge and the pills read همه، سررسید، تازه، در مرور from the right
   hand.
-- **Set your own pace.** Settings → *New cards each day* (default 20, set
-  it to 0 for review-only days).
+- **Set your own pace.** Settings → *New cards each day* (default 2 — a
+  scripture deck is learned a couple of verses a day; set it to 0 for
+  review-only days).
 - **Size the app for your eyes.** Settings → *Display*: an *interface
   scale* that grows the whole page at once — cards, pills and words
   together, the way a phone's display-size setting does — and a *text
@@ -150,6 +175,7 @@ the whole deck as one file you can carry by hand.
 | --------------------- | ---------------------------------------------- |
 | **Space** / **Enter** | show the answer, then answer **Good**          |
 | **1** – **4**         | answer **Again**, **Hard**, **Good**, **Easy** |
+| **S**                 | **Not today** — put the card back for the day  |
 | **Esc**               | close the session                              |
 
 While editing a card: **Esc** closes without saving, **Ctrl+Enter** saves.

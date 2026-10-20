@@ -247,12 +247,15 @@ func _check_study_session(main: Node) -> void:
         # The way out stands beneath the way forward: "Not today" is a quiet
         # ghost centred under the page's one loud word -- never beside it --
         # so the thumb that wants to go on meets one word first, and the
-        # thumb that wants out finds it without aiming.
+        # thumb that wants out finds it without aiming. "Not at all" stands
+        # a breath further down and a breath smaller still: the quietest way
+        # out, found only by reaching for it.
         var forward: Button = study.get_node_or_null("Margin/Column/Footer/Stack/ShowAnswer")
         var escape: Button = study.get_node_or_null("Margin/Column/Footer/Stack/PutBack")
+        var never: Button = study.get_node_or_null("Margin/Column/Footer/Stack/TakeOut")
         _ok(
-                forward != null and escape != null,
-                "the question side carries the way forward and the way out"
+                forward != null and escape != null and never != null,
+                "the question side carries the way forward and the two ways out"
         )
         if forward != null and escape != null:
                 var forward_rect := forward.get_global_rect()
@@ -264,6 +267,21 @@ func _check_study_session(main: Node) -> void:
                 _ok(
                         absf(escape_rect.get_center().x - forward_rect.get_center().x) < 3.0,
                         "the way out is centred under the way forward"
+                )
+        if escape != null and never != null:
+                var escape_rect := escape.get_global_rect()
+                var never_rect := never.get_global_rect()
+                _ok(
+                        never_rect.position.y >= escape_rect.end.y - 1.0,
+                        "the quietest way out stands beneath the first"
+                )
+                _ok(
+                        absf(never_rect.get_center().x - escape_rect.get_center().x) < 3.0,
+                        "the quietest way out is centred under the first"
+                )
+                _ok(
+                        never_rect.size.y < escape_rect.size.y,
+                        "the quietest way out is the smaller word"
                 )
         # The recitation's loudness lives in the header's free corner: a coin
         # beside the way back, and under it a rule the hand can drag.
@@ -545,14 +563,14 @@ func _check_study_session(main: Node) -> void:
                         (footer.get_node("Citation") as RichTextLabel).text.contains("quran.makarem.ir"),
                         "the footer carries the deck's source"
                 )
-        # Scripture leans when its author asked it to: the deck's italic marks
-        # are honoured in every script, and the engine's forced tilt on the
-        # Quranic face is the emphasis the stars always meant. Stripping them
-        # instead made the bismillah's emphasis vanish, and the author noticed.
+        # The author's stars are the author's stars: a star written beside a
+        # word is shown beside the word, in every script -- the emphasis
+        # reading was the app's own, and the author asked for it to stop.
         var CardViewForType := load("res://scripts/ui/card_view.gd")
-        _is(CardViewForType._bbcode("*بِسمِ اللهِ*", "arabic"), "[i]بِسمِ اللهِ[/i]", "an Arabic emphasis keeps its lean")
-        _is(CardViewForType._bbcode("*a note*", "plain"), "[i]a note[/i]", "a Latin emphasis keeps its lean")
-        _is(CardViewForType._bbcode("*بنام خداوند*", "persian"), "[i]بنام خداوند[/i]", "a Persian emphasis keeps its lean")
+        _is(CardViewForType._bbcode("*بِسمِ اللهِ*", "arabic"), "*بِسمِ اللهِ*", "an Arabic star stays a star")
+        _is(CardViewForType._bbcode("*a note*", "plain"), "*a note*", "a Latin star stays a star")
+        _is(CardViewForType._bbcode("*بنام خداوند*", "persian"), "*بنام خداوند*", "a Persian star stays a star")
+        _is(CardViewForType._bbcode("**bold**", "plain"), "[b]bold[/b]", "a double star still means weight")
         # The verse's Persian voice stands beside its Arabic one: the
         # translation recitation, offered as its own pill, named for its
         # language and the verse it speaks.

@@ -17,6 +17,7 @@ func _init() -> void:
         _test_lapse_and_relearn()
         _test_counts_and_queue()
         _test_defer()
+        _test_suspend()
         if _failures > 0:
                 print("scheduler: %d FAILURE(S)" % _failures)
                 quit(1)
@@ -203,6 +204,7 @@ func _test_defer() -> void:
         _is(deferred.reps, 0, "nothing is remembered of the old learning")
         _is(deferred.ease, SchedulerScript.INITIAL_EASE, "the ease starts over")
         _is(deferred.defer_day, SchedulerScript.today(now), "the day is stamped")
+        _is(deferred.mod, now, "the moment is stamped, so the merges can see the act")
         _ok(SchedulerScript.is_deferred(deferred, now), "the state is deferred today")
 
         # Today the queue passes over the deferred card without paying for it.
@@ -223,6 +225,45 @@ func _test_defer() -> void:
                 not SchedulerScript.is_deferred(deck.cards[0].state, day_after),
                 "the defer has passed"
         )
+
+## The reader's last word on a card: out of the schedule for good, as
+## though never started. Whatever the card was -- new, learning, resting
+## between reviews -- it is none of the day's business again, and the day's
+## count is never spent on it.
+func _test_suspend() -> void:
+        var now := 1792000000
+        var deck = load("res://scripts/data/deck.gd").new()
+        deck.name = "suspend"
+        for i in range(6):
+                deck.cards.append(load("res://scripts/data/card.gd").new(str(i), ""))
+
+        # A studied card and a resting card are both taken out: each is
+        # given back to the initial basket, and the door is closed.
+        deck.answer(deck.cards[0], "good", now)
+        deck.answer(deck.cards[1], "good", now)
+        deck.answer(deck.cards[1], "good", now + SchedulerScript.DAY)  # graduate to review
+        _is(deck.cards[1].state.status, "review", "the card rested between reviews before the suspend")
+        var suspended := SchedulerScript.suspended_state(now + 2 * SchedulerScript.DAY)
+        _is(suspended.status, "new", "a suspended card is a new card")
+        _is(suspended.reps, 0, "nothing is remembered of the old learning")
+        _is(suspended.ease, SchedulerScript.INITIAL_EASE, "the ease starts over")
+        _is(suspended.mod, now + 2 * SchedulerScript.DAY, "the moment is stamped, so the merges can see the act")
+        _ok(SchedulerScript.is_suspended(suspended), "the state is suspended")
+        _ok(not SchedulerScript.is_suspended(SchedulerScript.new_state()), "a plain new card is not suspended")
+
+        deck.cards[0].state = suspended.duplicate(true)
+        deck.cards[1].state = suspended.duplicate(true)
+        var later := now + 3 * SchedulerScript.DAY
+        var counts := SchedulerScript.counts(deck, later)
+        var queue := SchedulerScript.queue(deck, later)
+        _is(counts.due, 0, "a suspended card is never due")
+        _is(counts.new, SchedulerScript.NEW_PER_DAY, "a suspended card never spends the day's count")
+        _is(counts.learned, 0, "a suspended card is not learned")
+        _ok(not queue.has(deck.cards[0]), "a suspended learning card is not offered")
+        _ok(not queue.has(deck.cards[1]), "a suspended review card is not offered")
+        # A year on, the door stays closed.
+        var year := now + 365 * SchedulerScript.DAY
+        _ok(not SchedulerScript.queue(deck, year).has(deck.cards[0]), "a year on, the card is still out of the schedule")
 
 func _days_of(opts: Array, button: String) -> int:
         for opt in opts:

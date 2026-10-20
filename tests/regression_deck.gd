@@ -19,6 +19,7 @@ func _init() -> void:
         _test_progress_round_trip()
         _test_progress_bytes_are_stable()
         _test_defer_round_trip()
+        _test_suspend_round_trip()
         _test_pace_round_trip()
         _test_choice_round_trip()
         _test_broken_progress()
@@ -141,6 +142,32 @@ func _test_defer_round_trip() -> void:
         )
         var raw := FileAccess.get_file_as_string(ROOT.path_join("progress.json"))
         _ok(raw.contains("\"defer_day\""), "the defer's day is written to progress.json")
+
+## A card taken out of the schedule for good round-trips like a defer does:
+## the deck remembers the closed door across a reload, whatever the card
+## had learned before it closed, and the queue and the counts pass over
+## the card forever.
+func _test_suspend_round_trip() -> void:
+        var deck: DeckScript = DeckScript.load(ROOT)
+        var now := 1792000300
+        # A card with history: the suspend must give the history back.
+        deck.answer(deck.cards[0], "good", 1792000100)
+        deck.suspend(deck.cards[0], now)
+        _ok(deck.dirty, "suspending marks the deck dirty")
+        _ok(deck.save_progress(), "progress saves with a suspended card")
+        var reloaded: DeckScript = DeckScript.load(ROOT)
+        _ok(SchedulerScript.is_suspended(reloaded.cards[0].state), "a studied card stays out of the schedule after a reload")
+        _is(reloaded.cards[0].state.reps, 0, "nothing is remembered of the old learning")
+        _is(reloaded.cards[0].state.ease, SchedulerScript.INITIAL_EASE, "the ease starts over")
+        _ok(not SchedulerScript.is_suspended(reloaded.cards[1].state), "the card beside it is untouched and unsuspended")
+        # The queue and the counts never offer the card again -- not even a
+        # year on, when every defer has long passed.
+        var queue: Array = SchedulerScript.queue(reloaded, now + 365 * SchedulerScript.DAY, 20)
+        _ok(not queue.has(reloaded.cards[0]), "a suspended card is never in the queue, even a year on")
+        var counts: Dictionary = SchedulerScript.counts(reloaded, now + 365 * SchedulerScript.DAY, 20)
+        _is(counts["new"], 1, "the counts see only the card left to offer (got %d)" % int(counts["new"]))
+        var raw := FileAccess.get_file_as_string(ROOT.path_join("progress.json"))
+        _ok(raw.contains("\"suspended\": true"), "the suspension is written to progress.json")
 
 ## The reader's own pace rides the progress file, where sync carries it to
 ## every device the deck reaches: a deck whose file never said one says

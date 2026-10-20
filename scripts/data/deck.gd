@@ -154,10 +154,12 @@ func save_progress() -> bool:
                 # Untouched cards stay out of the file -- but a defer is a
                 # touch the deck must remember: the card is new and unanswer,
                 # yet its day is spoken for until tomorrow carries it back.
+                # A suspend is the same kind of touch, without tomorrow.
                 if (
                         state["status"] == "new"
                         and int(state.get("reps", 0)) == 0
                         and int(state.get("defer_day", 0)) == 0
+                        and not SchedulerScript.is_suspended(state)
                 ):
                         continue
                 entries[card.id] = canonical_state(state)
@@ -227,4 +229,14 @@ func answer(card: CardScript, button: String, now: int) -> void:
 ## returns the card as new.
 func defer(card: CardScript, now: int) -> void:
         card.state = SchedulerScript.deferred_state(now)
+        dirty = true
+
+
+## A card taken out of the schedule for good: the reader never started
+## studying it, as far as the queue is ever told. Everything it had learned
+## is given back, the way a defer gives it back, and the door is closed:
+## not due, not new, not counted. The card stays in the deck -- a page in
+## the book, never again a card in its queue.
+func suspend(card: CardScript, now: int) -> void:
+        card.state = SchedulerScript.suspended_state(now)
         dirty = true

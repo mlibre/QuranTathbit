@@ -84,6 +84,7 @@ static func new_state() -> Dictionary:
                 "lapses": 0,
                 "mod": 0,
                 "defer_day": 0,  # the day a defer is waiting out; 0 never waited
+                "suspended": false,  # out of the schedule for good; see suspended_state
         }
 
 
@@ -93,11 +94,33 @@ static func new_state() -> Dictionary:
 ## today's counts; tomorrow the day has moved past the stamp and the card
 ## is new again, offered with the day's own fresh cards. Whatever the card
 ## had learned before is given back -- the reader asked for the initial
-## basket, not a shorter version of the old one.
+## basket, not a shorter version of the old one. The moment is stamped too:
+## a defer is a deliberate act, later than any answer before it, and the
+## merges that compare card states must be able to see that.
 static func deferred_state(now: int) -> Dictionary:
         var state := new_state()
         state["defer_day"] = today(now)
+        state["mod"] = now
         return state
+
+
+## Out of the schedule for good: the initial basket with the door closed
+## behind it. Nothing is due, nothing is offered, nothing is counted -- the
+## card is a page in the deck's book and never a card in its queue, as
+## though the reader never started studying it at all. The moment is
+## stamped the way a defer's is, so the merges can see the act.
+static func suspended_state(now: int) -> Dictionary:
+        var state := new_state()
+        state["suspended"] = true
+        state["mod"] = now
+        return state
+
+
+## Is this state a card the queue never offers, whatever its status? A
+## suspended card stands outside the schedule entirely: not due, not new,
+## not learned -- simply not asked.
+static func is_suspended(state: Dictionary) -> bool:
+        return bool(state.get("suspended", false))
 
 
 ## Is this state a card today's offer passes over? Only a new card can be
@@ -122,6 +145,10 @@ static func queue(deck, now: int, new_per_day := NEW_PER_DAY) -> Array:
         var new_left := maxi(new_per_day, 0)
         for card in deck.cards:
                 var state: Dictionary = card.state
+                # A suspended card is not the day's to ask, whatever it was:
+                # not due, not new, not learned -- outside the schedule.
+                if is_suspended(state):
+                        continue
                 match state["status"]:
                         "learning":
                                 if int(state["due_ts"]) <= now:
@@ -159,6 +186,10 @@ static func counts(deck, now: int, new_per_day := NEW_PER_DAY) -> Dictionary:
         var new_left := maxi(new_per_day, 0)
         for card in deck.cards:
                 var state: Dictionary = card.state
+                # The counts agree with the queue: a suspended card is
+                # nowhere among them, whatever it was before the door closed.
+                if is_suspended(state):
+                        continue
                 match state["status"]:
                         "learning":
                                 if int(state["due_ts"]) <= now:
