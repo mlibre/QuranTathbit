@@ -11,14 +11,14 @@ platform.
 GitHub → Settings → Developer settings → OAuth Apps → **Register a new OAuth
 app**. Fill the form exactly like this:
 
-| Field                         | Value                                                                 |
-| --- | --- |
-| **Application name**          | `QuranTathbit`                                                        |
-| **Homepage URL**              | `https://mlibre.github.io/QuranTathbit/`                              |
-| **Application description**   | `Quran flashcards. Sign in with GitHub to sync your deck and study progress across Android, Windows, Linux and Web.` |
+| Field                         | Value                                                                                                                                          |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Application name**          | `QuranTathbit`                                                                                                                                 |
+| **Homepage URL**              | `https://mlibre.github.io/QuranTathbit/`                                                                                                       |
+| **Application description**   | `Quran flashcards. Sign in with GitHub to sync your deck and study progress across Android, Windows, Linux and Web.`                           |
 | **Redirect URI**              | `https://mlibre.github.io/QuranTathbit/` (optional future browser-redirect: `http://localhost:8899/callback`; leave **wildcard matching off**) |
-| **Enable Device Flow**        | **checked** — the flow the app uses on every platform.                |
-| **Expire user access tokens** | leave **unchecked** — the app does not yet refresh tokens, and expiring tokens would sign you out every few hours. |
+| **Enable Device Flow**        | **checked** — the flow the app uses on every platform.                                                                                         |
+| **Expire user access tokens** | leave **unchecked** — the app does not yet refresh tokens, and expiring tokens would sign you out every few hours.                             |
 
 Submit the form, then copy the **Client ID** (a public value, not a secret —
 nothing else on that page is needed).

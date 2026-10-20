@@ -55,10 +55,10 @@ Screen** in Safari.
 
 Grab a build from the [**Releases**](https://github.com/mlibre/QuranTathbit/releases) page:
 
-| Platform    | File                                             | How to run                                           |
-| ----------- | ------------------------------------------------ | ---------------------------------------------------- |
-| **Windows** | `QuranTathbit-Windows.zip` → `QuranTathbit.exe`  | unzip anywhere, double-click                         |
-| **Linux**   | `QuranTathbit-Linux.zip` → `QuranTathbit.x86_64` | `chmod +x`, then run                                 |
+| Platform    | File                                             | How to run                   |
+| ----------- | ------------------------------------------------ | ---------------------------- |
+| **Windows** | `QuranTathbit-Windows.zip` → `QuranTathbit.exe`  | unzip anywhere, double-click |
+| **Linux**   | `QuranTathbit-Linux.zip` → `QuranTathbit.x86_64` | `chmod +x`, then run         |
 
 No installer, no dependencies. The download *is* the app.
 
@@ -86,6 +86,7 @@ A few quiet extras:
 - **Keep the deck as one file.** Settings → *Backup* packs verses, recitations and all your progress into a single zip; import joins a backup back in card by card, so a restore can never take a review away.
 - **Copy any verse or translation** — drag or long-press, and paste it anywhere.
 - **Runs on the phone you already have.** The web build loads even on Firefox 68 / Chrome 57-era browsers, says plainly when a device cannot run it or a download stalls, and its service worker takes over the moment an update arrives; the APK ships both 32- and 64-bit (`armeabi-v7a` + `arm64-v8a`) — Android 5.0 or newer.
+
 ## Your progress, kept safe
 
 Your deck can live in **your own private GitHub repository** — free, and
