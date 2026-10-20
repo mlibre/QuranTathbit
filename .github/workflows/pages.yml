@@ -245,6 +245,17 @@ jobs:
           grep -q "qt-paste-bridge" builds/web/index.html
           grep -q "addEventListener('paste'" builds/web/index.html
           grep -q "__qtPasteBridge" builds/web/index.html
+          # The clipboard the browser already owns answers Ctrl+C and Ctrl+X
+          # over the app's fields (the engine's own is a no-op on the web),
+          # and the browser's own menu answers a right press on the page's
+          # empty ground -- the app's working parts keep theirs. The markers
+          # alone would pass even if the gates arrived truncated, so their
+          # working parts are demanded, as always.
+          grep -q "qt-native-menu" builds/web/index.html
+          grep -q "__qtNativeMenu" builds/web/index.html
+          grep -q "__qtLastPointer" builds/web/index.html
+          grep -q "__qtClipInstall" builds/web/index.html
+          grep -q "__qtClipSel" builds/web/index.html
           # The WebGL2 pre-flight guard rides the page's head the same way:
           # a device that cannot run the app is told so, in its own words,
           # instead of being left watching a bar that never moves -- and the

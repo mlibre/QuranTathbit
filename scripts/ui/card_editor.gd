@@ -270,7 +270,8 @@ func _caption(text: String, node_name := "Caption") -> Label:
         return label
 
 ## What the keyboard already knows, said once for the eye: leaving, saving,
-## and the one mark of the deck's own markdown.
+## and the clipboard every hand already knows -- on the web the page carries
+## it, on a desktop the engine does, and to the reader it is one thing.
 func _hint_row() -> Control:
         var row := HBoxContainer.new()
         row.name = "Hints"
@@ -281,7 +282,8 @@ func _hint_row() -> Control:
         row.add_child(_hint_word(I18nScript.t("leave")))
         row.add_child(ThemeScript.key_chip("Ctrl + Enter"))
         row.add_child(_hint_word(I18nScript.t("save")))
-        row.add_child(_hint_word(I18nScript.t("·  *stars* lean a word")))
+        row.add_child(ThemeScript.key_chip("Ctrl + C / V"))
+        row.add_child(_hint_word(I18nScript.t("copy & paste")))
         return row
 
 func _hint_word(text: String) -> Label:

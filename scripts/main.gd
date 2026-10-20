@@ -15,6 +15,7 @@ const BrowseScript := preload("res://scripts/ui/browse.gd")
 const I18nScript := preload("res://scripts/ui/i18n.gd")
 const LanguagePickerScript := preload("res://scripts/ui/language_picker.gd")
 const TouchScrollScript := preload("res://scripts/ui/touch_scroll.gd")
+const RtlFieldScript := preload("res://scripts/ui/rtl_field.gd")
 
 ## QuranTathbit: one deck, kept in folders and files, studied one card at
 ## a time. This root owns the small amount of state the app has -- settings,
@@ -49,6 +50,11 @@ var _sync_retrying := false  # a failed quiet sync is waiting to try again
 var _sync_attempts := 0  # how many retries this quiet run has made
 var _sync_generation := 0  # a new run cancels the retries an older one left pending
 var _paste_callback: Variant = null  # the page's paste hook, kept alive for the app's whole life
+var _cut_callback: Variant = null  # the page's cut hook, kept beside it
+var _clip_state := ""  # what the page was last told the field in hand holds
+var _menu_free := -1  # what the page was last told the mouse stands on: paper (1) or working parts (0)
+var _menu_mouse := Vector2(-1.0, -1.0)  # where the mouse stood when that was last measured
+var _menu_at := 0  # when, because the ground can move under a still mouse too
 
 
 func _ready() -> void:
@@ -59,6 +65,7 @@ func _ready() -> void:
         # that matters dresses itself.
         get_window().theme = ThemeScript.tooltip_theme()
         _install_deck()
+        _patch_deck()
         _deliver_cards()
         _ensure_deck_audio()
         _sweep_sidecars()
@@ -86,6 +93,13 @@ func _ready() -> void:
         _sync = GitHubSyncScript.new(_http, _auth)
 
         _install_paste_bridge()
+        # Two quiet truths the page is told as they change, on the web alone:
+        # what the field in hand holds (the words a Ctrl+C means -- the page's
+        # own clipboard carries them; the engine's cannot), and whether the
+        # mouse stands on the page's paper or on one of its working parts
+        # (where nothing of the app lives, the browser's own menu answers a
+        # right press).
+        set_process(OS.has_feature("web"))
         _watch_updates()
         # The hand's own scroller, standing above every page from the first
         # one: on a phone the shelf answers a finger the way every list the
@@ -126,6 +140,38 @@ func _install_deck() -> void:
                 push_error("QuranTathbit: cannot create %s" % USER_DECK)
                 return
         _copy_tree(BUNDLED_DECK, USER_DECK)
+
+
+## Fixes the deck itself carries, asked of every boot: each patch touches
+## only a file still byte-for-byte the one this app shipped -- a card the
+## reader has edited is theirs, not ours -- and each is idempotent by
+## construction: once applied, the old bytes are gone and it never fires
+## again. The basmala card's author once wrapped its lines in stars for the
+## app's old leaning reading; the reading retired in v1.0.38, the stars
+## stayed, and the leading one reads as a stray the reader asked to see
+## gone. To the sync this is exactly an edit the reader made on this
+## machine: it wins the merge the way every honest edit does.
+const DECK_PATCHES := [
+        {
+                "path": "007/back.md",
+                "was": "*بِسمِ اللهِ الرَّحمانِ الرَّحیمِ * الم\n\n*بنام خداوند بخشنده مهربان* الم\n\n![002001.mp3](002001.mp3)\n\n[quran.makarem.ir · 2:1](https://quran.makarem.ir/#2:1)\n",
+                "now": "بِسمِ اللهِ الرَّحمانِ الرَّحیمِ * الم\n\nبنام خداوند بخشنده مهربان* الم\n\n![002001.mp3](002001.mp3)\n\n[quran.makarem.ir · 2:1](https://quran.makarem.ir/#2:1)\n",
+        },
+]
+
+func _patch_deck() -> void:
+        for patch in DECK_PATCHES:
+                var target := USER_DECK.path_join(str(patch["path"]))
+                if not FileAccess.file_exists(target):
+                        continue
+                if FileAccess.get_file_as_string(target) != str(patch["was"]):
+                        continue
+                var file := FileAccess.open(target, FileAccess.WRITE)
+                if file == null:
+                        push_error("QuranTathbit: cannot patch %s" % target)
+                        continue
+                file.store_string(str(patch["now"]))
+                file.close()
 
 
 func _copy_tree(from: String, to: String) -> void:
@@ -882,40 +928,187 @@ func _install_paste_bridge() -> void:
         if installer == null:
                 return
         installer.install(_paste_callback)
+        # Cut's other half rides the same install: the page takes the words
+        # to the browser's own clipboard (a keydown is a gesture the browser
+        # accepts), then hands the field back its empty.
+        _cut_callback = bridge.call("create_callback", _on_web_cut)
+        var clip: Variant = bridge.call("get_interface", "__qtClipInstall")
+        if clip != null:
+                clip.install(_cut_callback)
 
 
-## The page handed us its paste. One line is all a field takes; a
+## The page handed us its paste. A settings field takes one line -- a
 ## multi-line clipboard pastes its first line, the way every single-line
-## field everywhere treats it. A selection is replaced, not prepended to.
+## field everywhere treats it -- and the editor's own right-reading fields
+## answer for themselves: a verse keeps the shape the clipboard carried, a
+## reference takes its first line. A selection is replaced, never prepended
+## to.
 func _on_web_paste(args: Array) -> void:
         if args.is_empty():
                 return
         var raw := str(args[0]).replace("\r\n", "\n").replace("\r", "\n")
-        var text := raw.split("\n")[0].strip_edges()
-        if text.is_empty():
-                return
         var focus := get_viewport().gui_get_focus_owner()
-        if not focus is LineEdit:
+        if focus is LineEdit:
+                var text := raw.split("\n")[0].strip_edges()
+                if text.is_empty():
+                        return
+                var field := focus as LineEdit
+                if not field.editable:
+                        return
+                if field.has_selection():
+                        var from := field.get_selection_from_column()
+                        var to := field.get_selection_to_column()
+                        field.text = field.text.substr(0, from) + text + field.text.substr(to)
+                        field.caret_column = from + text.length()
+                        field.deselect()
+                else:
+                        field.insert_text_at_caret(text)
+                field.grab_focus()
+                # The page is told what its paste became -- length and a first look,
+                # never the whole secret -- so the live web test can prove the hand
+                # arrived, the same corner-of-the-document pattern as always.
+                var note := ("ok:%d:%s" % [field.text.length(), field.text.substr(0, 8)]).uri_encode()
+                var bridge := _bridge()
+                if bridge != null:
+                        bridge.call("eval", "document.documentElement.setAttribute('data-qt-pasted','" + note + "')")
                 return
-        var field := focus as LineEdit
-        if not field.editable:
-                return
-        if field.has_selection():
+        if focus is TextEdit:
+                # The editor's field is a TextEdit under the app's own mirror
+                # (rtl_field.gd); the field itself places the words, selection
+                # and caret together.
+                var editor := focus as TextEdit
+                if not editor.editable:
+                        return
+                var writing := editor.get_parent() as RtlFieldScript
+                if writing == null:
+                        return
+                var text := raw.split("\n")[0].strip_edges()
+                if not writing.one_line:
+                        text = raw.strip_edges()
+                if text.is_empty():
+                        return
+                writing.paste_text(text)
+                var note := ("ok:%d:%s" % [writing.get_text().length(), writing.get_text().substr(0, 8)]).uri_encode()
+                var bridge := _bridge()
+                if bridge != null:
+                        bridge.call("eval", "document.documentElement.setAttribute('data-qt-pasted','" + note + "')")
+
+
+## The page took the words to the browser's own clipboard; the field's half
+## of a cut is simply letting them go. The engine's own cut cannot be asked
+## for this: on the web its clipboard half is a no-op, and the words would
+## leave without ever arriving anywhere.
+func _on_web_cut(_args: Array) -> void:
+        var focus := get_viewport().gui_get_focus_owner()
+        if focus is LineEdit:
+                var field := focus as LineEdit
+                if not field.editable or not field.has_selection():
+                        return
                 var from := field.get_selection_from_column()
                 var to := field.get_selection_to_column()
-                field.text = field.text.substr(0, from) + text + field.text.substr(to)
-                field.caret_column = from + text.length()
+                field.text = field.text.substr(0, from) + field.text.substr(to)
+                field.caret_column = from
                 field.deselect()
-        else:
-                field.insert_text_at_caret(text)
-        field.grab_focus()
-        # The page is told what its paste became -- length and a first look,
-        # never the whole secret -- so the live web test can prove the hand
-        # arrived, the same corner-of-the-document pattern as always.
-        var note := ("ok:%d:%s" % [field.text.length(), field.text.substr(0, 8)]).uri_encode()
+                field.grab_focus()
+        elif focus is TextEdit:
+                var editor := focus as TextEdit
+                if not editor.editable:
+                        return
+                var writing := editor.get_parent() as RtlFieldScript
+                if writing == null:
+                        if editor.has_selection():
+                                editor.delete_selection()
+                        return
+                writing.cut_selection()
+
+
+## What the field in hand holds, told to the page whenever it changes: the
+## words a Ctrl+C means, and whether there is a field in hand at all. The
+## page's own clipboard is the honest one on the web; this is how it knows
+## what to carry.
+func _publish_clipboard() -> void:
+        var sel := ""
+        var on := false
+        var focus := get_viewport().gui_get_focus_owner()
+        if focus is LineEdit:
+                var field := focus as LineEdit
+                on = field.editable
+                if field.has_selection():
+                        sel = field.get_selected_text()
+        elif focus is TextEdit:
+                var editor := focus as TextEdit
+                on = editor.editable
+                if editor.has_selection():
+                        sel = editor.get_selected_text()
+        var state := "%d%s" % [1 if on else 0, sel]
+        if state == _clip_state:
+                return
+        _clip_state = state
         var bridge := _bridge()
         if bridge != null:
-                bridge.call("eval", "document.documentElement.setAttribute('data-qt-pasted','" + note + "')")
+                bridge.call(
+                        "eval",
+                        "window.__qtClipSel=" + JSON.stringify(sel)
+                                + ";window.__qtClipOn=" + ("true" if on else "false")
+                )
+
+
+# --- the browser's own menu ------------------------------------------------------------
+
+## Whether the mouse stands on the page's paper or on one of its working
+## parts, told to the page for the browser's own menu: a right press where
+## nothing of the app lives is the browser's to answer. Measured when the
+## mouse moves -- and every half second besides, because the ground can
+## move under a still mouse: a page turned, a popover closed.
+func _publish_menu() -> void:
+        var mouse := get_viewport().get_mouse_position()
+        var now := Time.get_ticks_msec()
+        if mouse == _menu_mouse and now - _menu_at < 500:
+                return
+        _menu_mouse = mouse
+        _menu_at = now
+        var free := not _interactive_under(get_tree().root, mouse)
+        var state := 1 if free else 0
+        if state == _menu_free:
+                return
+        _menu_free = state
+        var bridge := _bridge()
+        if bridge != null:
+                bridge.call("eval", "window.__qtNativeMenu=" + ("true" if free else "false"))
+
+
+## Does one of the page's working parts stand under this point -- a button,
+## a field, a slider, a shelf row? The paper behind them does not count,
+## nor a verse's ink: the reader asked for the browser's menu where nothing
+## of the app lives, and the app's working parts are exactly what "something
+## lives here" means.
+func _interactive_under(node: Node, pos: Vector2) -> bool:
+        if node is Control:
+                var control := node as Control
+                if (
+                        control.is_visible_in_tree()
+                        and control.mouse_filter != Control.MOUSE_FILTER_IGNORE
+                        and control.get_global_rect().has_point(pos)
+                        and (
+                                control is Button
+                                or control is LineEdit
+                                or control is TextEdit
+                                or control is ItemList
+                                or control is Range
+                                or control is ScrollBar
+                                or control is Tree
+                        )
+                ):
+                        return true
+        for child in node.get_children():
+                if _interactive_under(child, pos):
+                        return true
+        return false
+
+
+func _process(_delta: float) -> void:
+        _publish_clipboard()
+        _publish_menu()
 
 
 # --- web updates ----------------------------------------------------------------

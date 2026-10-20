@@ -218,6 +218,32 @@ func set_caret_at_end() -> void:
 func caret_control() -> Control:
         return _caret
 
+# --- the clipboard, arriving from the page ------------------------------------------------
+
+## A paste the page handed over. On the web the browser's clipboard reaches
+## the app as a callback, not a keystroke -- the page's own paste event
+## carries the text, and the head script brings it here; on a desktop the
+## engine's own Ctrl+V answers and this is never asked. The chosen words
+## step aside for what arrives, exactly the way a paste has always worked
+## everywhere.
+func paste_text(text: String) -> void:
+        if _editor == null or not _editor.editable:
+                return
+        _editor.grab_focus()
+        if _editor.has_selection():
+                _editor.delete_selection()
+        _editor.insert_text_at_caret(text)
+        _mirror_follows()
+
+## A cut whose clipboard half the page already took: the words are simply
+## let go of, the gold wash leaving with them.
+func cut_selection() -> void:
+        if _editor == null or not _editor.editable or not _editor.has_selection():
+                return
+        _editor.grab_focus()
+        _editor.delete_selection()
+        _mirror_follows()
+
 func _on_editor_input(event: InputEvent) -> void:
         if one_line and event is InputEventKey and event.pressed and not event.echo:
                 if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:

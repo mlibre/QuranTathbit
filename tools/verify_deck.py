@@ -69,14 +69,36 @@ def is_translation(name: str) -> bool:
 
 
 def punctuation_pass(data: bytes) -> bytes:
-    """The reader's own edit of the deck's words, v1.0.30: every semicolon
-    -- the ASCII ';' the package's translation carried between its clauses
-    and the Arabic '؛' two verses used -- reads as a colon, the punctuation
-    the deck's own quotations already use. The proof compares both sides
-    after the same pass, so it still catches every drift that is not this
-    one deliberate edit.
+    """The reader's own edits of the deck's words, applied to both sides so
+    the proof still catches every drift that is not one of these deliberate
+    edits. v1.0.30: every semicolon -- the ASCII ';' the package's
+    translation carried between its clauses and the Arabic '؛' two verses
+    used -- reads as a colon, the punctuation the deck's own quotations
+    already use. v1.0.39: the basmala card's leading star -- written for
+    the app's old leaning reading, retired in v1.0.38 -- reads as nothing;
+    the star the author kept before the verse's letters stays.
     """
-    return data.replace(b";", b":").replace("\u061b".encode(), b":")
+    data = data.replace(b";", b":").replace("\u061b".encode(), b":")
+    for was, now in (
+        (
+            "*\u0628\u0650\u0633\u0645\u0650 \u0627\u0644\u0644\u0651\u0647\u0650 "
+            "\u0627\u0644\u0631\u0651\u062d\u0645\u0627\u0646\u0650 "
+            "\u0627\u0644\u0631\u0651\u062d\u06cc\u0645\u0650 * \u0627\u0644\u0645",
+            "\u0628\u0650\u0633\u0645\u0650 \u0627\u0644\u0644\u0651\u0647\u0650 "
+            "\u0627\u0644\u0631\u0651\u062d\u0645\u0627\u0646\u0650 "
+            "\u0627\u0644\u0631\u0651\u062d\u06cc\u0645\u0650 * \u0627\u0644\u0645",
+        ),
+        (
+            "*\u0628\u0646\u0627\u0645 \u062e\u062f\u0627\u0648\u0646\u062f "
+            "\u0628\u062e\u0634\u0646\u062f\u0647 \u0645\u0647\u0631\u0628\u0627\u0646* "
+            "\u0627\u0644\u0645",
+            "\u0628\u0646\u0627\u0645 \u062e\u062f\u0627\u0648\u0646\u062f "
+            "\u0628\u062e\u0634\u0646\u062f\u0647 \u0645\u0647\u0631\u0628\u0627\u0646* "
+            "\u0627\u0644\u0645",
+        ),
+    ):
+        data = data.replace(was.encode(), now.encode())
+    return data
 
 
 def is_extension_card(rel: Path, fresh_card_ids: set[str]) -> bool:

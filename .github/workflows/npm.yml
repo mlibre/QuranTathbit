@@ -150,6 +150,13 @@ jobs:
           grep -q "qt-browser-keys" builds/web/index.html
           grep -q "stopImmediatePropagation" builds/web/index.html
           grep -q "addEventListener('keydown'" builds/web/index.html
+          # The clipboard and menu gates ride that same head: Ctrl+C/X over
+          # the app's fields go to the browser's own clipboard, and a right
+          # press on the page's empty ground opens the browser's own menu.
+          grep -q "qt-native-menu" builds/web/index.html
+          grep -q "__qtNativeMenu" builds/web/index.html
+          grep -q "__qtClipInstall" builds/web/index.html
+          grep -q "__qtClipSel" builds/web/index.html
           # The boot watch rides that same head, the same way: a page that
           # cannot start says why, a load gone quiet says so.
           grep -q "qt-boot-watch" builds/web/index.html
