@@ -17,6 +17,9 @@ signal sync_pressed
 signal settings_pressed
 signal update_pressed
 signal browse_pressed
+## The day's offer is spent, but the reader asked for one more new card
+## anyway: a session of exactly one card, opened from the caught-up page.
+signal extra_new_pressed
 
 var _counts := {"due": 0, "new": 0, "learned": 0}
 var _deck_of_last_setup: DeckScript
@@ -66,6 +69,8 @@ func _layout() -> void:
                 pill.custom_minimum_size = Vector2(pill_w, 74)
         var study: Button = get_node("Margin/Column/Study")
         study.custom_minimum_size = Vector2(minf(340.0, avail), 60.0)
+        var extra: Button = get_node("Margin/Column/ExtraNew")
+        extra.custom_minimum_size = Vector2(minf(340.0, avail), 50.0)
         var browse: Button = get_node("Margin/Column/Browse")
         browse.custom_minimum_size = Vector2(minf(340.0, avail), 50.0)
         _fit_sync_line()
@@ -112,6 +117,7 @@ func _apply_counts(counts: Dictionary) -> void:
         ThemeScript.count_up(new_pill, int(counts["new"]))
         ThemeScript.count_up(learned_pill, int(counts["learned"]))
         var study: Button = get_node("Margin/Column/Study")
+        var extra: Button = get_node("Margin/Column/ExtraNew")
         if counts["due"] + counts["new"] == 0:
                 study.text = I18nScript.t("All caught up")
                 study.disabled = true
@@ -123,9 +129,15 @@ func _apply_counts(counts: Dictionary) -> void:
                 rest.set_border_width_all(2)
                 study.add_theme_stylebox_override("disabled", rest)
                 study.add_theme_color_override("font_disabled_color", ThemeScript.GREEN_DEEP)
+                # But a day with nothing waiting is not necessarily a deck
+                # with nothing left: while an unseen card remains, one more
+                # can be taken into a session now, and the offer stands
+                # between the day's rest and the library's door.
+                extra.visible = _next_fresh_card() != null
         else:
                 study.text = I18nScript.t("Study") if counts["due"] > 0 else I18nScript.t("Learn new cards")
                 study.disabled = false
+                extra.visible = false
 
 ## The sync coin says the state before any words do: a green coin when the
 ## deck and the repo last agreed, a gold coin while answers still wait to
@@ -187,12 +199,7 @@ func _next_reference() -> String:
         )
         if queue.is_empty():
                 return ""
-        var front: String = queue[0].front
-        for line in front.split("\n"):
-                var plain := MarkdownScript.plain(line).strip_edges()
-                if not plain.is_empty():
-                        return plain
-        return ""
+        return MarkdownScript.first_plain_line(queue[0].front)
 
 func _size_for(script: String) -> int:
         # The reference is the card's hero now, the figure the eye is brought
@@ -205,6 +212,17 @@ func _size_for(script: String) -> int:
         if script == "persian":
                 return 22
         return 16
+
+## The first card a larger offer would bring, read past the day's cap by
+## the scheduler's own rule: new, not suspended, not waiting out a defer.
+## Null when the deck holds nothing more to take -- the offer then has
+## nothing to stand on and the button that asks for it stays away.
+func _next_fresh_card():
+        if _deck_of_last_setup == null:
+                return null
+        return SchedulerScript.first_fresh(
+                _deck_of_last_setup, int(Time.get_unix_time_from_system())
+        )
 
 func _build() -> void:
         set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -231,6 +249,7 @@ func _build() -> void:
         column.add_child(_deck_card())
         column.add_child(_stats())
         column.add_child(_study_button())
+        column.add_child(_extra_new_button())
         column.add_child(_browse_button())
         column.add_child(_sync_line())
 
@@ -508,6 +527,24 @@ func _browse_button() -> Control:
         button.pressed.connect(func() -> void: browse_pressed.emit())
         return button
 
+## The day is done and the deck is not: one more new card, offered where
+## the day's own button rests, between it and the library's door. A reader
+## whose pace is spent -- or set to reviews alone -- can still take one
+## fresh card into a session; the offer stands only while an unseen card
+## remains, and never offers back a card the reader deferred or suspended
+## today.
+func _extra_new_button() -> Control:
+        var button := ThemeScript.ghost_button(
+                I18nScript.t("Learn one more card"), ThemeScript.GREEN, 50
+        )
+        button.name = "ExtraNew"
+        button.custom_minimum_size = Vector2(340, 50)
+        button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        button.tooltip_text = I18nScript.t("One more new card, beyond the day's own offer")
+        button.visible = false
+        button.pressed.connect(func() -> void: extra_new_pressed.emit())
+        return button
+
 func refresh(counts: Dictionary) -> void:
         _apply_counts(counts)
 
@@ -539,7 +576,8 @@ func offer_update() -> void:
 
 ## Enter begins the day's study, the way Space reveals an answer: the home
 ## screen's one button is the whole screen, so the keyboard may press it
-## from anywhere.
+## from anywhere. When the day is done, the same key takes the one card
+## still on offer -- the page's answer to itself, not a dead key.
 func _unhandled_input(event: InputEvent) -> void:
         if not visible:
                 return
@@ -549,3 +587,8 @@ func _unhandled_input(event: InputEvent) -> void:
                         if not study.disabled:
                                 study_pressed.emit()
                                 get_viewport().set_input_as_handled()
+                        else:
+                                var extra: Button = get_node("Margin/Column/ExtraNew")
+                                if extra.visible:
+                                        extra_new_pressed.emit()
+                                        get_viewport().set_input_as_handled()

@@ -489,13 +489,10 @@ func _reveal() -> void:
                 grid.get_child(0).grab_focus()
 
 ## The first plain line of a card's question: the reference the reader was
-## asked to recite from.
+## asked to recite from -- one law with home and the library
+## (MarkdownScript.first_plain_line).
 func _reference_of(card: CardScript) -> String:
-        for line in card.front.split("\n"):
-                var plain := MarkdownScript.plain(line).strip_edges()
-                if not plain.is_empty():
-                        return plain
-        return ""
+        return MarkdownScript.first_plain_line(card.front)
 
 ## One answer, one button. The button says three things at once: what it
 ## means (the word, in the grade's colour), what it costs (the interval --
@@ -831,11 +828,13 @@ func _font_popup() -> Control:
 ## One face, one row: its name at the reading end, the basmala in the face
 ## itself at the other -- the choice is judged on what it chooses, not on a
 ## description of it, exactly as the Settings page judges the same choice.
+## The row's height is said by the faces themselves, so no sample can
+## outgrow the box that offers it.
 func _face_row(key: String, on: bool) -> Button:
         var button := Button.new()
         button.name = "Face" + key.capitalize()
         button.set_meta("choice", key)
-        button.custom_minimum_size = Vector2(0, 54)
+        button.custom_minimum_size = Vector2(0, _face_row_height())
         button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         _dress_face_row(button, on)
         var pad := MarginContainer.new()
@@ -856,19 +855,33 @@ func _face_row(key: String, on: bool) -> Button:
         name.name = "Name"
         name.text = ThemeScript.ayah_face_label(key)
         name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
         ThemeScript.dress(name, 13, ThemeScript.GREEN_DEEP if on else ThemeScript.INK, on)
         row.add_child(name)
         var sample := Label.new()
         sample.name = "Sample"
-        sample.text = "بِسْمِ اللَّهِ"
+        sample.text = ThemeScript.BASMALA_SAMPLE
         sample.text_direction = TextDirection.TEXT_DIRECTION_AUTO
-        sample.add_theme_font_override("font", ThemeScript.ayah_face_for(key))
-        sample.add_theme_font_size_override("font_size", ThemeScript.fs(19))
+        var face: Font = ThemeScript.ayah_face_for(key)
+        var sample_size := ThemeScript.fs(19)
+        sample.add_theme_font_override("font", face)
+        sample.add_theme_font_size_override("font_size", sample_size)
         sample.add_theme_color_override("font_color", ThemeScript.INK)
+        # The sample's ink is measured, not guessed: a face whose marks
+        # stand past its font's box is given the room they ask for -- the
+        # same law every verse on every page is drawn by.
+        ThemeScript.give_label_room(sample, sample.text, face, sample_size)
         row.add_child(sample)
         ThemeScript.pressable(button)
         button.pressed.connect(_choose_face.bind(key))
         return button
+
+## The height every face row shares: the tallest face's measured sample,
+## with the padding the row carries inside. The faces themselves say the
+## number, the same way Settings' segments are sized.
+static func _face_row_height() -> float:
+        var name_h := ceili(ThemeScript.vazir(13).get_height(ThemeScript.fs(13)))
+        return 12.0 + maxf(name_h, ThemeScript.basmala_sample_height())
 
 ## A face row at rest is quiet paper; the face being worn carries the
 ## page's own green wash -- the way a book's folios are marked.

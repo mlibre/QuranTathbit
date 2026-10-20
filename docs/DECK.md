@@ -69,3 +69,23 @@ not playable audio at all — a file that would never decode serves nobody.
 The zip (`scripts/data/deck_zip.gd`) merges the same way: progress card by
 card (the better-informed entry wins), travelling choices by their own
 moments, files only where the deck lacks them.
+
+## The merge law, told once
+
+Both doors that merge a `progress.json` — the sync engine
+(`scripts/net/github_sync.gd`) and the backup's import
+(`scripts/data/deck_zip.gd`) — judge by rules that live in the deck itself
+(`scripts/data/deck.gd`), never restated per door:
+
+- `Deck.state_beats` — which card state outranks which: two answered
+  states compare by `[reps, mod]` (more reviews, then the later answer);
+  a deliberate reset (a defer or a suspend: `reps == 0` with a stamped
+  `mod`) is judged by its moment alone — newer than anything older,
+  older than anything newer, whatever either side's review count says.
+- `Deck.CHOICE_KEYS` / `Deck.choices_of` — which travelling choices a
+  document carries (`new_per_day`, `ayah_font`, `ui_lang`), each with its
+  moment; a value of the wrong shape is noise, and noise never travels
+  (the two doors once disagreed here: the sync door carried wrong-shaped
+  values the backup door refused).
+- `Deck.entries_of` — the card entries a document carries, cleaned of
+  anything that is not a card's state.

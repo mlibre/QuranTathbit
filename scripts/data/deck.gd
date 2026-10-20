@@ -218,6 +218,69 @@ static func canonical_state(state: Dictionary) -> Dictionary:
                         out[key] = value
         return out
 
+## The choices that travel with a deck's progress: the reader's own pace,
+## the face the verses wear, the tongue the chrome speaks. Both doors that
+## merge a progress document -- the sync engine and the backup's import --
+## read them by this one list, so the two doors can never disagree about
+## what a travelling choice is.
+const CHOICE_KEYS := ["new_per_day", "ayah_font", "ui_lang"]
+
+## Does one card state outrank another? Two answered states compare the way
+## they always have: more reviews wins, then the later answer. A deliberate
+## reset -- nothing answered, yet touched at a known moment (a defer put the
+## card back in the initial basket; a suspend took it out of the schedule
+## altogether) -- is judged by its moment alone: it outranks anything older,
+## whatever that side's review count says, and anything newer outranks it.
+## Without this, a defer would lose the merge to the very answers it was a
+## deliberate act later than, and the card the reader put back would return
+## as though they had never said "not today". One law, told once here,
+## because both doors that merge a deck must judge by it.
+static func state_beats(a: Dictionary, b: Dictionary) -> bool:
+        var a_reset := int(a.get("reps", 0)) == 0 and int(a.get("mod", 0)) > 0
+        var b_reset := int(b.get("reps", 0)) == 0 and int(b.get("mod", 0)) > 0
+        if a_reset or b_reset:
+                return int(a.get("mod", 0)) > int(b.get("mod", 0))
+        return _state_rank(a) > _state_rank(b)
+
+## A card's standing in a merge: how much was learned, then when it was
+## last answered.
+static func _state_rank(state: Dictionary) -> Array:
+        return [int(state.get("reps", 0)), int(state.get("mod", 0))]
+
+## The card entries a progress document carries, cleaned of anything that
+## is not a card's state -- a hand-edited file may hold noise where an
+## entry belongs, and noise never merges.
+static func entries_of(doc: Dictionary) -> Dictionary:
+        var entries: Variant = doc.get("cards", {})
+        var out: Dictionary = {}
+        if typeof(entries) == TYPE_DICTIONARY:
+                for card_id in (entries as Dictionary).keys():
+                        if typeof((entries as Dictionary)[card_id]) == TYPE_DICTIONARY:
+                                out[card_id] = (entries as Dictionary)[card_id]
+        return out
+
+## The choices a progress document carries, each with its value and the
+## moment it was chosen. A value of the wrong shape (a hand-edited file, a
+## number where a font's key belongs) is not a choice -- it is noise, and
+## noise never travels.
+static func choices_of(doc: Dictionary) -> Dictionary:
+        var out := {}
+        for key in CHOICE_KEYS:
+                var value: Variant = doc.get(key, null)
+                if value == null:
+                        continue
+                if key == "new_per_day":
+                        if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT:
+                                continue
+                elif typeof(value) != TYPE_STRING:
+                        continue
+                var mod: Variant = doc.get(key + "_mod", 0)
+                out[key] = {
+                        "value": value,
+                        "mod": int(mod) if (typeof(mod) == TYPE_INT or typeof(mod) == TYPE_FLOAT) else 0,
+                }
+        return out
+
 func answer(card: CardScript, button: String, now: int) -> void:
         card.state = SchedulerScript.apply(SchedulerScript.id_seed(card.id), card.state, button, now)
         dirty = true

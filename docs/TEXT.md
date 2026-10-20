@@ -28,6 +28,11 @@ each surface the room it asks for:
   separation, so the pitch the `TextEdit` lays never drifts.
 
 Never pad by a guessed constant, never blame the font, never clip a mark.
+The same law sizes the boxes a face is offered in: Settings' font segments
+and the session's face rows are as tall as the tallest face's measured
+sample (`ThemeScript.basmala_sample_height`), so no preview outgrows the
+box that offers it — the mushaf cut's line box stands half again its
+font's size, and a fixed height once let its basmala draw past the border.
 
 ## A page reads from the edge its tongue reads from
 

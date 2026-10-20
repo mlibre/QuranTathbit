@@ -262,7 +262,12 @@ func _rebuild_filters() -> void:
         for card in _deck.cards:
                 match card.state["status"]:
                         "new":
-                                new_count += 1
+                                # The counts agree with the home page's pills: a
+                                # card taken out of the schedule for good is not
+                                # waiting to be learned -- it is a page in the
+                                # book, and only the whole shelf counts it.
+                                if not SchedulerScript.is_suspended(card.state):
+                                        new_count += 1
                         "review":
                                 learned += 1
         counts["due"] = _due
@@ -491,10 +496,14 @@ func _matches(card: CardScript) -> bool:
 
 ## The thread of the shelf a pill keeps: the whole story, or only the cards
 ## the day is asking for, the ones never yet studied, or the ones resting
-## between reviews.
+## between reviews. A card taken out of the schedule for good is none of
+## the last three -- it stands only on the whole shelf, the way it stands
+## only in the book.
 func _filter_matches(card: CardScript) -> bool:
         if _filter == "all":
                 return true
+        if SchedulerScript.is_suspended(card.state):
+                return false
         if _filter == "due":
                 return _is_due(card)
         var status := str(card.state["status"])
@@ -1137,13 +1146,13 @@ func _on_editor_saved(card: CardScript) -> void:
 
 # --- the card's own words ------------------------------------------------------------
 
-## The reference the card asks for: the first plain line of its front.
+## The reference the card asks for: the first plain line of its front, or
+## its id when the front says nothing -- one law with home and the editor
+## (MarkdownScript.first_plain_line), so a card is called the same thing
+## everywhere it is named.
 func _reference_of(card: CardScript) -> String:
-        for line in card.front.split("\n"):
-                var plain := MarkdownScript.plain(line).strip_edges()
-                if not plain.is_empty():
-                        return plain
-        return card.id
+        var reference := MarkdownScript.first_plain_line(card.front)
+        return reference if not reference.is_empty() else card.id
 
 ## The verse's first words, for the row's primary line: the first plain line
 ## of the card's answer that carries words a reader would recognise.

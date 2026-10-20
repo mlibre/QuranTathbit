@@ -141,10 +141,14 @@ func _build() -> void:
         column.add_child(bar["row"])
 
         column.add_child(_deck_body())
-        column.add_child(_backup_body())
         column.add_child(_reading_body())
         column.add_child(_display_body())
         column.add_child(_github_body())
+        # The deck as one file stands with the deck's own story: after the
+        # account, before where the words come from -- the reader who walks
+        # down the page meets their deck's safety next to their deck's
+        # source, both of them about the deck rather than the machine.
+        column.add_child(_backup_body())
         column.add_child(_source_body())
         column.add_child(_about())
         # The last card gets the same breath under it the page gives above:
@@ -604,8 +608,15 @@ func _reading_body() -> Control:
         # deck carried into boot. A choice made here re-says the page, so
         # the segments can never disagree with what they chose.
         var current_face := ThemeScript.ayah_face_key()
+        # One height for every segment: the row is one question and its
+        # boxes must align, so the tallest face's own sample -- measured,
+        # not guessed -- says the height for all three.
+        var seg_height := _face_segment_height()
         for face in ThemeScript.AYAH_FACES:
-                faces.add_child(_ayah_font_segment(str(face["key"]), str(face["label"]), str(face["key"]) == current_face))
+                faces.add_child(_ayah_font_segment(
+                        str(face["key"]), str(face["label"]),
+                        str(face["key"]) == current_face, seg_height
+                ))
 
         box.add_child(ThemeScript.hairline())
 
@@ -620,15 +631,24 @@ func _reading_body() -> Control:
                 langs.add_child(_language_segment(code, code == current_lang))
         return card
 
+## The height every font segment in the row shares: the tallest face's
+## measured sample, plus the name label above it and the padding the
+## segment carries inside. The faces themselves say the number, so the
+## row grows with whatever a future face needs and no preview can outgrow
+## its box at any scale the reader steps the words to.
+static func _face_segment_height() -> float:
+        var name_h := ceili(ThemeScript.vazir(12).get_height(ThemeScript.fs(12)))
+        return 8.0 + name_h + 2.0 + ThemeScript.basmala_sample_height()
+
 ## One font, one segment: its own name in the UI's face, and beneath it a
 ## line of scripture drawn in the font itself -- the choice is judged on
 ## what it chooses, not on a description of it.
-func _ayah_font_segment(key: String, label: String, on: bool) -> Button:
+func _ayah_font_segment(key: String, label: String, on: bool, min_height: float) -> Button:
         var button := Button.new()
         button.name = "Face" + key.capitalize()
         button.set_meta("choice", key)
         button.toggle_mode = false
-        button.custom_minimum_size = Vector2(0, 66)
+        button.custom_minimum_size = Vector2(0, min_height)
         button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         _dress_segment(button, on)
         var stack := VBoxContainer.new()
@@ -647,12 +667,18 @@ func _ayah_font_segment(key: String, label: String, on: bool) -> Button:
         sample.name = "Sample"
         # The basmala, harakat and all: every curl a verse's face draws, at
         # the size a shelf's preview shows it.
-        sample.text = "بِسْمِ اللَّهِ"
+        sample.text = ThemeScript.BASMALA_SAMPLE
         sample.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         sample.text_direction = TextDirection.TEXT_DIRECTION_AUTO
-        sample.add_theme_font_override("font", ThemeScript.ayah_face_for(key))
-        sample.add_theme_font_size_override("font_size", ThemeScript.fs(19))
+        var face: Font = ThemeScript.ayah_face_for(key)
+        var sample_size := ThemeScript.fs(19)
+        sample.add_theme_font_override("font", face)
+        sample.add_theme_font_size_override("font_size", sample_size)
         sample.add_theme_color_override("font_color", ThemeScript.INK)
+        # The sample's ink is measured, not guessed: a face whose marks
+        # stand past its font's box is given the room they ask for -- the
+        # same law every verse on every page is drawn by.
+        ThemeScript.give_label_room(sample, sample.text, face, sample_size)
         stack.add_child(sample)
         var pad := MarginContainer.new()
         pad.name = "Pad"

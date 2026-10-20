@@ -217,7 +217,7 @@ func _build_scroll() -> Control:
         # The question is a reference, and a reference is Arabic by
         # construction: the field writes in the verses' own hand.
         _front.set_face(ThemeScript.editor_face_for(
-                ThemeScript.reference_script(_reference_of_text(_card.front))
+                ThemeScript.reference_script(MarkdownScript.first_plain_line(_card.front))
         ))
 
         _write_column.add_child(_spacer(8))
@@ -401,7 +401,7 @@ func _on_front_changed() -> void:
                 _front.set_face(wanted)
 
 func _reference_of_front() -> String:
-        return _reference_of_text(_front.get_text())
+        return MarkdownScript.first_plain_line(_front.get_text())
 
 func _clear_warning() -> void:
         _warn.text = " "
@@ -505,16 +505,10 @@ func request_back() -> bool:
         return true
 
 ## The first plain line of the card's question: the name of what is being
-## edited, said the way the study page says it.
+## edited, said the way every page that names a card says it
+## (MarkdownScript.first_plain_line).
 static func _reference_of(card: CardScript) -> String:
-        return _reference_of_text(card.front)
-
-static func _reference_of_text(source: String) -> String:
-        for line in source.split("\n"):
-                var plain := MarkdownScript.plain(line).strip_edges()
-                if not plain.is_empty():
-                        return plain
-        return ""
+        return MarkdownScript.first_plain_line(card.front)
 
 # --- the page answers the window -------------------------------------------------------
 

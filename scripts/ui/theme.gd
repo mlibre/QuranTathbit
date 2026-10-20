@@ -51,6 +51,26 @@ const AYAH_FACES := [
         {"key": "noto_naskh", "label": "Noto Naskh Arabic"},
 ]
 
+## The line every face is sampled by, wherever a face is offered: the
+## basmala, harakat and all -- every curl a verse's hand draws, in the
+## fewest words that carry them.
+const BASMALA_SAMPLE := "بِسْمِ اللَّهِ"
+
+## The height that sample needs in the tallest face the app offers: the
+## font's own box plus the room its ink asks for. Settings' row and the
+## session's popup both size their segments by it, so no face's preview can
+## outgrow the box that offers it -- the mushaf cut's line box stands half
+## again its font's size, and a fixed height once let its ink draw past
+## the border.
+static func basmala_sample_height() -> int:
+        var tallest := 0
+        for face in AYAH_FACES:
+                var f := ayah_face_for(str(face["key"]))
+                var size := fs(19)
+                var room := ink_room(BASMALA_SAMPLE, f, size)
+                tallest = maxi(tallest, ceili(f.get_height(size)) + 2 * maxi(room.x, room.y))
+        return tallest
+
 ## The face scripture currently wears, as the reader chose it (or the
 ## default before any choice). Set once at boot from the setting that
 ## travels with the deck, and again from Settings the moment a choice is

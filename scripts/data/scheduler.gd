@@ -178,6 +178,22 @@ static func queue(deck, now: int, new_per_day := NEW_PER_DAY) -> Array:
                 out.append(card)
         return out
 
+## The first card a larger offer would bring: new, not suspended, not
+## waiting out a defer -- the queue's own rule, read past the day's cap.
+## The day's offer may be spent or set to reviews alone, while the deck
+## still holds an unseen card; this is that card, or null when every card
+## has been started or set aside. A card the reader deferred or suspended
+## is never offered back the same day by a bigger cap -- the defer was the
+## reader's own word about today.
+static func first_fresh(deck, now: int):
+        for card in deck.cards:
+                var state: Dictionary = card.state
+                if is_suspended(state):
+                        continue
+                if str(state.get("status", "new")) == "new" and not is_deferred(state, now):
+                        return card
+        return null
+
 static func counts(deck, now: int, new_per_day := NEW_PER_DAY) -> Dictionary:
         var today_idx := today(now)
         var due := 0

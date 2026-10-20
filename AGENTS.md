@@ -135,6 +135,10 @@ Windows, web) in Godot 4.7 with GDScript only.
   shallowest.
 - **Delete what is not needed.** No dead code, no leftovers, no documents
   describing a world the app never built.
+- **Both doors that merge a deck judge by one law.** Sync and the backup's
+  import both merge the deck's progress; the rules they judge by live in
+  one place — the deck itself — never restated per door, so the two can
+  never drift apart (they once did).
 
 ## Learning and maintaining knowledge
 

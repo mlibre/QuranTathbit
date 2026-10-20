@@ -495,14 +495,6 @@ static func _commit_message(sends: Array, deletes: Array) -> String:
 
 # --- progress merge ------------------------------------------------------------
 
-## The choices that travel with the deck's progress: the day's pace, the
-## verses' own face, and the tongue the app's chrome speaks. Each is a
-## flat pair in progress.json (value + "_mod" stamp), each merges
-## later-choice-wins, and each is written back the same way -- one list,
-## so a new travelling choice cannot grow a merge of its own that drifts
-## from the others.
-const CHOICE_KEYS := ["new_per_day", "ayah_font", "ui_lang"]
-
 ## Card by card: more reviews wins, then the later answer -- unless one
 ## side is a deliberate reset (a defer, a suspend: nothing answered, yet
 ## touched at a known moment), which is judged by its moment alone, newer
@@ -532,18 +524,18 @@ func _merge_progress(deck_path: String, remote: Dictionary, manifest: Dictionary
                         return {"merged": 0, "changed": false, "error": "progress_pull_failed"}
                 var remote_data: Variant = JSON.parse_string(fetched.body.get_string_from_utf8())
                 if typeof(remote_data) == TYPE_DICTIONARY:
-                        theirs = _progress_entries(fetched.body)
-                        their_choices = _choices_of(remote_data)
+                        theirs = DeckScript.entries_of(remote_data)
+                        their_choices = DeckScript.choices_of(remote_data)
         var merged := 0
         for card_id in theirs.keys():
                 var their_state: Dictionary = theirs[card_id]
                 if not mine.has(card_id):
                         mine[card_id] = their_state
                         merged += 1
-                elif _state_beats(their_state, mine[card_id]):
+                elif DeckScript.state_beats(their_state, mine[card_id]):
                         mine[card_id] = their_state
                         merged += 1
-        for key in CHOICE_KEYS:
+        for key in DeckScript.CHOICE_KEYS:
                 var their_choice: Dictionary = their_choices.get(key, {})
                 if their_choice.is_empty():
                         continue
@@ -579,70 +571,17 @@ static func _progress_needs_push(local_path: String, manifest: Dictionary) -> bo
                 return true
         return _blob_sha(FileAccess.get_file_as_bytes(local_path)) != baseline
 
-static func _progress_rank(state: Dictionary) -> Array:
-        return [int(state.get("reps", 0)), int(state.get("mod", 0))]
-
-
-## Does one card state outrank another? Two answered states are compared
-## the way they always were: more reviews wins, then the later answer. A
-## deliberate reset -- nothing answered, yet touched at a known moment (a
-## defer put the card back in the initial basket; a suspend took it out of
-## the schedule altogether) -- is judged by its moment alone: it outranks
-## anything older, whatever that side's review count says, and anything
-## newer outranks it. Without this, a defer would lose the merge to the
-## very answers it was a deliberate act later than, and the card the
-## reader put back would return as though they had never said "not today".
-static func _state_beats(a: Dictionary, b: Dictionary) -> bool:
-        var a_reset := int(a.get("reps", 0)) == 0 and int(a.get("mod", 0)) > 0
-        var b_reset := int(b.get("reps", 0)) == 0 and int(b.get("mod", 0)) > 0
-        if a_reset or b_reset:
-                return int(a.get("mod", 0)) > int(b.get("mod", 0))
-        return _progress_rank(a) > _progress_rank(b)
-
-static func _progress_entries(body: PackedByteArray) -> Dictionary:
-        if body.is_empty():
-                return {}
-        var data: Variant = JSON.parse_string(body.get_string_from_utf8())
-        if typeof(data) != TYPE_DICTIONARY:
-                return {}
-        var entries: Dictionary = data.get("cards", {})
-        var clean: Dictionary = {}
-        for card_id in entries.keys():
-                if typeof(entries[card_id]) == TYPE_DICTIONARY:
-                        clean[card_id] = entries[card_id]
-        return clean
-
+## The card entries and travelling choices a progress document carries are
+## read by the deck's own law (DeckScript.entries_of / choices_of), told
+## once for both doors that merge a deck -- this one and the backup's
+## import -- so they can never disagree.
 func _read_progress(path: String) -> Dictionary:
         if not FileAccess.file_exists(path):
                 return {}
         var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
         if typeof(data) != TYPE_DICTIONARY:
                 return {}
-        var entries: Dictionary = data.get("cards", {})
-        var clean: Dictionary = {}
-        for card_id in entries.keys():
-                if typeof(entries[card_id]) == TYPE_DICTIONARY:
-                        clean[card_id] = entries[card_id]
-        return clean
-
-## The choices a parsed progress document carries, if it says any: each
-## travelling key with its value and the moment it was chosen. A value of
-## the wrong type (a hand-edited file, a number where a font's key belongs)
-## is not a choice -- it is noise, and noise never travels.
-static func _choices_of(data: Dictionary) -> Dictionary:
-        var out := {}
-        for key in CHOICE_KEYS:
-                var value: Variant = data.get(key, null)
-                if value == null:
-                        continue
-                var mod: Variant = data.get(key + "_mod", 0)
-                out[key] = {
-                        "value": value,
-                        "mod": int(mod) if (
-                                typeof(mod) == TYPE_INT or typeof(mod) == TYPE_FLOAT
-                        ) else 0,
-                }
-        return out
+        return DeckScript.entries_of(data)
 
 func _read_choices(path: String) -> Dictionary:
         if not FileAccess.file_exists(path):
@@ -650,7 +589,7 @@ func _read_choices(path: String) -> Dictionary:
         var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
         if typeof(data) != TYPE_DICTIONARY:
                 return {}
-        return _choices_of(data)
+        return DeckScript.choices_of(data)
 
 # --- inventories ---------------------------------------------------------------
 

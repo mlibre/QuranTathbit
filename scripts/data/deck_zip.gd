@@ -22,10 +22,6 @@ const DeckScript := preload("res://scripts/data/deck.gd")
 ## Editor metadata (.import/.uid, Godot's and the desktop's) is never deck
 ## content and never travels, the same law the sync engine keeps.
 
-## The choices that ride progress.json wherever it goes -- the same keys the
-## sync engine merges, kept here so the two doors agree on what travels.
-const CHOICE_KEYS := ["new_per_day", "ayah_font", "ui_lang"]
-
 ## Where a backup tries to land, in order: the shared Downloads folder
 ## (writable on a desktop; on a modern phone the OS declines and the write
 ## simply fails), then the app's own storage there, then the app's own
@@ -234,17 +230,17 @@ static func _merge_progress(deck_path: String, their_bytes: PackedByteArray) -> 
                 return {"ok": true, "merged": 0, "choices": 0}
         var path := deck_path.path_join(DeckScript.PROGRESS)
         var my_doc := _read_doc(path)
-        var my_cards := _entries_of(my_doc)
-        var their_cards := _entries_of(their_doc as Dictionary)
+        var my_cards := DeckScript.entries_of(my_doc)
+        var their_cards := DeckScript.entries_of(their_doc as Dictionary)
         var merged := 0
         for card_id in their_cards.keys():
-                if not my_cards.has(card_id) or _state_beats(their_cards[card_id], my_cards[card_id]):
+                if not my_cards.has(card_id) or DeckScript.state_beats(their_cards[card_id], my_cards[card_id]):
                         my_cards[card_id] = their_cards[card_id]
                         merged += 1
-        var my_choices := _choices_of(my_doc)
-        var their_choices := _choices_of(their_doc as Dictionary)
+        var my_choices := DeckScript.choices_of(my_doc)
+        var their_choices := DeckScript.choices_of(their_doc as Dictionary)
         var choices := 0
-        for key in CHOICE_KEYS:
+        for key in DeckScript.CHOICE_KEYS:
                 var theirs: Dictionary = their_choices.get(key, {})
                 if theirs.is_empty():
                         continue
@@ -270,65 +266,11 @@ static func _merge_progress(deck_path: String, their_bytes: PackedByteArray) -> 
         return {"ok": true, "merged": merged, "choices": choices}
 
 
-## A card's standing in the merge: how much was learned, then when it was
-## last answered -- the same rank the sync engine compares by.
-static func _rank(state: Dictionary) -> Array:
-        return [int(state.get("reps", 0)), int(state.get("mod", 0))]
-
-
-## Does one card state outrank another, by the sync engine's own rule? Two
-## answered states compare by rank; a deliberate reset (a defer, a suspend:
-## nothing answered, yet touched at a known moment) compares by its moment
-## alone -- newer than anything older, older than anything newer, whatever
-## either side's review count says. Without this, importing a backup made
-## after a defer would hand the card back to the answers the defer was a
-## deliberate act later than.
-static func _state_beats(a: Dictionary, b: Dictionary) -> bool:
-        var a_reset := int(a.get("reps", 0)) == 0 and int(a.get("mod", 0)) > 0
-        var b_reset := int(b.get("reps", 0)) == 0 and int(b.get("mod", 0)) > 0
-        if a_reset or b_reset:
-                return int(a.get("mod", 0)) > int(b.get("mod", 0))
-        return _rank(a) > _rank(b)
-
-
 static func _read_doc(path: String) -> Dictionary:
         if not FileAccess.file_exists(path):
                 return {}
         var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
         return data if typeof(data) == TYPE_DICTIONARY else {}
-
-
-static func _entries_of(doc: Dictionary) -> Dictionary:
-        var entries: Variant = doc.get("cards", {})
-        var out: Dictionary = {}
-        if typeof(entries) == TYPE_DICTIONARY:
-                for card_id in (entries as Dictionary).keys():
-                        if typeof((entries as Dictionary)[card_id]) == TYPE_DICTIONARY:
-                                out[card_id] = (entries as Dictionary)[card_id]
-        return out
-
-
-## The choices a progress document carries, each with its value and the
-## moment it was chosen. A value of the wrong shape (a hand-edited file, a
-## number where a font's key belongs) is not a choice -- it is noise, and
-## noise never travels.
-static func _choices_of(doc: Dictionary) -> Dictionary:
-        var out: Dictionary = {}
-        for key in CHOICE_KEYS:
-                var value: Variant = doc.get(key, null)
-                if value == null:
-                        continue
-                if key == "new_per_day":
-                        if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT:
-                                continue
-                elif typeof(value) != TYPE_STRING:
-                        continue
-                var mod: Variant = doc.get(key + "_mod", 0)
-                out[key] = {
-                        "value": value,
-                        "mod": int(mod) if (typeof(mod) == TYPE_INT or typeof(mod) == TYPE_FLOAT) else 0,
-                }
-        return out
 
 
 # --- the archive's own hygiene -----------------------------------------------------

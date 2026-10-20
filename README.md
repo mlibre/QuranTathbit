@@ -70,7 +70,7 @@ No installer, no dependencies. The download *is* the app.
 2. A **question** appears: the surah and verse, set large in the middle of the page. Press **Space** or **Show answer** when you are ready.
 3. The **answer** shows the verse with its Persian translation, and each side can be played — in Arabic, or spoken in Persian. Four buttons ask how it went: **Again**, **Hard**, **Good**, **Easy** — each says when the card comes back.
 4. Under **Show answer** (question side only) wait two quiet ways out: **Not today** puts the card back until tomorrow's new cards; **Not at all** takes it out of the schedule for good — as if you never started studying it. (To bring a "not at all" card back, delete its entry from `progress.json`.)
-5. When the queue is empty, the app says so. Come back tomorrow.
+5. When the queue is empty, the app says so. If unseen cards remain, a quiet button beneath offers to learn one more new card — beyond the day's pace. Otherwise, come back tomorrow.
 
 A few quiet extras:
 
@@ -126,7 +126,7 @@ While editing a card: **Esc** closes without saving, **Ctrl+Enter** saves, and *
 
 [AGENTS.md](AGENTS.md) holds the design rules, [docs/TESTING.md](docs/TESTING.md)
 the test battery, [docs/OAUTH_SETUP.md](docs/OAUTH_SETUP.md) your own GitHub
-app, [docs/README.npm.md](docs/README.npm.md) the npm package. The technical
+app, [docs/npm.md](docs/npm.md) the npm package. The technical
 documentation lives in [docs/TEXT.md](docs/TEXT.md) (type and the page's
 chrome), [docs/INPUT.md](docs/INPUT.md) (the writing field, touch, the back
 key), [docs/DECK.md](docs/DECK.md) (folders, the package's audio, the

@@ -423,6 +423,7 @@ func _go_home() -> void:
         home.settings_pressed.connect(_on_settings_pressed)
         home.update_pressed.connect(_apply_update)
         home.browse_pressed.connect(_on_browse_pressed)
+        home.extra_new_pressed.connect(_start_extra_new_session)
         if _update_waiting:
                 home.offer_update()
 
@@ -435,6 +436,27 @@ func _start_session() -> void:
         var cards := SchedulerScript.queue(_deck, _now(), _settings.new_per_day)
         if cards.is_empty():
                 return
+        _open_study(cards)
+
+
+## The day's offer is spent, but the deck still holds an unseen card and the
+## reader asked for it: a session of exactly one card, the same card a
+## larger offer would have brought next. The session itself is the session
+## any queue opens -- same wiring, same doors home -- only its queue is the
+## one card the reader took.
+func _start_extra_new_session() -> void:
+        if _screen is StudyScript:
+                return
+        var card = SchedulerScript.first_fresh(_deck, _now())
+        if card == null:
+                return
+        _open_study([card])
+
+
+## One session, one wiring: whatever queue a session is opened with -- the
+## day's own, or the one card taken beyond it -- its answers, defers,
+## suspensions, edits and choices all ride the same doors home.
+func _open_study(cards: Array) -> void:
         var study := StudyScript.new()
         study.name = "Study"
         # The recitation speaks as loudly as the last session left it: the

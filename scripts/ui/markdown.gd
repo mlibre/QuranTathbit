@@ -76,6 +76,18 @@ static func plain(source: String) -> String:
         return text.strip_edges()
 
 
+## The first line that says anything, plain: the reference a card asks
+## with, wherever a page needs the card's own heading -- the home page's
+## day's news, the shelf's address line, the editor's title. One law for
+## all three, so a card is called the same thing everywhere it is named.
+static func first_plain_line(source: String) -> String:
+        for line in source.replace("\r\n", "\n").split("\n"):
+                var bare := plain(line).strip_edges()
+                if not bare.is_empty():
+                        return bare
+        return ""
+
+
 static func _replace_links(text: String) -> String:
         var re := RegEx.create_from_string("\\[([^\\]]+)\\]\\(([^)]+)\\)")
         return re.sub(text, "$1", true)
