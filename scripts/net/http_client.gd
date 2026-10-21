@@ -1,11 +1,12 @@
 class_name HttpClient
 extends Node
 
-## One HTTP client for the whole app, made of a pool of throwaway
-## HTTPRequest nodes so calls can overlap. Everything that talks to the
-## network goes through here, and everything that takes a client takes an
-## HttpClient -- tests hand it a fake with the same request() shape and no
-## network at all.
+## One HTTP client for the whole app, made of throwaway HTTPRequest nodes.
+## Everything that talks to the network goes through here, and everything
+## that takes a client takes an HttpClient -- tests hand it a fake with the
+## same request() shape and no network at all. One client, one request at
+## a time: the app never asks the network for two things at once, because
+## a parallel answer can race the very files it carries.
 ##
 ## Returns {status: bool, code: int, headers: Dictionary, body: PackedByteArray}.
 ## status is false when the request never completed (no network, refused,
@@ -44,64 +45,6 @@ func request(
         var outcome: Array = await node.request_completed
         node.queue_free()
         return _outcome(outcome)
-
-
-## Many requests at once: they all fly concurrently -- each on its own node,
-## the way the browser does it -- and the call returns when the last one
-## lands, with the answers in the same order as the asks. The sync engine's
-## batch uploads ride this so a first sync is not a long queue of round
-## trips. Overlapping batches are not supported: one at a time.
-func request_many(requests: Array) -> Array:
-        var results: Array = []
-        results.resize(requests.size())
-        var state := {"remaining": 0}
-        for i in requests.size():
-                var spec: Dictionary = requests[i]
-                var node := HTTPRequest.new()
-                node.timeout = TIMEOUT
-                var headers: Dictionary = spec.get("headers", {})
-                var flat := PackedStringArray()
-                for key in headers.keys():
-                        flat.append("%s: %s" % [str(key), str(headers[key])])
-                var verb: int = METHODS.get(
-                        str(spec.get("method", "GET")).strip_edges().to_upper(),
-                        HTTPClient.METHOD_GET
-                )
-                var body := PackedByteArray(spec.get("body", PackedByteArray()))
-                # The node has to be in the tree before request() is called --
-                # HTTPRequest refuses to start outside it (ERR_UNCONFIGURED),
-                # which is what broke the Linux build's first sync.
-                add_child(node)
-                var err := node.request(str(spec.get("url", "")), flat, verb, body.get_string_from_utf8())
-                if err != OK:
-                        # A request that cannot even start answers immediately;
-                        # the rest of the batch still flies.
-                        results[i] = _failed_result()
-                        node.queue_free()
-                        continue
-                state.remaining += 1
-                node.request_completed.connect(_on_batch_one.bind(node, i, results, state))
-        # The last answer always arrives in a later frame than this loop, so
-        # polling the frame is race-free: no completion can be missed, and a
-        # batch that never started needs no wait at all.
-        while state.remaining > 0:
-                await get_tree().process_frame
-        return results
-
-
-func _on_batch_one(
-        _result: int,
-        _code: int,
-        _headers: PackedStringArray,
-        _body: PackedByteArray,
-        node: HTTPRequest,
-        index: int,
-        results: Array,
-        state: Dictionary
-) -> void:
-        results[index] = _outcome([_result, _code, _headers, _body])
-        node.queue_free()
-        state.remaining -= 1
 
 
 static func _failed_result() -> Dictionary:

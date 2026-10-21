@@ -183,6 +183,51 @@ func save_progress() -> bool:
         return true
 
 
+## The deck takes another reading of its own folder into itself, in place:
+## the card objects it already holds are the ones it keeps -- a session in
+## flight holds these very objects, and an answer it gives must land on a
+## card that is still the deck's own, still saved by the deck's own hand,
+## never on an orphan a wholesale replacement would quietly forget. What
+## arrives: states that outrank what is held (a local answer newer than the
+## file is never walked back -- the file is read, not obeyed; this machine
+## keeps its own word unless the other side earned the win), the faces and
+## the choices that travel with the deck, the words of cards the folder
+## holds, cards the folder gained, and the leaving of cards the folder
+## lost. Same object in, same object out: the deck the app holds at dawn is
+## the deck it holds at dusk.
+func adopt(other) -> void:
+        if other == null:
+                return
+        name = other.name
+        source = other.source
+        new_per_day = other.new_per_day
+        new_per_day_mod = other.new_per_day_mod
+        ayah_font = other.ayah_font
+        ayah_font_mod = other.ayah_font_mod
+        ui_lang = other.ui_lang
+        ui_lang_mod = other.ui_lang_mod
+        var held := {}
+        for card in cards:
+                held[card.id] = card
+        for other_card in other.cards:
+                var mine = held.get(other_card.id)
+                if mine == null:
+                        cards.append(other_card)
+                        continue
+                mine.front = other_card.front
+                mine.back = other_card.back
+                mine.media = other_card.media
+                if state_beats(other_card.state, mine.state):
+                        mine.state = other_card.state
+        var their_ids := {}
+        for other_card in other.cards:
+                their_ids[other_card.id] = true
+        for i in range(cards.size() - 1, -1, -1):
+                if not their_ids.has(cards[i].id):
+                        cards.remove_at(i)
+        dirty = other.dirty
+
+
 ## A string choice read honestly: a hand-edited progress file can carry a
 ## number where a word belongs, and a number dressed as the font's key
 ## would dress every verse in a face that does not exist.

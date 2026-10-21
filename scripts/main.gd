@@ -43,7 +43,9 @@ var _auth: GitHubAuthScript
 var _sync: GitHubSyncScript
 var _screen: Control
 var _update_waiting := false  # a newer web version was announced; Home owes the user the offer
-var _syncing := false  # one sync at a time; a second press is a question, not a demand
+var _syncing := false  # one sync at a time; a second ask waits its turn, it is never lost
+var _sync_queued := false  # an ask that arrived while one ran; it goes when this one ends
+var _sync_queued_quiet := true  # the queued ask's own voice -- a press of the button outranks a quiet one
 var _answers_waiting := 0  # answers given since the repo last heard from this deck
 var _deck_edited := false  # a card was edited in the app since the repo last heard
 var _sync_failed := false  # the last sync could not finish; the deck is honest about it
@@ -572,19 +574,18 @@ func _on_choice_push_requested() -> void:
 
 
 ## A backup has been joined to the deck on disk: the deck in memory is
-## behind what the folder now holds, so it is read back the same way a
-## finished sync reads it -- adopting whatever travelling choices arrived
-## (a tongue the backup carried is spoken at once, and the page it landed
-## on is said again in it) -- and the re-read deck is handed back to the
-## page that asked. What arrived should reach the repo on its own too, the
-## same quiet way every arrival does, so the next device to sync finds it
+## behind what the folder now holds, so the folder's new word is taken
+## into the deck the app already holds -- in place, the same way a finished
+## sync takes it -- adopting whatever travelling choices arrived (a tongue
+## the backup carried is spoken at once, and the page it landed on is said
+## again in it) -- and the current deck is handed back to the page that
+## asked. What arrived should reach the repo on its own too, the same
+## quiet way every arrival does, so the next device to sync finds it
 ## already there.
 func _on_deck_imported() -> void:
-        var reloaded: DeckScript = DeckScript.load(USER_DECK)
-        if reloaded == null:
+        _adopt_deck_from_disk()
+        if _deck == null:
                 return
-        _deck = reloaded
-        _adopt_deck_choices()
         if not _settings.ui_lang.is_empty() and _settings.ui_lang != I18nScript.lang():
                 _apply_language(_settings.ui_lang)
         else:
@@ -595,6 +596,23 @@ func _on_deck_imported() -> void:
                 _refresh_home()
         if _settings.has_token() and _settings.auto_sync:
                 _run_sync(true)
+
+
+## The folder's own word about the deck, taken into the deck the app
+## already holds: same object, current word, every card reference in
+## flight (a session's queue, the library's page, home's next card)
+## landing on a card that is still the deck's own. A deck that could not
+## be read at all is left exactly as it stands -- the folder may be
+## mid-write, and the deck in memory is the reader's safest copy.
+func _adopt_deck_from_disk() -> void:
+        var reloaded: DeckScript = DeckScript.load(USER_DECK)
+        if reloaded == null:
+                return
+        if _deck == null:
+                _deck = reloaded
+        else:
+                _deck.adopt(reloaded)
+        _adopt_deck_choices()
 
 
 ## The deck's own word about the choices that travel with it, said once at
@@ -720,8 +738,16 @@ func _on_sync_pressed() -> void:
 ## app's own -- each retry a resume, because everything that landed is
 ## already the baseline -- so an interrupted opening heals itself without
 ## a hand on the button.
+##
+## One exchange at a time, always: two syncs racing one repo is the very
+## race that loses work. But an ask that arrives while one runs is never
+## dropped -- a session that closed, a choice that settled, a press of the
+## button -- it waits for the running one to end and then goes itself, so
+## every answer is carried without the reader having to ask twice.
 func _run_sync(quiet := false) -> void:
         if _syncing:
+                _sync_queued = true
+                _sync_queued_quiet = _sync_queued_quiet and quiet
                 return
         _syncing = true
         _sync_generation += 1
@@ -758,21 +784,21 @@ func _run_sync(quiet := false) -> void:
                 _maybe_schedule_sync_retry(quiet, result)
 
         # Progress may have merged in from another device -- the cards and the
-        # deck's own choices alike (pace, verses' face, tongue); read the deck
-        # back and speak whatever arrived.
-        var reloaded: DeckScript = DeckScript.load(USER_DECK)
-        if reloaded != null:
-                _deck = reloaded
-                _adopt_deck_choices()
-                _sync = GitHubSyncScript.new(_http, _auth)
-                # A language that arrived from another device is spoken at
-                # once, and the home page under this one is said again in
-                # it; a deck that has never answered keeps its own silence
-                # (the picker is asking, or Settings will).
-                if not _settings.ui_lang.is_empty() and _settings.ui_lang != I18nScript.lang():
-                        _apply_language(_settings.ui_lang)
-                else:
-                        ThemeScript.set_ayah_face(_settings.ayah_font)
+        # deck's own choices alike (pace, verses' face, tongue); the folder's
+        # new word is taken into the deck the app already holds, in place, so
+        # the card objects a session in flight holds are still the deck's own
+        # cards and an answer given mid-sync lands on a card the deck will
+        # save -- never on an orphan a wholesale replacement would forget.
+        _adopt_deck_from_disk()
+        _sync = GitHubSyncScript.new(_http, _auth)
+        # A language that arrived from another device is spoken at once, and
+        # the home page under this one is said again in it; a deck that has
+        # never answered keeps its own silence (the picker is asking, or
+        # Settings will).
+        if not _settings.ui_lang.is_empty() and _settings.ui_lang != I18nScript.lang():
+                _apply_language(_settings.ui_lang)
+        else:
+                ThemeScript.set_ayah_face(_settings.ayah_font)
 
         var line := ""
         if ok:
@@ -798,6 +824,14 @@ func _run_sync(quiet := false) -> void:
                 screen.note_sync_result(line)
                 # The settings screen keeps its own account of the moment; the
                 # home line recomputes when the user goes back to it.
+
+        # The ask that waited behind this one goes now: one exchange at a
+        # time, and none of them ever dropped.
+        if _sync_queued:
+                _sync_queued = false
+                var queued_quiet := _sync_queued_quiet
+                _sync_queued_quiet = true  # the next wait starts from silence, not this one's echo
+                _run_sync(queued_quiet)
 
 
 ## A file both sides changed is the reader's to settle, never the engine's:

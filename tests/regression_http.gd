@@ -2,12 +2,12 @@ extends SceneTree
 const HttpClientScript := preload("res://scripts/net/http_client.gd")
 
 ## The network client against a real socket. A local server answers on
-## 127.0.0.1, and the client's single and batch requests must both complete
-## against it -- which is only possible while every HTTPRequest node sits
-## inside the tree before request() is called. The batch path once started
-## its nodes outside the tree (ERR_UNCONFIGURED, "blob progress.json
-## failed (0)"), and a first sync died in front of the user; this suite keeps
-## that from coming back by construction, not by convention.
+## 127.0.0.1, and the client's requests must complete against it -- which
+## is only possible while the HTTPRequest node sits inside the tree before
+## request() is called. A node started outside the tree once died with
+## ERR_UNCONFIGURED ("blob progress.json failed (0)") and a first sync died
+## in front of the user; this suite keeps that from coming back by
+## construction, not by convention.
 
 var _failures := 0
 var _server := TCPServer.new()
@@ -41,17 +41,12 @@ func _run() -> void:
         _is(int(one.code), 200, "the single request sees HTTP 200")
         _is(one.body.get_string_from_utf8(), "one", "the single request reads its body")
 
-        # A batch of three, all in flight at once, answered in order.
-        var batch: Array = await http.request_many([
-                {"method": "GET", "url": _url("/first")},
-                {"method": "GET", "url": _url("/second")},
-                {"method": "GET", "url": _url("/third")},
-        ])
-        _ok(batch.size() == 3, "the batch returns one answer per request")
-        _ok(batch.all(func(r: Dictionary) -> bool: return bool(r.status)), "every batched request completes")
-        _is(batch[0].body.get_string_from_utf8(), "first", "answers keep the order of the asks (1)")
-        _is(batch[1].body.get_string_from_utf8(), "second", "answers keep the order of the asks (2)")
-        _is(batch[2].body.get_string_from_utf8(), "third", "answers keep the order of the asks (3)")
+        # And the next one after it, on its own node: the app asks for one
+        # thing at a time, so two in a row must both land, each on a fresh
+        # node that was in the tree before it asked.
+        var second: Dictionary = await http.request("GET", _url("/two"))
+        _ok(bool(second.status), "a second request lands on its own node")
+        _is(second.body.get_string_from_utf8(), "two", "the second request reads its own body")
 
         # A request that cannot start answers false, not hangs.
         var bad: Dictionary = await http.request("GET", "not-a-url")

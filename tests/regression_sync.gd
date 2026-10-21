@@ -37,6 +37,9 @@ func _init() -> void:
         await _test_conflict_asks_and_local_hard_forces()
         await _test_conflict_remote_hard_forces()
         await _test_conflict_declined_replaces_nothing()
+        await _test_mid_fetch_answer_survives()
+        await _test_push_lands_before_pull()
+        await _test_answer_after_upload_still_pushes()
         _teardown()
         if _failures > 0:
                 print("sync: %d FAILURE(S)" % _failures)
@@ -71,12 +74,16 @@ class FakeGitHub:
         var tree_posts := 0
         var commit_posts := 0
         var content_gets := 0  # file downloads, progress included
+        var order: Array = []  # every ask in the order it flew: "METHOD url"
+        var on_contents_get: Callable = Callable()  # the test's own hand inside a file fetch
+        var on_ref_patch: Callable = Callable()  # the test's own hand inside the commit's landing
 
         func _init() -> void:
                 files["README.md"] = {"sha": _content_sha("hello".to_utf8_buffer()), "content": "hello".to_utf8_buffer()}
 
         ## Speaks the small slice of the GitHub API the app uses.
         func request(method: String, url: String, _headers: Dictionary, body: PackedByteArray) -> Dictionary:
+                order.append("%s %s" % [method, url])
                 var path := _content_path(url)
                 if url.ends_with("/user"):
                         return _json(200, {"login": "tester"})
@@ -104,6 +111,8 @@ class FakeGitHub:
                         head = "head-%d" % commits
                         return _json(201, {"sha": head})
                 if method == "PATCH" and url.contains("/git/refs/heads/"):
+                        if on_ref_patch.is_valid():
+                                on_ref_patch.call()
                         if ref_conflicts > 0:
                                 ref_conflicts -= 1
                                 return _json(409, {})
@@ -118,6 +127,8 @@ class FakeGitHub:
                         return _json(200, {"default_branch": "main"})
                 if method == "GET" and not path.is_empty():
                         content_gets += 1
+                        if on_contents_get.is_valid():
+                                on_contents_get.call(path)
                         if not files.has(path):
                                 return _json(404, {})
                         return _raw(200, files[path].content)
@@ -176,21 +187,14 @@ class FakeGitHub:
                 return h.finish().hex_encode()
 
 ## The client the sync engine sees: the same methods, backed by the fake.
+## There is deliberately no batch shape here -- the engine asks for one
+## thing at a time, and a client that could fly many would let that law
+## drift back in unnoticed.
 class FakeHttp:
         extends RefCounted
 
         var request: Callable
         var request_json: Callable
-
-        ## The engine batches its downloads; the fake answers a batch as a
-        ## run of asks, in order, exactly what the batch promises.
-        func request_many(batch: Array) -> Array:
-                var out: Array = []
-                out.resize(batch.size())
-                for i in batch.size():
-                        var spec: Dictionary = batch[i]
-                        out[i] = request.call(str(spec["method"]), str(spec["url"]), spec["headers"], spec["body"])
-                return out
 
 # --- fixtures -------------------------------------------------------------------
 
@@ -710,6 +714,98 @@ func _test_conflict_declined_replaces_nothing() -> void:
                 return "local"
         await sync.sync(DECK, Callable(), on_conflict)
         _is(asks.size(), 1, "the next sync asks again")
+
+## The reader studies while a sync runs -- the merge's one fetch flies, and
+## an answer saves to the very file the merge is about to judge. The merge
+## must read the local file AFTER the fetch, so the write it makes is built
+## from a copy that already saw the answer. The old order read first,
+## fetched second, and wrote a merge that predated the answer: the answer
+## vanished, and the card came back as new the next time the deck was read.
+func _test_mid_fetch_answer_survives() -> void:
+        _write_deck({"001": ["Q1", "A1"], "002": ["Q2", "A2"]})
+        var fake := FakeGitHub.new()
+        var sync := _make_sync(fake)
+        await sync.sync(DECK)  # the baseline
+        # The other device studied 002; the repo holds it.
+        fake.commit_change("progress.json", (JSON.stringify({"format": 1, "cards": {
+                "002": {"status": "review", "ivl": 1, "ease": 2.5, "reps": 1, "lapses": 0, "mod": 900, "due_day": 100, "step": 0, "relearning": false, "due_ts": 0},
+        }}) + "\n"))
+        # The reader answers 001 on this device while the merge's fetch flies:
+        # the save lands on progress.json mid-flight, exactly the moment the
+        # old merge used to overwrite it.
+        fake.on_contents_get = func(path: String) -> void:
+                if path != "progress.json":
+                        return
+                _write_progress({
+                        "001": {"status": "review", "ivl": 4, "ease": 2.5, "reps": 1, "lapses": 0, "mod": 5000, "due_day": 100, "step": 0, "relearning": false, "due_ts": 0},
+                })
+        var result: Dictionary = await sync.sync(DECK)
+        fake.on_contents_get = Callable()
+        _ok(bool(result.get("ok", false)), "a sync whose reader answered mid-flight succeeds")
+        var merged: Variant = JSON.parse_string(_read(DECK.path_join("progress.json")))
+        var cards: Dictionary = (merged as Dictionary).cards
+        _ok(cards.has("002"), "the other device's study arrives")
+        _is(int(cards["001"].get("reps", 0)), 1, "the answer that landed mid-fetch survives")
+        _is(int(cards["001"].get("mod", 0)), 5000, "the mid-fetch answer is the one kept, not an older shadow")
+
+## This machine's word lands before the repo's is taken: a run with one of
+## each must commit its push before it fetches its pull, so the reader's
+## own work is safe in the repo even when the run dies between the two.
+func _test_push_lands_before_pull() -> void:
+        _write_deck({"001": ["Q1", "A1"]})
+        var fake := FakeGitHub.new()
+        var sync := _make_sync(fake)
+        await sync.sync(DECK)
+        fake.order.clear()
+        # This machine edits the back; the other machine edits the front.
+        _write(DECK.path_join("001/back.md"), "A1 edited here")
+        fake.commit_change("001/front.md", "Q1 edited there")
+        var result: Dictionary = await sync.sync(DECK)
+        _ok(bool(result.get("ok", false)), "a sync with a push and a pull completes")
+        _is(int(result.pushed), 1, "one file goes out (got %d)" % int(result.pushed))
+        _is(int(result.pulled), 1, "one file comes in (got %d)" % int(result.pulled))
+        var patch_at := -1
+        var pull_at := -1
+        for i in fake.order.size():
+                var ask := str(fake.order[i])
+                if ask.contains("PATCH") and ask.contains("/git/refs/heads/"):
+                        patch_at = i  # the LAST patch is this run's own commit
+                if ask.contains("GET") and ask.contains("/contents/001/front.md"):
+                        pull_at = i
+        _ok(patch_at >= 0 and pull_at >= 0, "the commit and the pull both flew")
+        _ok(
+                patch_at >= 0 and pull_at >= 0 and patch_at < pull_at,
+                "the push lands before the pull (commit at %d, pull at %d)" % [patch_at, pull_at]
+        )
+
+## An answer that lands while the commit itself flies must still reach the
+## repo on the next run. The manifest's baseline is the bytes that actually
+## flew -- never a re-reading of the disk -- so the newer local file stays
+## "waiting" and the next sync carries it, instead of the baseline lying
+## that the repo already holds an answer it never received.
+func _test_answer_after_upload_still_pushes() -> void:
+        _write_deck({"001": ["Q1", "A1"]})
+        var fake := FakeGitHub.new()
+        var sync := _make_sync(fake)
+        await sync.sync(DECK)  # the baseline
+        # This device studies; the sync will carry it.
+        _write_progress({
+                "001": {"status": "review", "ivl": 4, "ease": 2.5, "reps": 1, "lapses": 0, "mod": 6000, "due_day": 100, "step": 0, "relearning": false, "due_ts": 0},
+        })
+        # And while the commit lands, the reader answers again -- a newer
+        # save on the very file the run is pushing.
+        fake.on_ref_patch = func() -> void:
+                _write_progress({
+                        "001": {"status": "review", "ivl": 5, "ease": 2.5, "reps": 2, "lapses": 0, "mod": 7000, "due_day": 100, "step": 0, "relearning": false, "due_ts": 0},
+                })
+        var first: Dictionary = await sync.sync(DECK)
+        fake.on_ref_patch = Callable()
+        _ok(bool(first.get("ok", false)), "the sync whose reader answered mid-commit succeeds")
+        _ok(SyncScript.progress_dirty(DECK), "the answer that landed mid-commit is still waiting")
+        var second: Dictionary = await _make_sync(fake).sync(DECK)
+        _ok(bool(second.get("ok", false)), "the next sync carries the waiting answer")
+        var remote_text := str(fake.files["progress.json"].content.get_string_from_utf8())
+        _ok(remote_text.contains("7000"), "the answer reaches the repo (repo holds %s)" % remote_text)
 
 func _teardown() -> void:
         _remove_tree(DECK)

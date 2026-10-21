@@ -29,10 +29,18 @@ const GitHubAuthScript := preload("res://scripts/net/github_auth.gd")
 ## and it must reach the other machines.
 ##
 ## What there is to send is sent as ONE commit: the files' blobs upload
-## first, a handful at a time, and then a single tree, commit and ref update
-## land them together. A first sync is one tidy commit in the repo's history
-## -- not three hundred -- and the round trips that dominate its duration
-## happen in parallel.
+## first and then a single tree, commit and ref update land them together.
+## A first sync is one tidy commit in the repo's history -- not three
+## hundred. Every request flies alone, one at a time, start to finish: a
+## parallel flight races the very files it carries -- the reader studies
+## while a sync runs, and a batch's answer can land over a save that flew
+## beneath it -- so the engine never asks the network for two things at
+## once, and never moves two files in one breath.
+##
+## This machine's word goes first: the push lands before a single pull
+## flies, so the reader's own work reaches the repo at the first
+## opportunity, and the repo's word is only taken afterwards. A pull can
+## be retried; a lost answer cannot be.
 ##
 ## The checksums are git blob checksums, the same values GitHub lists in a
 ## tree, so a file that matches the repo byte for byte is recognised as
@@ -52,10 +60,6 @@ const API := "https://api.github.com"
 const MANIFEST := "user://sync_manifest.json"
 const RAW := "application/vnd.github.raw"
 const JSON_MIME := "application/vnd.github+json"
-
-## Blobs in flight at once. Six is the browser's own habit per host, and a
-## polite number against GitHub's secondary limits on desktop.
-const BLOB_WIDTH := 6
 
 const MEDIA_EXTENSIONS := ["mp3", "ogg", "wav", "m4a", "png", "jpg", "jpeg", "webp", "svg"]
 
@@ -77,9 +81,14 @@ func _init(p_http, p_auth: GitHubAuthScript) -> void:
         auth = p_auth
 
 ## Run one full sync. on_progress(phrase, done, total) is called as it goes,
-## with a plain phrase ("signing in", "reading repo", "downloading",
-## "uploading", "merging progress", "saving") and, when the size of the
-## phase is known, how far through it is.
+## with a plain phrase ("signing in", "reading repo", "merging progress",
+## "uploading", "saving", "downloading") and, when the size of the phase is
+## known, how far through it is.
+##
+## The order is the promise: progress merges first, this machine's push
+## lands second, and the repo's pulls fly last -- the reader's own word
+## always reaches the repo before the repo's word is taken, because a pull
+## can be retried and a lost answer cannot be. Every request flies alone.
 ##
 ## A file both sides changed since the last sync is not the engine's to
 ## settle: on_conflict(paths) is asked which copy stands, and its word hard
@@ -177,33 +186,19 @@ func sync(
                                 "merged": 0,
                         }
 
-        # Pulls are rare and small: each is one file this deck has never changed.
-        # They fly six at a time, the way uploads do -- a first sync onto a new
-        # device is a hundred files, and one round trip apiece is a hundred
-        # waits for the same network.
-        var pulls: Array = plan.filter(func(step: Dictionary) -> bool: return str(step.action) == "pull")
-        var pulled := 0
-        var failed: Array = []
-        _report(on_progress, "downloading", 0, pulls.size())
-        for start in range(0, pulls.size(), BLOB_WIDTH):
-                var flight: Array = []
-                for step in pulls.slice(start, start + BLOB_WIDTH):
-                        flight.append(str(step.path))
-                var responses: Array = await _fetch_files(flight)
-                for i in flight.size():
-                        if _write_pulled(deck_path, str(flight[i]), responses[i]):
-                                pulled += 1
-                        else:
-                                failed.append(str(flight[i]))
-                _report(on_progress, "downloading", minf(start + BLOB_WIDTH, pulls.size()), pulls.size())
-
         # progress.json is merged card by card, never bulk-overwritten, and the
         # merged file rides the same commit as everything else being sent.
+        # The merge reads the local file only AFTER the remote copy is in
+        # hand, so an answer that lands while the fetch flies is already in
+        # the file when the merge reads it -- the write can never overwrite a
+        # save it did not see.
         _report(on_progress, "merging progress", 0, 0)
         var merge := await _merge_progress(deck_path, remote, manifest)
         var progress_failed := merge.has("error")
         if progress_failed:
                 push_error("GitHubSync: the progress merge failed (%s)" % str(merge.get("error")))
+
+        var failed: Array = []  # transfers that did not land; the next run retries them
 
         var sends: Array = []  # local files the repo must receive
         for step in plan:
@@ -215,87 +210,120 @@ func sync(
         if bool(merge.get("changed", false)) and not progress_failed:
                 sends.append("progress.json")
 
+        # This machine's word goes first: the blobs, the tree, the commit and
+        # the ref all land before a single pull flies, so whatever the reader
+        # has already said is safe in the repo even when the run dies halfway
+        # -- a pull can be retried, a lost answer cannot be.
         var pushed := 0
         var settled_head := head
+        var commit_failed := false
+        var landed_sends: Dictionary = {}  # the blobs that truly reached the repo
+        var blob_shas: Dictionary = {}
         if not (sends.is_empty() and deletes.is_empty()):
                 _report(on_progress, "uploading", 0, sends.size())
-                var blob_shas: Dictionary = await _create_blobs(deck_path, sends, on_progress)
+                blob_shas = await _create_blobs(deck_path, sends, on_progress)
                 var missing := sends.filter(func(path: String) -> bool: return not blob_shas.has(path))
                 if not missing.is_empty():
                         # Nothing has landed yet -- a failed blob means no commit -- so
                         # the next run simply tries again.
                         failed.append_array(missing)
-                        _write_manifest(deck_path, failed, "progress.json" if progress_failed else "")
-                        return {
-                                "ok": false,
-                                "error": "blob_failed",
-                                "pushed": 0,
-                                "pulled": pulled,
-                                "merged": int(merge.get("merged", 0)),
-                                "failed": failed,
-                        }
-
-                _report(on_progress, "saving", 0, 0)
-                var landed := await _commit(blob_shas, sends, deletes, base_tree, head)
-                if not landed.ok and str(landed.get("error", "")) == "ref_moved":
-                        # Another machine synced mid-flight. Blobs are content addressed,
-                        # so they are still good: look again and commit onto the new head.
-                        var fresh_head := await _head_sha()
-                        var fresh_tree: Dictionary = await _get_json(
-                                "/repos/%s/%s/git/trees/%s?recursive=1" % [owner, repo, _branch]
-                        )
-                        if not fresh_head.is_empty() and _ok(fresh_tree):
-                                landed = await _commit(
-                                        blob_shas, sends, deletes,
-                                        str((fresh_tree.body_json as Dictionary).get("sha", "")), fresh_head
+                else:
+                        _report(on_progress, "saving", 0, 0)
+                        var landed := await _commit(blob_shas, sends, deletes, base_tree, head)
+                        if not landed.ok and str(landed.get("error", "")) == "ref_moved":
+                                # Another machine synced mid-flight. Blobs are content addressed,
+                                # so they are still good: look again and commit onto the new head.
+                                var fresh_head := await _head_sha()
+                                var fresh_tree: Dictionary = await _get_json(
+                                        "/repos/%s/%s/git/trees/%s?recursive=1" % [owner, repo, _branch]
                                 )
-                if not bool(landed.get("ok", false)):
-                        return {
-                                "ok": false,
-                                "error": str(landed.get("error", "commit_failed")),
-                                "code": int(landed.get("code", 0)),
-                                "pushed": 0,
-                                "pulled": pulled,
-                                "merged": int(merge.get("merged", 0)),
-                                "failed": failed,
-                        }
-                if landed.has("sha"):
-                        settled_head = str(landed.sha)
-                pushed = sends.size() + deletes.size()
+                                if not fresh_head.is_empty() and _ok(fresh_tree):
+                                        landed = await _commit(
+                                                blob_shas, sends, deletes,
+                                                str((fresh_tree.body_json as Dictionary).get("sha", "")), fresh_head
+                                        )
+                                        if bool(landed.get("ok", false)):
+                                                # The repo the retry landed against is a different
+                                                # tree than the run planned against: the manifest
+                                                # must speak of the one the commit really sits on.
+                                                remote = _tree_shas(fresh_tree.body_json)
+                        if not bool(landed.get("ok", false)):
+                                commit_failed = true
+                        else:
+                                if landed.has("sha"):
+                                        settled_head = str(landed.sha)
+                                pushed = sends.size() + deletes.size()
+                                landed_sends = blob_shas
 
-        # Everything that now agrees, locally and remotely, is the new
-        # baseline -- and the branch's own HEAD is remembered with it, so
-        # the next quiet sync can answer "already up to date" from the
-        # branch alone. Anything that failed to transfer stays out of both,
-        # so the next run looks at the tree again and retries.
-        var clean_finish: bool = failed.is_empty() and not progress_failed
-        _write_manifest(
-                deck_path, failed, "progress.json" if progress_failed else "",
-                settled_head if clean_finish else ""
-        )
+        # The repo's word arrives after this machine's was said: each pull is
+        # one file this deck has never changed, fetched alone, written home,
+        # counted -- the next one waits for this one to land. A push that
+        # failed does not stop the pulls: what the repo holds is this deck's
+        # to receive whatever became of its own sending.
+        var pulls: Array = plan.filter(func(step: Dictionary) -> bool: return str(step.action) == "pull")
+        var pulled := 0
+        var pull_done := 0
+        _report(on_progress, "downloading", 0, pulls.size())
+        for step in pulls:
+                var response: Dictionary = await _fetch_file(str(step.path))
+                if _write_pulled(deck_path, str(step.path), response):
+                        pulled += 1
+                else:
+                        failed.append(str(step.path))
+                pull_done += 1
+                _report(on_progress, "downloading", pull_done, pulls.size())
+
+        # Everything the repo now holds is the new baseline -- the bytes that
+        # actually flew, never a re-reading of the disk, which may have moved
+        # beneath the run (a reader answering while the commit flew). A
+        # baseline that flattered the disk could name an answer the repo
+        # never received as "already agreed", and the next sync would say
+        # "in step" forever. Anything that failed to transfer stays out of
+        # both, so the next run looks at the tree again and retries.
+        var clean_finish: bool = failed.is_empty() and not progress_failed and not commit_failed
+        if not commit_failed:
+                _write_manifest(
+                        remote, landed_sends,
+                        deletes, failed, "progress.json" if progress_failed else "",
+                        settled_head if clean_finish else ""
+                )
 
         return {
-                "ok": failed.is_empty() and not progress_failed,
+                "ok": failed.is_empty() and not progress_failed and not commit_failed,
                 "pushed": pushed,
                 "pulled": pulled,
                 "merged": int(merge.get("merged", 0)),
                 "failed": failed,
         }
 
-func _write_manifest(deck_path: String, failed: Array, progress_failed_path: String, settled_head := "") -> void:
-        var after := _local_files(deck_path)
+## The last-synced checksums of one run, told from the repo's side: every
+## deck file the tree listed, with this run's landed blobs pinned to the
+## bytes that actually flew, the deletions gone, the failures absent, and
+## the branch's HEAD remembered beside them. What the repo holds is what
+## "already synced" means -- the disk's own word is never asked, because the
+## disk can move while a run flies.
+func _write_manifest(
+        remote: Dictionary, sent: Dictionary, deletes: Array,
+        failed: Array, progress_failed_path: String, settled_head := ""
+) -> void:
         var fresh: Dictionary = {}
-        for path in after.keys():
-                if failed.has(path) or (path == progress_failed_path and not progress_failed_path.is_empty()):
+        for path in remote.keys():
+                if not _is_deck_path(str(path)):
+                        continue
+                if deletes.has(path) or failed.has(path) or path == progress_failed_path:
                         continue
                 # A machine that does not carry media must not remember it as
                 # agreed: the manifest is what "already synced" means, and a
-                # browser never agreed about files it cannot hold. Recording
-                # them anyway let a later desktop sync believe the repo had
-                # media it had never received.
-                if not carry_media and _is_media(path):
+                # browser never agreed about files it cannot hold.
+                if not carry_media and _is_media(str(path)):
                         continue
-                fresh[path] = after[path]
+                fresh[str(path)] = str(sent.get(str(path), remote[path]))
+        for path in sent.keys():
+                if failed.has(path) or path == progress_failed_path:
+                        continue
+                if not carry_media and _is_media(str(path)):
+                        continue
+                fresh[str(path)] = str(sent[path])
         # The branch this agreement was reached against, for the next run's
         # first question. An empty head -- a run that did not finish clean --
         # forces the next run to look at the tree instead of trusting it.
@@ -415,19 +443,17 @@ func _head_sha() -> String:
                 return ""
         return str(((head.body_json as Dictionary).get("object", {}) as Dictionary).get("sha", ""))
 
-## Fetch many files at once: one batch, as many answers, in the same order.
-func _fetch_files(paths: Array) -> Array:
-        var batch: Array = []
-        for path in paths:
-                var headers := _auth_headers()
-                headers["Accept"] = RAW
-                batch.append({
-                        "method": "GET",
-                        "url": API + "/repos/%s/%s/contents/%s" % [owner, repo, _encode_path(str(path))],
-                        "headers": headers,
-                        "body": PackedByteArray(),
-                })
-        return await _request_many(batch)
+## One fetched file, fetched alone: a single request, a single answer, the
+## next one waiting for this one to land. The engine never asks the network
+## for two things at once -- a parallel flight races the very files it
+## carries.
+func _fetch_file(path: String) -> Dictionary:
+        var headers := _auth_headers()
+        headers["Accept"] = RAW
+        return await http.request.call(
+                "GET", API + "/repos/%s/%s/contents/%s" % [owner, repo, _encode_path(path)],
+                headers, PackedByteArray()
+        )
 
 ## One fetched file, written home: inside the deck, nowhere else, with its
 ## folders made if the file is new to this machine.
@@ -453,38 +479,32 @@ func _write_pulled(deck_path: String, path: String, response: Dictionary) -> boo
         file.close()
         return true
 
-## Upload every file's blob, a few at a time. Returns {path: blob sha}; a
-## path missing from the answer failed and must be retried next sync.
+## Upload every file's blob, one at a time: a single request, a single
+## answer, the next file waiting for this one's sha. Returns {path: blob
+## sha}; a path missing from the answer failed and must be retried next
+## sync.
 func _create_blobs(deck_path: String, sends: Array, on_progress: Callable) -> Dictionary:
         var shas: Dictionary = {}
         var done := 0
-        for start in range(0, sends.size(), BLOB_WIDTH):
-                var flight: Array = sends.slice(start, start + BLOB_WIDTH)
-                var batch: Array = []
-                for path in flight:
-                        var bytes := FileAccess.get_file_as_bytes(deck_path.path_join(path))
-                        var headers := _auth_headers()
-                        headers["Accept"] = JSON_MIME
-                        headers["Content-Type"] = "application/json"
-                        batch.append({
-                                "method": "POST",
-                                "url": API + "/repos/%s/%s/git/blobs" % [owner, repo],
-                                "headers": headers,
-                                "body": JSON.stringify(
-                                        {"content": Marshalls.raw_to_base64(bytes), "encoding": "base64"}
-                                ).to_utf8_buffer(),
-                        })
-                var responses: Array = await _request_many(batch)
-                for i in responses.size():
-                        var path: String = flight[i]
-                        var body: Variant = _parse_json(responses[i].body)
-                        if int(responses[i].get("code", 0)) == 201 and typeof(body) == TYPE_DICTIONARY and (body as Dictionary).has("sha"):
-                                shas[path] = str((body as Dictionary).sha)
-                        else:
-                                push_error(
-                                        "GitHubSync: blob %s failed (%d)" % [path, int(responses[i].get("code", 0))]
-                                )
-                        done += 1
+        for path in sends:
+                var bytes := FileAccess.get_file_as_bytes(deck_path.path_join(path))
+                var headers := _auth_headers()
+                headers["Accept"] = JSON_MIME
+                headers["Content-Type"] = "application/json"
+                var response: Dictionary = await http.request.call(
+                        "POST", API + "/repos/%s/%s/git/blobs" % [owner, repo], headers,
+                        JSON.stringify(
+                                {"content": Marshalls.raw_to_base64(bytes), "encoding": "base64"}
+                        ).to_utf8_buffer()
+                )
+                var body: Variant = _parse_json(response.body)
+                if int(response.get("code", 0)) == 201 and typeof(body) == TYPE_DICTIONARY and (body as Dictionary).has("sha"):
+                        shas[str(path)] = str((body as Dictionary).sha)
+                else:
+                        push_error(
+                                "GitHubSync: blob %s failed (%d)" % [path, int(response.get("code", 0))]
+                        )
+                done += 1
                 _report(on_progress, "uploading", done, sends.size())
         return shas
 
@@ -556,6 +576,15 @@ static func _commit_message(sends: Array, deletes: Array) -> String:
 ## the choice made later wins, the way a later answer breaks a card's tie.
 ## The file goes to the repo when the merge changed it or when local study
 ## moved it past the bytes the repo last saw.
+##
+## The remote copy is fetched FIRST and the local file read only afterwards
+## -- the one wait in the merge sits before the read, never between the
+## read and the write. A reader answers while the fetch flies (the merge
+## runs under the whole app, and the app does not stop for it); the answer
+## saves to the file mid-flight, and the merge's later read sees it, so the
+## write can never overwrite a save it did not see. The old order read the
+## file first and wrote a merge built from a copy that predated the answer
+## -- the answer vanished, and the card returned as new.
 func _merge_progress(deck_path: String, remote: Dictionary, manifest: Dictionary) -> Dictionary:
         var local_path := deck_path.path_join("progress.json")
         var remote_sha := str(remote.get("progress.json", ""))
@@ -565,8 +594,6 @@ func _merge_progress(deck_path: String, remote: Dictionary, manifest: Dictionary
         # Downloading it anyway made every sync look like a full round trip.
         if not remote_sha.is_empty() and remote_sha == baseline and not _progress_needs_push(local_path, manifest):
                 return {"merged": 0, "changed": false}
-        var mine := _read_progress(local_path)
-        var choices := _read_choices(local_path)
         var theirs: Dictionary = {}
         var their_choices: Dictionary = {}
         if not remote_sha.is_empty():
@@ -579,6 +606,11 @@ func _merge_progress(deck_path: String, remote: Dictionary, manifest: Dictionary
                 if typeof(remote_data) == TYPE_DICTIONARY:
                         theirs = DeckScript.entries_of(remote_data)
                         their_choices = DeckScript.choices_of(remote_data)
+        # The local word, read as late as the merge can read it -- after every
+        # wait, so that read, merge and write are one breath: no answer can
+        # land inside them, and none can be overwritten from outside them.
+        var mine := _read_progress(local_path)
+        var choices := _read_choices(local_path)
         var merged := 0
         for card_id in theirs.keys():
                 var their_state: Dictionary = theirs[card_id]
@@ -758,19 +790,6 @@ func _request_json(method: String, path: String, payload: Variant) -> Dictionary
         var headers := _auth_headers()
         headers["Accept"] = JSON_MIME
         return await http.request_json.call(method, API + path, headers, payload)
-
-## A batch, when the client can fly many at once; one by one otherwise.
-func _request_many(batch: Array) -> Array:
-        if http != null and http.has_method("request_many"):
-                return await http.request_many.call(batch)
-        var out: Array = []
-        for spec in batch:
-                out.append(
-                        await http.request.call(
-                                str(spec["method"]), str(spec["url"]), spec["headers"], spec["body"]
-                        )
-                )
-        return out
 
 func _auth_headers() -> Dictionary:
         return {"Authorization": "Bearer " + token, "User-Agent": "QuranTathbit"}

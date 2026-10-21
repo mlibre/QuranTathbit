@@ -12,9 +12,12 @@ const ThemeScript := preload("res://scripts/ui/theme.gd")
 ## never offers back a card the reader deferred or suspended today, and the
 ## session it opens holds exactly that one card. The same file holds the
 ## merge law to one place -- the deck itself tells both doors that merge a
-## progress document how states compare and which choices travel -- and
-## holds the settings page's font segments to the height their own faces
-## ask for, so no preview can outgrow the box that offers it.
+## progress document how states compare and which choices travel -- holds
+## the deck's own in-place adoption of its folder's next word (the card
+## objects a session holds are never orphaned by a wholesale replacement,
+## and a local answer newer than the file keeps its ground), and holds the
+## settings page's font segments to the height their own faces ask for, so
+## no preview can outgrow the box that offers it.
 
 var _failures := 0
 
@@ -24,6 +27,7 @@ func _init() -> void:
         await _test_session_opens()
         await _test_browse_counts()
         _test_merge_law_one_place()
+        _test_deck_adopts_in_place()
         await _test_segment_heights()
 
         if _failures > 0:
@@ -224,6 +228,81 @@ func _test_merge_law_one_place() -> void:
         var entries := DeckScript.entries_of({"cards": {"001": {"reps": 1}, "junk": 5}})
         _is(entries.size(), 1, "a hand-edited entry that is not a card's state never merges")
         _ok(entries.has("001"), "the honest entry survives the cleaning")
+
+# --- the deck that is never replaced -----------------------------------------------
+
+## A finished sync (or a backup's arrival) re-reads the deck folder -- and
+## the deck the app holds must take that word INTO ITSELF, in place: the
+## card objects a session in flight holds are the deck's own cards still,
+## so an answer given mid-sync lands on a card the deck will save. A deck
+## replaced wholesale once orphaned those cards: the answer applied to an
+## object the new deck did not hold, the save skipped it, and the card came
+## back as new -- the same card offered twice by "one more card".
+func _test_deck_adopts_in_place() -> void:
+        var base := "user://scratch_extra_card/adopt"
+        _remove_tree(base)
+        DirAccess.make_dir_recursive_absolute(base)
+        var ids := ["001", "002", "003"]
+        var meta := FileAccess.open(base.path_join("deck.json"), FileAccess.WRITE)
+        meta.store_string(JSON.stringify({"format": 1, "name": "Adopt", "cards": ids}) + "\n")
+        meta.close()
+        for id in ids:
+                var folder := base.path_join(id)
+                DirAccess.make_dir_recursive_absolute(folder)
+                var front := FileAccess.open(folder.path_join("front.md"), FileAccess.WRITE)
+                front.store_string("Q %s\n" % id)
+                front.close()
+                var back := FileAccess.open(folder.path_join("back.md"), FileAccess.WRITE)
+                back.store_string("A %s\n" % id)
+                back.close()
+        var deck = DeckScript.load(base)
+        _ok(deck != null, "the adopt deck loads")
+        if deck == null:
+                return
+        var held = deck.cards[0]
+        _is(held.id, "001", "the held card is the first (guard)")
+
+        # The folder's next word: 001 answered on disk, 002's folder gone,
+        # 004's folder new, the deck renamed.
+        var progress := FileAccess.open(base.path_join("progress.json"), FileAccess.WRITE)
+        progress.store_string(JSON.stringify({"format": 1, "cards": {
+                "001": {"status": "review", "ivl": 4, "ease": 2.5, "reps": 2, "lapses": 0, "mod": 900, "due_day": 100, "step": 0, "relearning": false, "due_ts": 0},
+        }}) + "\n")
+        progress.close()
+        _remove_tree(base.path_join("002"))
+        var new_folder := base.path_join("004")
+        DirAccess.make_dir_recursive_absolute(new_folder)
+        var nf := FileAccess.open(new_folder.path_join("front.md"), FileAccess.WRITE)
+        nf.store_string("Q 004\n")
+        nf.close()
+        var nb := FileAccess.open(new_folder.path_join("back.md"), FileAccess.WRITE)
+        nb.store_string("A 004\n")
+        nb.close()
+
+        var fresh = DeckScript.load(base)
+        _ok(fresh != null, "the folder's next word loads")
+        if fresh == null:
+                return
+        deck.adopt(fresh)
+        _ok(deck.cards[0] == held, "the card objects keep their identity")
+        _is(str(deck.cards[0].state.get("status", "")), "review", "an answer on disk arrives in place")
+        _is(int(deck.cards[0].state.get("reps", 0)), 2, "the arrived answer is the file's own word")
+        _is(deck.cards.size(), 3, "the gained card joins and the lost card leaves (got %d)" % deck.cards.size())
+        var id_set := {}
+        for card in deck.cards:
+                id_set[card.id] = true
+        _ok(id_set.has("001") and not id_set.has("002") and id_set.has("003") and id_set.has("004"), "the shelf is exactly the folder's own")
+        _is(deck.cards[0].front, "Q 001\n", "the held card keeps its own words when the file agrees")
+
+        # A local answer newer than the file is never walked back: the deck
+        # keeps its own word unless the other side earned the win.
+        deck.cards[0].state = {
+                "status": "review", "ivl": 9, "ease": 2.5, "reps": 9, "lapses": 0, "mod": 9999,
+                "due_day": 100, "step": 0, "relearning": false, "due_ts": 0, "defer_day": 0, "suspended": false,
+        }
+        var older = DeckScript.load(base)
+        deck.adopt(older)
+        _is(int(deck.cards[0].state.get("reps", 0)), 9, "a local answer newer than the file keeps its ground")
 
 # --- the segments a face is offered in --------------------------------------------------
 
