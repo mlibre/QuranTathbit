@@ -99,9 +99,13 @@ jobs:
       # the wire for every first visit. gzip -9 makes it 10 MB; the page's
       # head script (html/head_include) swaps the engine's fetch to the .gz
       # and decompresses it in the browser, falling back to the raw file when
-      # the .gz is absent. The service worker should cache the bytes the page
-      # actually asks for -- the .gz -- so a returning visitor loads from the
-      # local cache instead of the network.
+      # the .gz is absent. The bytes are read whole before the response is
+      # handed over, so a link that drops mid-download rejects cleanly and
+      # the engine's own retry (four attempts) takes it again -- instead of a
+      # stream that breaks under the compiler and leaks out as an unhandled
+      # promise. The service worker should cache the bytes the page actually
+      # asks for -- the .gz -- so a returning visitor loads from the local
+      # cache instead of the network.
       - name: Ship the engine compressed
         run: |
           test -f builds/web/index.wasm
@@ -272,11 +276,13 @@ jobs:
           grep -q "qt-simd-guard" builds/web/index.html
           grep -q "__qtWasmSimdMissing" builds/web/index.html
           grep -q "WebAssembly.validate" builds/web/index.html
-          # The boot watch rides the same head: a page that cannot start
-          # says why (a script that never parsed, a promise nothing
-          # caught), and a load gone quiet for a long spell says so too,
-          # instead of hanging forever without a word. The marker alone
-          # would pass even if the watch arrived truncated, so its working
+          # The boot watch rides the same head: an error or a promise
+          # nothing caught is said to the console (never over the
+          # reader's page -- the takeover notice belongs to the guards
+          # alone, and a desktop Firefox on a flaky link once met it on
+          # every unhandled rejection), and a load gone quiet for a long
+          # spell says so gently, with an invite to reload. The marker
+          # alone would pass even if the watch arrived truncated, so its working
           # parts are demanded, as always.
           grep -q "qt-boot-watch" builds/web/index.html
           grep -q "unhandledrejection" builds/web/index.html

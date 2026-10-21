@@ -108,6 +108,33 @@ Ctrl+V sends — and confirms the app's answer (stamped into a document
 attribute: the length and first bytes of what the field now holds) matches
 the token byte for byte. Show then reveals the field for a screenshot.
 
+The page's head scripts are proven the same way, on the exact bytes the
+built page carries. Two node suites take the built `index.html` apart and
+drive the scripts in a world the suite controls:
+
+```bash
+node tools/test_wasm_gz_whole.js   # the gz shim's whole-file-or-nothing law
+node tools/test_boot_watch.js      # the boot watch's console-only law
+```
+
+The first proves the engine is handed a whole file or a clean rejection
+(a good `.gz` hands over the whole decompressed file; a truncated one —
+a link that dropped mid-download — and a missing one both fall back to
+the raw wasm, whole; a non-wasm URL passes through untouched; when both
+sides are missing the rejection is one the engine's own retry can take).
+The second proves an unhandled promise is said to the console and never
+over the reader's page, the gentle stall line arriving at 45 s of a
+frozen bar — 10 s once a rejection has been seen — with no APK link,
+and a guard that has spoken keeping the watch quiet for good. And
+`bash tools/test_web_boot_watch.sh` proves both ends to end in a real
+browser: the app boots through the buffered shim, a stray rejection
+after boot leaves the page untouched, and a load that cannot finish
+(the wasm deleted, the engine's retries exhausted) shows the reader
+the stall line alone — never the takeover notice, never the Android
+download button. The failure run serves on a fresh port every time: the
+service worker an earlier run registered would serve its cached whole
+build, and the page would boot, failure or no failure.
+
 ## Adding a suite
 
 Name it `tests/regression_<subject>.gd`; the battery picks it up

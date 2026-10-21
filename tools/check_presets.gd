@@ -113,6 +113,26 @@ func _init() -> void:
         if not (0 <= guard_at and guard_at < simd_at):
                 push_error("the SIMD guard must be installed after the WebGL2 guard")
                 failures += 1
+        # The takeover notice (the bilingual boxes with the APK link)
+        # belongs to the guards alone: a browser that truly cannot run the
+        # app. The boot watch says its word to the console, and the one
+        # line it shows a reader (the stall line) wears no APK -- a
+        # desktop Firefox on a flaky link once met the takeover on every
+        # unhandled promise, was told its browser was the problem, and was
+        # offered an Android download on a machine with no Android.
+        var boot_at := include.find("qt-boot-watch")
+        var boot_close := include.find("</script>", boot_at)
+        if not (0 <= boot_at and boot_at < boot_close):
+                push_error("the boot watch must be present and closed")
+                failures += 1
+        else:
+                var watch := include.substr(boot_at, boot_close - boot_at)
+                if watch.contains("apk"):
+                        push_error("the boot watch must not offer the APK takeover; that is the guards' word alone")
+                        failures += 1
+                if not watch.contains("unhandledrejection"):
+                        push_error("the boot watch must keep its unhandledrejection listener (the console's word)")
+                        failures += 1
         # The debug log is gone (v1.0.36): its five-tap overlay earned its
         # keep diagnosing the phone that sat in silence, and was retired the
         # release after -- nothing may quietly bring it back.

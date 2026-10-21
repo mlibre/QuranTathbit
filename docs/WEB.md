@@ -31,9 +31,16 @@ double-quoted config line). In order of installation:
   link never goes stale with a release). The guards and the boot watch
   all speak through `window.__qtNotice(en, fa, {why, apk})`, so every
   warning wears the same face;
-- **the gz shim** — swaps the engine's `fetch` of `index.wasm` for
-  `index.wasm.gz` (CI gzips it; static hosts serve the wasm raw) and
-  decompresses with `DecompressionStream`, falling back to the raw file;
+- **the gz shim** (`qt-wasm-gz`) — swaps the engine's `fetch` of
+  `index.wasm` for `index.wasm.gz` (CI gzips it; static hosts serve the
+  wasm raw) and decompresses with `DecompressionStream`, falling back to
+  the raw file. The engine is handed a whole file or nothing: the bytes
+  are read to their end *before* the response is returned, so a link
+  that drops mid-download becomes a clean rejection the engine's own
+  retry (four attempts) takes again — never a stream that breaks under
+  the compiler with the failure leaking out as an unhandled promise
+  (the report: a desktop Firefox that sometimes could not load, and a
+  takeover notice for a page that had merely lost its connection);
 - **the browser-keys gate** — capture-phase window listener that stops
   propagation for the browser-reserved combos (F5, Ctrl+R/L/T, and
   friends) so the engine's canvas cannot eat them, and hands the page's
@@ -56,9 +63,14 @@ double-quoted config line). In order of installation:
   The guard probes with the canonical SIMD module before the engine
   downloads and says so through the notice builder (both ABIs ship in
   the APK, so the same phone installs it fine);
-- **the boot watch** — a page that cannot start says why (every error,
-  every promise nothing caught), and a load gone quiet for a long spell
-  says so too — all through the same two-box notice.
+- **the boot watch** — the takeover notice belongs to the guards
+  alone: a browser that cannot run the app is told so, but an ordinary
+  error or an unhandled promise (a dropped link, a fetch that failed) is
+  said to the console, never over the reader's page. The watch's one
+  word to the reader is the stall line: a load gone quiet for a long
+  spell (45 seconds, or 10 once a rejection has been seen) is told the
+  connection may be slow and invited to reload — gently, through the
+  same two-box notice, with no APK link.
 
 ## The loader speaks older browsers
 
