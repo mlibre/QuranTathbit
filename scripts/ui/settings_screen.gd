@@ -324,6 +324,14 @@ func _github_body() -> Control:
         chip.add_child(chip_pad)
         var code := _text("", ThemeScript.GREEN_DEEP, 34, true, true)
         code.name = "CodeText"
+        # A code is a ticket, not a paragraph -- it never wraps. The _text
+        # builder dresses every line to wrap its words, and a wrapping
+        # label's least width is nothing at all, so the chip (which shrinks
+        # to its child's least width) stood one letter wide and stacked the
+        # code like a column of falling tiles -- the photograph from the
+        # phone. With the wrap off, the label's least width is the code's
+        # own width, and the chip closes around it, one line, centred.
+        code.autowrap_mode = TextServer.AUTOWRAP_OFF
         chip_pad.add_child(code)
         flow.add_child(chip)
 
