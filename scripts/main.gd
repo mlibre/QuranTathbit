@@ -17,6 +17,7 @@ const I18nScript := preload("res://scripts/ui/i18n.gd")
 const LanguagePickerScript := preload("res://scripts/ui/language_picker.gd")
 const TouchScrollScript := preload("res://scripts/ui/touch_scroll.gd")
 const RtlFieldScript := preload("res://scripts/ui/rtl_field.gd")
+const CopyChipScript := preload("res://scripts/ui/copy_chip.gd")
 
 ## QuranTathbit: one deck, kept in folders and files, studied one card at
 ## a time. This root owns the small amount of state the app has -- settings,
@@ -58,6 +59,7 @@ var _clip_state := ""  # what the page was last told the field in hand holds
 var _menu_free := -1  # what the page was last told the mouse stands on: paper (1) or working parts (0)
 var _menu_mouse := Vector2(-1.0, -1.0)  # where the mouse stood when that was last measured
 var _menu_at := 0  # when, because the ground can move under a still mouse too
+var _copy_chip: CopyChipScript  # the floating copy pill, standing over whatever label holds a choice
 
 
 func _ready() -> void:
@@ -110,6 +112,17 @@ func _ready() -> void:
         var touch := TouchScrollScript.new()
         touch.name = "TouchScroll"
         add_child(touch)
+        # The copy pill: a hand that chooses words is offered the copy, on a
+        # phone above all -- no keyboard and no system menu stands over the
+        # app's own ink there, so the app carries the words itself. It lives
+        # on the window, above every page and every swap of pages, and
+        # shows only while a selection lives. The window is still setting
+        # its children up while this page readies itself, so the pill joins
+        # it a beat later -- an add the window refuses is a pill that never
+        # says Copy anywhere.
+        _copy_chip = CopyChipScript.new()
+        _copy_chip.name = "CopyChip"
+        get_window().add_child.call_deferred(_copy_chip)
         _go_home()
         # The app's very first question, over the page it asks on: which
         # tongue do its own words speak? Only a reader who has never

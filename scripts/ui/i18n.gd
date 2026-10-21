@@ -385,6 +385,12 @@ const STRINGS := {
         },
         "Open GitHub": {"fa": "گشودن GitHub", "ar": "فتح GitHub"},
         "Copy code": {"fa": "رونوشت کد", "ar": "نسخ الرمز"},
+        "Copy": {"fa": "رونوشت", "ar": "نسخ"},
+        "Copied": {"fa": "رونوشت شد", "ar": "تم النسخ"},
+        "Copy the chosen words": {
+                "fa": "رونوشت واژه‌های برگزیده",
+                "ar": "نسخ الكلمات المحددة",
+        },
         "Open the sign-in page": {"fa": "گشودن صفحهٔ ورود", "ar": "فتح صفحة تسجيل الدخول"},
         "Copy the code to the clipboard": {
                 "fa": "رونوشت کد در کلیپ‌بورد",

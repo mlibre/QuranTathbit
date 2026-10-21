@@ -3,6 +3,7 @@ extends VBoxContainer
 const ThemeScript := preload("res://scripts/ui/theme.gd")
 const MarkdownScript := preload("res://scripts/ui/markdown.gd")
 const I18nScript := preload("res://scripts/ui/i18n.gd")
+const CopyChipScript := preload("res://scripts/ui/copy_chip.gd")
 
 ## Draws a card side: the markdown turned into calm, centered paragraphs.
 ## Arabic verses take the Quranic typeface at a size you can read across the
@@ -104,6 +105,7 @@ func _add_eyebrow(ref_line: String) -> void:
         label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         label.selection_enabled = true
+        CopyChipScript.watch(label)
         var script := ThemeScript.reference_script(ref_line)
         label.text_direction = TextDirection.TEXT_DIRECTION_AUTO
         label.horizontal_alignment = (
@@ -135,8 +137,11 @@ func _add_text(markdown: String, link: String, lead := false) -> void:
         label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         # A verse or translation is something a person will want to copy:
-        # hold the mouse and drag, the way every other reader works.
+        # hold the mouse and drag, the way every other reader works -- and
+        # on a phone, where no keyboard and no system menu stands over the
+        # app's own ink, the copy pill answers the choice.
         label.selection_enabled = true
+        CopyChipScript.watch(label)
         # The question side is a reference -- a surah's name and a range,
         # Arabic by construction -- so it reads in the Quranic face whether
         # or not its letters carry a script tell. Everything else (the answer
@@ -246,6 +251,7 @@ func _add_footer(markdown: String, url: String) -> void:
         line.fit_content = true
         line.scroll_active = false
         line.selection_enabled = true
+        CopyChipScript.watch(line)
         line.bbcode_enabled = true
         var font := ThemeScript.vazir(12)
         line.add_theme_font_override("normal_font", font)

@@ -56,6 +56,24 @@ touched at press-time; and a scroll never lands as a click on the row it
 began on: one far-off motion of the finger's own is delivered the moment
 the scroll starts, telling that row the hand has left.
 
+## The chosen words are carried by the app itself
+
+Godot draws its own selection, and a phone offers nothing over ink the
+app drew: Android's copy toolbar stands only over the system's real text
+fields, no keyboard hangs over a drawn verse, and the engine's own label
+menu waits for a right-click a finger never makes. So the app offers the
+copy itself — one small gold pill (`scripts/ui/copy_chip.gd`, standing on
+the window above every page) that appears the moment a selectable
+RichTextLabel holds a choice and leaves the moment the choice does. A
+label never announces its selection (there is no signal; the tell is
+`get_selection_from() < 0`), so the pill looks for itself each frame,
+the same quiet polling the page's clipboard half does. A press carries
+the chosen words to the clipboard — through the page's own writer on the
+web, the engine's everywhere else — says "Copied" for a beat, and then
+lets the choice go. A press never takes the focus: focus leaving a label
+is what ends its selection, and the words are still wanted through the
+beat.
+
 ## The back key is a page's way back, not the app's way out
 
 The engine quits on the back key by default; `quit_on_go_back` is off in

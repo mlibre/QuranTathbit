@@ -36,6 +36,7 @@ func _init() -> void:
                 "qt-zip-bridge",
                 "qt-paste-bridge",
                 "__qtClipInstall",
+                "__qtCopyText",
                 "qt-native-menu",
                 "__qtNativeMenu",
                 "__qtLastPointer",
@@ -127,6 +128,15 @@ func _init() -> void:
         var code := int(cfg.get_value("preset.3.options", "version/code", 0))
         if code < 13:
                 push_error("the Android version code must move past 12")
+                failures += 1
+        # The INTERNET permission: without it every network call on a phone
+        # dies the moment it starts -- the shipped v2.0.2 APK carried only
+        # DUMP, and GitHub connect said "could not reach GitHub" while the
+        # same build worked everywhere else. The default preset never adds
+        # it; only this line does, so the line must never leave.
+        var internet: bool = cfg.get_value("preset.3.options", "permissions/internet", false)
+        if not internet:
+                push_error("the Android preset must ask for the INTERNET permission; without it GitHub connect and sync die on every phone")
                 failures += 1
         # Every place a version lives must say the same word: the runtime's
         # own number, the desktop builds' product_version, the Android

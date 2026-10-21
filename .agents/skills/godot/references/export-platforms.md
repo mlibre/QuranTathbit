@@ -94,6 +94,7 @@ Recommended 4.7 host tools:
 - CMake 3.10.2.4988404 (as documented)
 
 Configure Java/SDK paths in Editor Settings. New apps generally publish an AAB; use a non-debug keystore and keep credentials outside source control. Networking needs the INTERNET permission. Other permissions, orientation, immersive mode, screen orientation, icon/splash, and privacy declarations are product/platform decisions.
+- **The Android preset carries no INTERNET permission unless it is said out loud** (verified 4.7.2, on a shipped APK): the export's manifest held only `android.permission.DUMP`, every `HTTPRequest` died on the phone at once, and GitHub connect said "could not reach GitHub" while the same build worked on desktop and web. Set `permissions/internet=true` in the preset (the cfg keeps only non-default values, so a key that was never there is invisible) and make a preset checker assert it, or a future preset rewrite drops it again. `OS.shell_open` needs no permission (ACTION_VIEW), and `DisplayServer.clipboard_set` works on Android through JNI (`GodotJavaWrapper.set_clipboard`) -- but not under a headless display server, which logs "Clipboard is not supported" instead.
 
 Godot 4.7 supports Android picture-in-picture, configurable splash screens, Perfetto tracing, Android XR, and `JavaClassWrapper`/`AndroidRuntime` access. `JavaClassWrapper` is Android-only; call `get_exception()` after JNI/Java operations because failures may not become GDScript errors.
 

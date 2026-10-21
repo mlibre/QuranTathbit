@@ -7,4 +7,4 @@ extends RefCounted
 ## lockstep with export_presets.cfg (product_version, version/name) and the
 ## package.json that publishes the web build to npm.
 
-const VERSION := "2.0.2"
+const VERSION := "2.0.3"

@@ -1389,6 +1389,14 @@ static func primary_button(label_text: String, height := 56) -> Button:
 static func ghost_button(label_text: String, tone: Color, height := 46, radius := 23) -> Button:
         var button := Button.new()
         button.text = label_text
+        dress_ghost(button, tone, height, radius)
+        return button
+
+
+## The outline's own tailor: the same dress on a button a screen built for
+## itself -- the floating copy chip wears it, standing over the very words
+## it offers to carry.
+static func dress_ghost(button: Button, tone: Color, height := 46, radius := 23) -> void:
         button.custom_minimum_size = Vector2(0, height)
         button.add_theme_font_override("font", vazir(BODY))
         button.add_theme_font_size_override("font_size", fs(BODY))
@@ -1404,7 +1412,6 @@ static func ghost_button(label_text: String, tone: Color, height := 46, radius :
         var ring := outline_stylebox(Color(tone.r, tone.g, tone.b, 0.55), 2, radius)
         button.add_theme_stylebox_override("focus", ring)
         pressable(button)
-        return button
 
 
 ## The styleboxes of a quiet square icon button (back marks, corner coins):

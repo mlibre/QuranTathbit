@@ -9,6 +9,7 @@ const DeckZipScript := preload("res://scripts/data/deck_zip.gd")
 const BackupPickerScript := preload("res://scripts/ui/backup_picker.gd")
 const VersionScript := preload("res://scripts/data/version.gd")
 const I18nScript := preload("res://scripts/ui/i18n.gd")
+const CopyChipScript := preload("res://scripts/ui/copy_chip.gd")
 
 ## The two ladders a size is stepped along: the interface in wider steps
 ## (it moves everything, so a small step is a big step) and the words in
@@ -215,6 +216,7 @@ func _card_header(box: VBoxContainer, title: String) -> void:
 func _text(what: String, color: Color, size: int, center := false, bold := false) -> RichTextLabel:
         var label := RichTextLabel.new()
         label.selection_enabled = true
+        CopyChipScript.watch(label)
         label.fit_content = true
         label.scroll_active = false
         label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1110,6 +1112,7 @@ func _source_body() -> Control:
         what.add_theme_color_override("default_color", ThemeScript.INK)
         # Selection lets a user copy the line; the link opens in the browser.
         what.selection_enabled = true
+        CopyChipScript.watch(what)
         what.add_theme_color_override("selection_color", ThemeScript.SELECT)
         what.meta_clicked.connect(func(meta: Variant) -> void: OS.shell_open(str(meta)))
         box.add_child(what)

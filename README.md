@@ -108,8 +108,8 @@ A few quiet extras:
 - 💾 **Keep the deck as one file.** Settings → *Backup* packs verses,
   recitations, all progress into one zip; import joins it back card by
   card — a restore never takes a review away.
-- **Copy any verse or translation** — drag or long-press, and paste it
-  anywhere.
+- **Copy any verse or translation** — drag or long-press, and a small
+  Copy pill stands over the choice; the words paste anywhere.
 - **Runs on the phone you already have.** Loads even on Firefox 68 /
   Chrome 57-era browsers, says plainly when a device cannot; the service
   worker serves updates the moment they arrive; the APK ships 32- and
