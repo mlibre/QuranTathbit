@@ -9,10 +9,10 @@ extends SceneTree
 ## card beside its margins, the library's shelf at a reader's measure. Run
 ## it at the same size the film should show:
 ##
-##     Xvfb :99 -screen 0 1280x800x24 &
-##     DISPLAY=:99 godot --path . --resolution 1280x800 \
+##     Xvfb :99 -screen 0 1440x810x24 &
+##     DISPLAY=:99 godot --path . --resolution 1440x810 \
 ##             --script tests/capture_gif.gd -- /tmp/gifframes
-##     python3 tools/make_gif.py /tmp/gifframes docs/media/app.gif 640
+##     python3 tools/make_gif.py /tmp/gifframes docs/media/app.gif 800
 ##
 ## The out directory defaults to /tmp/gifframes; name another after -- to
 ## put the frames somewhere else. The install is wiped first, so every

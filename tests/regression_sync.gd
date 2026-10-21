@@ -34,6 +34,9 @@ func _init() -> void:
         await _test_shared_deck_arrives()
         await _test_editor_metadata_never_travels()
         await _test_web_skips_media()
+        await _test_conflict_asks_and_local_hard_forces()
+        await _test_conflict_remote_hard_forces()
+        await _test_conflict_declined_replaces_nothing()
         _teardown()
         if _failures > 0:
                 print("sync: %d FAILURE(S)" % _failures)
@@ -271,12 +274,13 @@ func _test_local_edit_wins() -> void:
         var fake := FakeGitHub.new()
         var sync := _make_sync(fake)
         await sync.sync(DECK)
-        # The card is edited here and there at once.
+        # The card is edited here and there at once, and nobody is asked:
+        # the quiet scripted default is this machine's copy.
         _write(DECK.path_join("001/front.md"), "Q1 edited here")
         fake.commit_change("001/front.md", "Q1 edited there")
         var result: Dictionary = await sync.sync(DECK)
         _ok(bool(result.get("ok", false)), "a conflicting sync completes")
-        _is(_read(DECK.path_join("001/front.md")), "Q1 edited here", "the local edit wins a content conflict")
+        _is(_read(DECK.path_join("001/front.md")), "Q1 edited here", "the local edit stands when nobody is asked")
         # And an untouched file follows the remote.
         fake.commit_change("001/back.md", "A1 edited there")
         await sync.sync(DECK)
@@ -632,6 +636,80 @@ func _test_web_skips_media() -> void:
         var plain: Dictionary = await _make_sync(fake).sync(DECK)
         _ok(bool(plain.get("ok", false)), "a desktop sync succeeds after the web one")
         _ok(fake.files.has("001/verse.mp3"), "a desktop sync uploads the media")
+
+## A file both sides changed is the reader's to settle, never the engine's:
+## the engine asks, and the word it receives hard-forces one copy over the
+## other. "local" stands for this machine's bytes -- pushed over the
+## repo's -- and the ask names exactly the paths that conflicted.
+func _test_conflict_asks_and_local_hard_forces() -> void:
+        _write_deck({"001": ["Q1", "A1"], "002": ["Q2", "A2"]})
+        var fake := FakeGitHub.new()
+        var sync := _make_sync(fake)
+        await sync.sync(DECK)
+        _write(DECK.path_join("001/front.md"), "Q1 edited here")
+        fake.commit_change("001/front.md", "Q1 edited there")
+        var asked: Array = []
+        # Lambdas capture locals by value, so the ask records itself into the
+        # one shared array (in place, never reassigned) if the outer test is
+        # to see it.
+        var on_conflict := func(paths: Array) -> String:
+                asked.assign(paths)
+                return "local"
+        var result: Dictionary = await sync.sync(DECK, Callable(), on_conflict)
+        _ok(bool(result.get("ok", false)), "a local-verdict sync completes")
+        _is(asked.size(), 1, "the conflict is asked about once")
+        var first_asked := str(asked[0]) if asked.size() > 0 else ""
+        _is(first_asked, "001/front.md", "the asked path is the conflicted card")
+        _is(_read(DECK.path_join("001/front.md")), "Q1 edited here", "the device's copy stands here")
+        _is(
+                fake.files["001/front.md"].content.get_string_from_utf8(),
+                "Q1 edited here",
+                "the device's copy hard-forces the repo's"
+        )
+
+## "remote" stands for the repo's bytes: pulled over this machine's, and
+## the repo keeps what it had.
+func _test_conflict_remote_hard_forces() -> void:
+        _write_deck({"001": ["Q1", "A1"]})
+        var fake := FakeGitHub.new()
+        var sync := _make_sync(fake)
+        await sync.sync(DECK)
+        _write(DECK.path_join("001/front.md"), "Q1 edited here")
+        fake.commit_change("001/front.md", "Q1 edited there")
+        var result: Dictionary = await sync.sync(DECK, Callable(), func(_paths: Array) -> String: return "remote")
+        _ok(bool(result.get("ok", false)), "a remote-verdict sync completes")
+        _is(_read(DECK.path_join("001/front.md")), "Q1 edited there", "the repo's copy hard-forces the device's")
+        _is(
+                fake.files["001/front.md"].content.get_string_from_utf8(),
+                "Q1 edited there",
+                "the repo keeps its own copy"
+        )
+
+## A question stood down from replaces nothing at all: the deck and the
+## repo both stand exactly as they stood, the run says so, and the next
+## sync asks again.
+func _test_conflict_declined_replaces_nothing() -> void:
+        _write_deck({"001": ["Q1", "A1"]})
+        var fake := FakeGitHub.new()
+        var sync := _make_sync(fake)
+        await sync.sync(DECK)
+        _write(DECK.path_join("001/front.md"), "Q1 edited here")
+        fake.commit_change("001/front.md", "Q1 edited there")
+        var declined: Dictionary = await sync.sync(DECK, Callable(), func(_paths: Array) -> String: return "")
+        _ok(not bool(declined.get("ok", false)), "a declined conflict does not pass")
+        _is(str(declined.get("error", "")), "conflict_declined", "the error names the standing-down")
+        _is(_read(DECK.path_join("001/front.md")), "Q1 edited here", "the device's copy is untouched")
+        _is(
+                fake.files["001/front.md"].content.get_string_from_utf8(),
+                "Q1 edited there",
+                "the repo is untouched"
+        )
+        var asks: Array = []
+        var on_conflict := func(_paths: Array) -> String:
+                asks.append("asked")
+                return "local"
+        await sync.sync(DECK, Callable(), on_conflict)
+        _is(asks.size(), 1, "the next sync asks again")
 
 func _teardown() -> void:
         _remove_tree(DECK)

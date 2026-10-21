@@ -36,7 +36,9 @@ Windows, web) in Godot 4.7 with GDScript only.
 - **Local first.** The deck is fully usable offline, forever. Sync never
   blocks study and never loses work: a failed transfer is reported and
   retried, and progress merges card by card so two offline devices both keep
-  their reviews.
+  their reviews. A file both sides changed is the reader's to settle, never
+  the engine's: the app asks which copy should win and hard-forces the other
+  by that word, and a question stood down from replaces nothing.
 - **Gentle, never nagging.** No streaks, no timers-as-pressure, no FOMO. The
   app invites; it does not push. Leaving whenever is supported, and cards
   you miss simply wait.

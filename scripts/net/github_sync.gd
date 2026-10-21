@@ -14,8 +14,11 @@ const GitHubAuthScript := preload("res://scripts/net/github_auth.gd")
 ##
 ##   remote unchanged since last sync, local changed  -> send local
 ##   local unchanged since last sync, remote changed  -> pull remote
-##   both changed                                     -> local wins (cards)
-##                                                     -> per-card merge (progress)
+##   both changed, differently                       -> the reader is asked which
+##                                                     copy stands; the one they
+##                                                     name hard-forces the other
+##                                                     (progress.json never asks --
+##                                                     it merges card by card)
 ##
 ## progress.json merges card by card: the entry with more reviews wins, the
 ## later answer breaks ties -- and a deliberate reset (a defer, a suspend)
@@ -76,9 +79,20 @@ func _init(p_http, p_auth: GitHubAuthScript) -> void:
 ## Run one full sync. on_progress(phrase, done, total) is called as it goes,
 ## with a plain phrase ("signing in", "reading repo", "downloading",
 ## "uploading", "merging progress", "saving") and, when the size of the
-## phase is known, how far through it is. Returns {ok, pushed, pulled,
-## merged} or {ok: false, error}.
-func sync(deck_path: String, on_progress: Callable = Callable()) -> Dictionary:
+## phase is known, how far through it is.
+##
+## A file both sides changed since the last sync is not the engine's to
+## settle: on_conflict(paths) is asked which copy stands, and its word hard
+## forces the other away -- "local" sends this machine's bytes over the
+## repo's, "remote" pulls the repo's bytes over this machine's. Any other
+## answer abandons the run before a single file moves, so nothing is ever
+## replaced without the reader naming it. Without a callable the historic
+## quiet default stands: this machine's copy (a scripted sync is never
+## asked a question it cannot answer). Returns {ok, pushed, pulled, merged}
+## or {ok: false, error, conflicts?}.
+func sync(
+        deck_path: String, on_progress: Callable = Callable(), on_conflict: Callable = Callable()
+) -> Dictionary:
         _deck_path = deck_path
         var settings = SettingsScript.load_settings()
         token = settings.token
@@ -125,6 +139,43 @@ func sync(deck_path: String, on_progress: Callable = Callable()) -> Dictionary:
         # Remember where we started, so a mid-run failure does not lie later.
         var local := _local_files(deck_path)
         var plan := _plan(local, remote, manifest, carry_media)
+
+        # A file this machine changed and the repo changed too, each unseen by
+        # the other, is a conflict -- and a conflict is the reader's to settle,
+        # never the engine's. The question is asked before anything moves, so
+        # an answer names what is replaced and an abandonment replaces
+        # nothing at all: the deck and the repo both stand exactly as they
+        # stood, and the next sync asks again.
+        var conflicts: Array = plan.filter(
+                func(step: Dictionary) -> bool: return str(step.action) == "conflict"
+        )
+        if not conflicts.is_empty():
+                var verdict := "local"
+                if on_conflict.is_valid():
+                        verdict = str(
+                                await on_conflict.call(
+                                        conflicts.map(
+                                                func(step: Dictionary) -> String: return str(step.path)
+                                        )
+                                )
+                        )
+                if verdict == "remote":
+                        for step in conflicts:
+                                step.action = "pull"
+                elif verdict == "local":
+                        for step in conflicts:
+                                step.action = "push"
+                else:
+                        return {
+                                "ok": false,
+                                "error": "conflict_declined",
+                                "conflicts": conflicts.map(
+                                        func(step: Dictionary) -> String: return str(step.path)
+                                ),
+                                "pushed": 0,
+                                "pulled": 0,
+                                "merged": 0,
+                        }
 
         # Pulls are rare and small: each is one file this deck has never changed.
         # They fly six at a time, the way uploads do -- a first sync onto a new
@@ -296,8 +347,10 @@ static func _plan(local: Dictionary, remote: Dictionary, manifest: Dictionary, c
                         plan.append({"action": "push", "path": path})  # not there yet
                 elif synced_sha == local_sha:
                         plan.append({"action": "pull", "path": path})  # untouched here, changed there
+                elif synced_sha == remote_sha:
+                        plan.append({"action": "push", "path": path})  # changed here; the repo slept
                 else:
-                        plan.append({"action": "push", "path": path})  # changed here; local wins
+                        plan.append({"action": "conflict", "path": path})  # changed in both places
         for path in remote.keys():
                 if path == "progress.json" or local.has(path) or not _is_deck_path(path):
                         continue

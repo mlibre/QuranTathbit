@@ -404,7 +404,7 @@ func _github_body() -> Control:
         token_row.name = "TokenRow"
         token_row.add_theme_constant_override("separation", 8)
         box.add_child(token_row)
-        var show := ThemeScript.ghost_button(I18nScript.t("Show"), ThemeScript.INK_SOFT, 44, 12)
+        var show := ThemeScript.ghost_button(I18nScript.t("Show"), ThemeScript.INK_SOFT, 44, 22)
         show.name = "ShowToken"
         show.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         show.tooltip_text = I18nScript.t("Show or hide what was typed")

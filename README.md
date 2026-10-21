@@ -64,28 +64,56 @@ No installer, no dependencies. The download *is* the app.
 
 ## How a day works
 
-![The app at work — home, a card, its answer, the library, a search](docs/media/app.gif)
+![The app at work](docs/media/app.gif)
 
-1. **Home** shows how many cards wait today, and one big **Study** button.
-2. A **question** appears: the surah and verse, set large in the middle of the page. Press **Space** or **Show answer** when you are ready.
-3. The **answer** shows the verse with its Persian translation, and each side can be played — in Arabic, or spoken in Persian. Four buttons ask how it went: **Again**, **Hard**, **Good**, **Easy** — each says when the card comes back.
-4. Under **Show answer** (question side only) wait two quiet ways out: **Not today** puts the card back until tomorrow's new cards; **Not at all** takes it out of the schedule for good — as if you never started studying it. (To bring a "not at all" card back, delete its entry from `progress.json`.)
-5. When the queue is empty, the app says so. If unseen cards remain, a quiet button beneath offers to learn one more new card — beyond the day's pace. Otherwise, come back tomorrow.
+1. 🏠 **Home** shows today's waiting cards, and one big **Study** button.
+2. 📖 A **question** appears: the surah and verse, large, mid-page. **Space**
+   or **Show answer** reveals it.
+3. 🎧 The **answer** shows verse and Persian translation — playable in Arabic
+   or spoken Persian. **Again**, **Hard**, **Good**, **Easy** ask how it
+   went, each saying when the card returns.
+4. 🚪 Under **Show answer** (question side only), two quiet ways out:
+   **Not today** puts the card back until tomorrow; **Not at all** takes it
+   out of the schedule for good, as if never started. (Bring it back: delete
+   its entry in `progress.json`.)
+5. 🌙 When the queue empties the app says so; unseen cards remaining, a
+   quiet button offers one more beyond the day's pace — otherwise, tomorrow.
 
 A few quiet extras:
 
-- **Edit anything, anywhere.** The pencil on a card opens a simple editor — **Ctrl+C/V** copy and paste work there, in the browser too. Words are saved as plain files, scripture written in the verses' own hand.
-- **Browse the whole deck like a book.** Every verse flush right the way the Quran is read, its Persian translation as a second quiet line under it; search by verse (`2:93` or `۲:۹۳`) or by meaning, with filters for due, new, or resting cards.
-- **Set your own pace.** Settings → *New cards each day* (default 2; set 0 for review-only days).
-- **Size the app for your eyes.** Settings → *Display*: an *interface scale* grows the whole page at once, a *text scale* grows the words alone — both per-device comforts.
-- **Choose the verse's typeface.** In Settings → *Reading*, or mid-session (the alif button beside the speaker): **Amiri Quran** (default), **Amiri**, or **Noto Naskh Arabic** — each shown by its own drawing of the Basmala, and your pick follows the deck.
-- **The app speaks your language.** English, فارسی or العربية — asked once, changeable anytime in Settings. Numbers come in the language's own digits (۱ ۲ ۳), waits are spoken in words (۱ روز, not 1d), and a right-reading tongue lays every page out from the right.
-- **Every mark is drawn, whole.** The app measures where the ink really goes — in whatever face, at whatever size — so a damma above a hamza'd alef (أُنزِلَ) is never hidden, on the card, in the library, or in the editor.
-- **Edit by touch, precisely.** One tap places the caret under your finger, a double tap takes the word, a triple takes the line, and a held tap selects as it moves.
-- **Every page scrolls under your finger** — even when the drag starts on a button. A flick coasts and slows the way paper slows, a tap still taps, and the phone's back button closes what stands over the page first.
-- **Keep the deck as one file.** Settings → *Backup* packs verses, recitations and all your progress into a single zip; import joins a backup back in card by card, so a restore can never take a review away.
-- **Copy any verse or translation** — drag or long-press, and paste it anywhere.
-- **Runs on the phone you already have.** The web build loads even on Firefox 68 / Chrome 57-era browsers, says plainly when a device cannot run it or a download stalls, and its service worker takes over the moment an update arrives; the APK ships both 32- and 64-bit (`armeabi-v7a` + `arm64-v8a`) — Android 5.0 or newer.
+- ✏️ **Edit anything, anywhere.** The pencil on a card opens a simple editor
+  — **Ctrl+C/V** work there, even in the browser; words save as plain files,
+  scripture in the verses' own hand.
+- 🔍 **Browse the whole deck like a book.** Every verse flush right as the
+  Quran is read, its Persian a quiet second line; search by verse (`2:93` or
+  `۲:۹۳`) or meaning, filter due, new, resting.
+- **Set your own pace.** Settings → *New cards each day* (default 2; 0 for
+  review-only days).
+- **Size the app for your eyes.** Settings → *Display*: an *interface scale*
+  grows the whole page, a *text scale* the words alone — both per-device.
+- **Choose the verse's typeface.** Settings → *Reading* or mid-session (the
+  alif button): **Amiri Quran** (default), **Amiri**, **Noto Naskh Arabic**
+  — each shown by its own Basmala; your pick follows the deck.
+- **The app speaks your language.** English, فارسی or العربية — asked once,
+  changeable in Settings; numbers in the tongue's digits (۱ ۲ ۳), waits in
+  words (۱ روز); a right-reading tongue lays every page from the right.
+- **Every mark is drawn, whole.** The app measures where the ink really goes
+  — whatever face, whatever size — so a damma above a hamza'd alef (أُنزِلَ)
+  is never hidden: card, library, editor.
+- **Edit by touch, precisely.** One tap places the caret under your finger,
+  a double takes the word, a triple the line, a held tap selects.
+- **Every page scrolls under your finger** — even when the drag starts on a
+  button. A flick coasts like paper, a tap still taps; the back button
+  closes what stands over the page first.
+- 💾 **Keep the deck as one file.** Settings → *Backup* packs verses,
+  recitations, all progress into one zip; import joins it back card by
+  card — a restore never takes a review away.
+- **Copy any verse or translation** — drag or long-press, and paste it
+  anywhere.
+- **Runs on the phone you already have.** Loads even on Firefox 68 /
+  Chrome 57-era browsers, says plainly when a device cannot; the service
+  worker serves updates the moment they arrive; the APK ships 32- and
+  64-bit (`armeabi-v7a` + `arm64-v8a`) — Android 5.0 or newer.
 
 ## Your progress, kept safe
 
@@ -93,7 +121,9 @@ Your deck can live in **your own private GitHub repository** — free, and
 yours. Press **Connect GitHub** in Settings, follow the short sign-in, and
 the app keeps everything in step: study on your phone, and the same deck
 waits on your computer. If two devices study apart from each other, both
-keep their work when they meet again. Not interested? Everything also
+keep their work when they meet again — and if the same card was changed
+in two places, the app asks which copy should win, never deciding that for
+you. Not interested? Everything also
 works fully offline, forever, on one device — and the *Backup* card keeps
 the whole deck as one file you can carry by hand.
 

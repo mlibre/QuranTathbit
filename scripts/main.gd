@@ -7,6 +7,7 @@ const HttpClientScript := preload("res://scripts/net/http_client.gd")
 const GitHubAuthScript := preload("res://scripts/net/github_auth.gd")
 const GitHubSyncScript := preload("res://scripts/net/github_sync.gd")
 const SyncOverlayScript := preload("res://scripts/ui/sync_overlay.gd")
+const ConflictDialogScript := preload("res://scripts/ui/conflict_dialog.gd")
 const ThemeScript := preload("res://scripts/ui/theme.gd")
 const HomeScript := preload("res://scripts/ui/home.gd")
 const StudyScript := preload("res://scripts/ui/study.gd")
@@ -733,7 +734,9 @@ func _run_sync(quiet := false) -> void:
                 overlay.name = "SyncOverlay"
                 add_child(overlay)
         var result: Dictionary = await _sync.sync(
-                USER_DECK, overlay.report if overlay != null else Callable()
+                USER_DECK,
+                overlay.report if overlay != null else Callable(),
+                _ask_conflict
         )
         if overlay != null:
                 overlay.finish(bool(result.get("ok", false)))
@@ -782,6 +785,10 @@ func _run_sync(quiet := false) -> void:
                         )
         elif _sync_retrying:
                 line = I18nScript.t("Connection trouble — the app will try again by itself")
+        elif str(result.get("error", "")) == "conflict_declined":
+                line = I18nScript.t(
+                        "Some cards changed in two places — press Sync to choose which copy wins"
+                )
         else:
                 line = I18nScript.t("Sync could not finish — your cards are safe here. Try again.")
         if _screen is HomeScript:
@@ -793,12 +800,27 @@ func _run_sync(quiet := false) -> void:
                 # home line recomputes when the user goes back to it.
 
 
+## A file both sides changed is the reader's to settle, never the engine's:
+## the dialog stands over whatever is on the page -- the sync overlay
+## included, quiet or loud alike -- names what changed, and its word hard
+## forces one copy over the other. Standing down decides nothing: both
+## sides keep what they have, and the next sync asks again.
+func _ask_conflict(paths: Array) -> String:
+        var dialog := ConflictDialogScript.new(paths)
+        dialog.name = "ConflictDialog"
+        add_child(dialog)
+        var verdict: String = await dialog.ask()
+        dialog.queue_free()
+        return verdict
+
+
 ## Should this failure be tried again without being asked? Anything the
 ## network could have caused, yes; a token the repo does not accept, no --
 ## that will not heal on its own, and the answer is in Settings, not in a
-## retry loop.
+## retry loop. A conflict the reader stood down from is not the network's
+## either: they said "later", and an unprompted re-ask would be a nag.
 func _sync_retryable(error: String) -> bool:
-        return error != "no_token" and error != "auth_failed"
+        return error != "no_token" and error != "auth_failed" and error != "conflict_declined"
 
 
 ## The quiet promise kept: a network-failed sync schedules its own next
