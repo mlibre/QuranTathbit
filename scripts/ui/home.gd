@@ -313,6 +313,13 @@ func _build() -> void:
 func _corner_coin(coin_name: String, x_range: Vector2, mark: Control, tooltip: String, on_press: Callable) -> Button:
         var coin := Button.new()
         coin.name = coin_name
+        # The corner is chrome, not the reading's flow: a page laid out from
+        # the right turns every row it owns, but the coin is no row -- it
+        # keeps the corner the app's gold has always arrived at, the page's
+        # right, on either reading side. Anchors mirror with the page's
+        # direction, so the coin speaks the left-to-right reading of its own
+        # anchors and never turns with the tongue.
+        coin.layout_direction = Control.LAYOUT_DIRECTION_LTR
         coin.anchor_left = 1.0
         coin.anchor_right = 1.0
         coin.anchor_top = 0.0

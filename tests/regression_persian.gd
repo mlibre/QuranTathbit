@@ -6,7 +6,8 @@ extends SceneTree
 ## pinned before the first page stands, the choice written into the files it
 ## travels in from the very first boot, Settings carrying no question it
 ## would be wrong to ask, the page laid out from the right with its doors in
-## the reading's own order, and a deck arriving from an English phone
+## the reading's own order and the update coin keeping the corner it has
+## always stood in, and a deck arriving from an English phone
 ## answered in this one. The standard build's asking is regression_boot's
 ## own check; this suite proves the other clothes.
 
@@ -29,6 +30,7 @@ func _init() -> void:
         _check_the_question_is_never_asked(main)
         _check_the_tongue_is_written_down()
         _check_home_speaks_it(main)
+        _check_the_coin_keeps_its_corner(main)
         await _check_settings_never_asks(main)
         _check_an_english_deck_is_answered(main)
 
@@ -108,6 +110,25 @@ func _check_home_speaks_it(main: Control) -> void:
                         and sync.get_global_rect().get_center().x
                         > settings_door.get_global_rect().get_center().x,
                 "the dock's doors stand in the reading's own order -- the library first, from the right"
+        )
+
+## The one gold way a newer version arrives keeps the corner it has always
+## stood in: the coin is chrome, not the reading's flow, so a page laid out
+## from the right turns its rows and never the coin -- it waits at the
+## page's right head, as it does on the page laid out from the left.
+func _check_the_coin_keeps_its_corner(main: Control) -> void:
+        var home: Control = main.get_node("Home")
+        home.offer_update()
+        var coin: Button = home.get_node("UpdateCoin")
+        _ok(coin.visible, "the waiting version wakes the coin")
+        var window := root.get_visible_rect()
+        var coin_rect := coin.get_global_rect()
+        _ok(
+                not coin.is_layout_rtl()
+                        and coin_rect.get_center().x > window.get_center().x
+                        and coin_rect.end.x >= window.end.x - 40.0,
+                "the coin keeps the page's right head on the page laid out from the right (%s)"
+                        % coin_rect
         )
 
 ## Settings never asks about the tongue: the build answered it the day it
