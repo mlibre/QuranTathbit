@@ -5,20 +5,44 @@ name: Publish to npm
 # A user can then `npx qurantathbit` and get the app at localhost:8080, or
 # install it as a dependency and serve the files from their own host.
 #
-# Runs on every `v*` tag (the same tag that drives the desktop release builds)
-# so each release ships a fresh npm package; also runnable by hand from the
-# Actions tab.
+# Runs on every push to the house's branch whose version the registry does
+# not have yet (the same push that drives the release builds), on every `v*`
+# tag, and by hand from the Actions tab; a version already out is a silence --
+# the prepare leg asks the registry first, and nothing is built for it.
 
 on:
   push:
+    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: npm-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.check.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ask the registry whether this version is already out
+        id: check
+        run: |
+          VERSION=$(jq -r .version package.json)
+          if npm view "qurantathbit@$VERSION" version 2>/dev/null | grep -qx "$VERSION"; then
+            echo "publish=no" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=yes" >> "$GITHUB_OUTPUT"
+          fi
+
   publish:
+    needs: prepare
+    if: needs.prepare.outputs.publish == 'yes'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
