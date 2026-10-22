@@ -361,6 +361,34 @@ class SlidersMark extends Control:
                         draw_circle(Vector2(xs[i], ys[i]), 2.9, color)
 
 
+## A closed book seen from its side, spine turned to the reader: the mark
+## the dock's library door wears. The spine stands a breath taller than
+## the covers at both ends, the way a bound book's own spine does, and its
+## two ends are rounded the way a hardback's are.
+class BookMark extends Control:
+        var color := INK_SOFT
+
+        func _init(p_color: Color = INK_SOFT) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(20, 20)
+
+        func _draw() -> void:
+                # The covers: the top edge, the fore-edge and the bottom of
+                # the book itself, three straight rules.
+                draw_polyline(
+                        PackedVector2Array([
+                                Vector2(5.4, 2.5), Vector2(16.7, 2.5),
+                                Vector2(16.7, 15.0), Vector2(5.4, 15.0),
+                        ]),
+                        color, 2.0, true
+                )
+                # The spine: rounded at the head where it meets the covers,
+                # straight down the back, rounded again at the foot.
+                draw_arc(Vector2(5.4, 4.6), 2.1, PI, PI * 1.5, 10, color, 2.0, true)
+                draw_arc(Vector2(3.3, 15.0), 2.1, 0.0, PI * 0.5, 10, color, 2.0, true)
+                draw_line(Vector2(3.3, 17.1), Vector2(3.3, 4.6), color, 2.0, true)
+
+
 ## A speaker with its own breath of sound: the volume mark, for the one
 ## corner of a study session that says how loud the recitation is. A silent
 ## app wears the speaker alone -- no breath, nothing to hear -- so the eye
@@ -1142,6 +1170,24 @@ class SyncMark extends Control:
                 tween.tween_property(self, "rotation", upright, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 
+## The state the sync mark carries at its shoulder: a small dot in the
+## state's own colour, ringed in the surface it stands on, so the state is
+## told at a glance from anywhere on the page. It is drawn beside the
+## mark, never inside it -- the mark turns while a sync runs, and a dot
+## that turned with it would say motion, not state.
+class SyncDot extends Control:
+        var color := GREEN
+
+        func _init(p_color: Color = GREEN) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(10, 10)
+                mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+        func _draw() -> void:
+                draw_circle(Vector2(5.0, 5.0), 3.4, color)
+                draw_arc(Vector2(5.0, 5.0), 4.4, 0.0, TAU, 20, CARD, 2.0, true)
+
+
 ## A title-page ornament: a small eight-pointed star riding a short rule,
 ## the way a reverent book dresses the space under its name. One mark, gold,
 ## quiet -- the paper pattern's lattice in miniature.
@@ -1440,6 +1486,26 @@ static func apply_mark_styles(button: Button, styles: Dictionary) -> void:
         button.add_theme_stylebox_override("hover", styles["hover"])
         button.add_theme_stylebox_override("pressed", styles["pressed"])
         button.add_theme_stylebox_override("focus", styles["focus"])
+
+
+## The dock item's own dress: nothing at rest -- the dock is one surface,
+## and its items are places on it, not buttons in a row -- a soft wash of
+## the item's own tone while visited, and the same quiet focus ring the
+## coins wear. Rounded like the cards rather than like a coin: a place is
+## wider than it is tall.
+static func dock_button_styles(tone: Color = INK) -> Dictionary:
+        var rest := StyleBoxFlat.new()
+        rest.bg_color = Color(0, 0, 0, 0)
+        rest.set_corner_radius_all(14)
+        var hover := StyleBoxFlat.new()
+        hover.bg_color = Color(tone.r, tone.g, tone.b, 0.10)
+        hover.set_corner_radius_all(14)
+        var focus := StyleBoxFlat.new()
+        focus.bg_color = Color(0, 0, 0, 0)
+        focus.border_color = Color(tone.r, tone.g, tone.b, 0.55)
+        focus.set_border_width_all(2)
+        focus.set_corner_radius_all(14)
+        return {"normal": rest, "hover": hover, "pressed": hover, "focus": focus}
 
 
 ## One voice for every plain label: the face, the size, the colour, one
@@ -1953,6 +2019,24 @@ static func card_stylebox(accent: Color = CARD) -> StyleBoxFlat:
         box.shadow_color = Color(0.42, 0.34, 0.16, 0.13)
         box.shadow_size = 24
         box.shadow_offset = Vector2(0, 10)
+        return box
+
+
+## The bar the app's standing doors live in, riding the page's own foot:
+## the card's own white, a hairline along its top edge where it meets the
+## paper, the card's own radius on the two top corners alone, and one soft
+## shadow above it -- the card's sense of depth turned upward, so the bar
+## reads as lying on the desk above the paper rather than stamped onto it.
+static func dock_stylebox() -> StyleBoxFlat:
+        var box := StyleBoxFlat.new()
+        box.bg_color = CARD
+        box.border_color = LINE
+        box.border_width_top = 1
+        box.corner_radius_top_left = RADIUS
+        box.corner_radius_top_right = RADIUS
+        box.shadow_color = Color(0.42, 0.34, 0.16, 0.10)
+        box.shadow_size = 14
+        box.shadow_offset = Vector2(0, -5)
         return box
 
 

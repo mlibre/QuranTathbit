@@ -229,12 +229,12 @@ func _init() -> void:
         main._apply_language("fa")
         await create_timer(0.8).timeout
         await _shot("home_fa")
-        # The corner's own words, raised by the engine on a hover: a tooltip
+        # The dock's own words, raised by the engine on a hover: a tooltip
         # that arrives in the engine's default face arrives in no language at
         # all -- this frame keeps the one the app now raises, in Vazirmatn.
-        var corner_fa: Button = main.get_node_or_null("Home/SettingsCorner")
-        if corner_fa != null:
-                Input.warp_mouse(corner_fa.get_global_rect().get_center())
+        var dock_settings_fa: Button = main.get_node_or_null("Home/Dock/Pad/Row/Settings")
+        if dock_settings_fa != null:
+                Input.warp_mouse(dock_settings_fa.get_global_rect().get_center())
                 await create_timer(1.4).timeout
                 await _shot("tooltip_fa")
                 Input.warp_mouse(Vector2(10, 700))

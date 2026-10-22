@@ -763,8 +763,8 @@ func _on_sync_pressed() -> void:
 
 
 ## Sync, with its own quiet screen while it works when the hand asked for
-## it, and with only the turning coin when the app asked for itself: a
-## phase in plain words, a bar that knows how far along it is, and the
+## it, and with only the dock's turning mark when the app asked for itself:
+## a phase in plain words, a bar that knows how far along it is, and the
 ## promise that the deck is safe on this machine whatever the network
 ## does. The app stays usable when it fails -- the deck is local first,
 ## always. A sync the network interrupts is asked again on the app's own,

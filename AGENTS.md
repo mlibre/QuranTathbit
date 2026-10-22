@@ -78,9 +78,9 @@ Windows, web) in Godot 4.7 with GDScript only.
   numbers keep themselves current while the page stands open: a quiet
   watch re-reads the deck, and a card that comes due is said by the page
   itself, never waiting for a hand to refresh it. The deck's other life on
-  GitHub says itself in the corner coin alone — its tone, and its words in
-  the coin's own tooltip — never in a line standing under the day's
-  button.
+  GitHub says itself in the dock's sync door alone — its tone, its
+  shoulder dot, and its words in its own tooltip — never in a line
+  standing under the day's button, and never as an unnamed icon.
 - **Every size goes through fs()**: the font scale multiplies only the
   words, so every size a control displays — and every size a measurement
   takes beside it (a pill measured from its widest line, a mirror kept on

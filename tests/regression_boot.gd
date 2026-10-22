@@ -35,7 +35,7 @@ func _init() -> void:
                 return
 
         await _check_home_numbers(home)
-        _check_home_says_sync_by_coin_only(home)
+        _check_home_says_sync_by_the_dock_alone(home)
         await _check_language_picker(main)
         await _check_study_session(main)
         await _check_due_watch(main)
@@ -157,20 +157,27 @@ func _check_home_numbers(home: Control) -> void:
                         "the deck's name is calm furniture at one quiet measure"
                 )
 
-        # The settings corner once sat under a full-rect container added after
-        # it, and no click could reach it. The engine's hit test -- deepest
-        # topmost control, children in reverse order -- is the part that
-        # decides who gets the click, so it is the part this walks by hand.
-        var corner: Button = home.get_node("SettingsCorner")
-        var at := corner.get_global_rect().get_center()
-        _ok(_top_at(home, at) == corner, "the settings corner is on top of everything at its own centre")
-        # The browsing door stands under the day's work.
-        var browse_button: Button = home.get_node_or_null("Margin/Column/Browse")
-        _ok(browse_button != null, "the library's door stands under the study button")
-        # A turning sync mark stays inside its coin: the turn is about the
+        # The dock's doors once lived as corner coins under a full-rect
+        # container added after them, and no click could reach them. The
+        # engine's hit test -- deepest topmost control, children in reverse
+        # order -- is the part that decides who gets the click, so it is the
+        # part this walks by hand.
+        var dock_settings: Button = home.get_node("Dock/Pad/Row/Settings")
+        var at := dock_settings.get_global_rect().get_center()
+        _ok(_top_at(home, at) == dock_settings, "the dock's settings door is on top of everything at its own centre")
+        # The library's door stands in the dock at the page's foot, named
+        # in words beside its kin -- and the page's own flow no longer
+        # carries it.
+        var dock_browse: Button = home.get_node_or_null("Dock/Pad/Row/Browse")
+        _ok(dock_browse != null, "the library's door stands in the dock at the page's foot")
+        _ok(
+                home.get_node_or_null("Margin/Column/Browse") == null,
+                "the library's door has left the page's own flow"
+        )
+        # A turning sync mark stays inside its place: the turn is about the
         # mark's own centre, and a mark that swings out of its button is the
         # mark that once left the outer circle.
-        var sync_mark: ThemeScript.SyncMark = home.get_node("SyncCoin/Mark/SyncMark")
+        var sync_mark: ThemeScript.SyncMark = home.get_node("Dock/Pad/Row/Sync/Stack/Icon/Mark/SyncMark")
         sync_mark.set_working(true)
         await process_frame
         await process_frame
@@ -1737,7 +1744,7 @@ func _check_marks_and_rtl(main: Node) -> void:
                 tooltip_font != null and str(tooltip_font.resource_path).ends_with("Vazirmatn-Regular.ttf"),
                 "tooltips speak in a face that carries the reader's letters"
         )
-        _is(i18n.t("Browse the cards"), "همهٔ کارت‌ها", "the library's door says all the cards")
+        _is(i18n.t("Library"), "کتابخانه", "the dock's library door is named in the reader's tongue")
         main._apply_language("en")
         main._on_settings_pressed()
         await create_timer(0.5).timeout
@@ -1928,16 +1935,35 @@ func _check_due_watch(main: Node) -> void:
         await create_timer(0.7).timeout
 
 
-## The sync state's words belong to the corner coin alone: the page keeps
-## its day, the coin carries the whole story in its tooltip and its tone,
-## and nothing of the plumbing stands under the day's button.
-func _check_home_says_sync_by_coin_only(home: Control) -> void:
+## The page's own flow says nothing of sync: the dock's sync door is the
+## whole story -- its tone, its shoulder dot, and its words in its own
+## tooltip -- and the corner coins that once stood for sync and settings
+## are gone entirely, their doors named in words at the page's foot.
+func _check_home_says_sync_by_the_dock_alone(home: Control) -> void:
         _ok(
                 home.get_node_or_null("Margin/Column/SyncLine") == null,
-                "the page itself says nothing of sync -- the coin is the whole story"
+                "the page's own flow says nothing of sync -- the dock is the whole story"
         )
-        var coin: Button = home.get_node("SyncCoin")
-        _ok(coin.tooltip_text.length() > 0, "the coin carries its state in its own words")
+        _ok(
+                home.get_node_or_null("SyncCoin") == null,
+                "the sync coin has left the corner for the dock"
+        )
+        _ok(
+                home.get_node_or_null("SettingsCorner") == null,
+                "the settings coin has left the corner for the dock"
+        )
+        var sync: Button = home.get_node("Dock/Pad/Row/Sync")
+        _ok(sync.tooltip_text.length() > 0, "the dock's sync door carries its state in its own words")
+        _ok(
+                sync.get_node_or_null("Stack/Icon/Dot") != null,
+                "the dock's sync door wears its status dot at its mark's shoulder"
+        )
+        for item_name in ["Browse", "Sync", "Settings"]:
+                var label: Label = home.get_node("Dock/Pad/Row/%s/Stack/Text" % item_name)
+                _ok(
+                        label != null and not label.text.is_empty(),
+                        "the dock's %s door is named in words, not a riddle icon" % item_name.to_lower()
+                )
 
 
 ## The app's own memory must survive its own handwriting: JSON writes

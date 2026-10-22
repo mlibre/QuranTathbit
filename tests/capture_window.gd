@@ -107,30 +107,35 @@ func _check_canvas() -> void:
                         "a desktop window keeps its own canvas (got %s, window %s)" % [canvas, _window])
 
 ## A thumb must be able to reach everything the page offers: the study
-## button and the corner coins sit inside the canvas, and the coins are on
-## top of everything at their own centres, where a tap lands.
+## button, the dock at the page's foot and the corner's sleeping update
+## coin sit inside the canvas, and the dock's doors are on top of
+## everything at their own centres, where a tap lands.
 func _check_touch_reach(home: Control) -> void:
         var window := root.get_visible_rect()
         var study: Control = home.get_node("Margin/Column/Study")
         _ok(window.grow(1.0).encloses(study.get_global_rect()),
                 "the study button is inside the window (%s in %s)" % [study.get_global_rect(), window])
-        for coin_name in ["SyncCoin", "SettingsCorner", "UpdateCoin"]:
-                var coin: Button = home.get_node(coin_name)
-                _ok(window.encloses(coin.get_global_rect()),
-                        "the %s coin is inside the window (%s)" % [coin_name, coin.get_global_rect()])
-                if not coin.visible:
-                        continue  # the update coin sleeps until a version waits
-                var at := coin.get_global_rect().get_center()
-                _ok(_top_at(home, at) == coin,
-                        "the %s coin is on top of everything at its own centre" % coin_name)
-        var sync_coin: Button = home.get_node("SyncCoin")
+        var dock: Control = home.get_node("Dock")
+        _ok(window.grow(1.0).encloses(dock.get_global_rect()),
+                "the dock is inside the window (%s in %s)" % [dock.get_global_rect(), window])
+        for item_name in ["Browse", "Sync", "Settings"]:
+                var item: Button = home.get_node("Dock/Pad/Row/" + item_name)
+                _ok(window.encloses(item.get_global_rect()),
+                        "the dock's %s door is inside the window (%s)" % [item_name, item.get_global_rect()])
+                var at := item.get_global_rect().get_center()
+                _ok(_top_at(home, at) == item,
+                        "the dock's %s door is on top of everything at its own centre" % item_name)
+        var update_coin: Button = home.get_node("UpdateCoin")
+        _ok(window.encloses(update_coin.get_global_rect()),
+                "the update coin is inside the window (%s)" % update_coin.get_global_rect())
+        var sync_item: Button = home.get_node("Dock/Pad/Row/Sync")
         _ok(
                 home.get_node_or_null("Margin/Column/SyncLine") == null,
-                "the page itself says nothing of sync -- the corner coin is the whole story"
+                "the page itself says nothing of sync -- the dock's sync door is the whole story"
         )
         _ok(
-                sync_coin.tooltip_text.length() > 0,
-                "the sync state says itself in the coin's own words"
+                sync_item.tooltip_text.length() > 0,
+                "the sync state says itself in the dock door's own words"
         )
 
 ## The card never asks a window for more room than it has.
