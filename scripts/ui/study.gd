@@ -48,7 +48,6 @@ var _cards: Array = []
 var _index := 0
 var _revealed := false
 var _answered_count := 0
-var _grade_counts := {}
 var _started_ms := 0
 var _busy := false
 var _player: AudioStreamPlayer
@@ -75,7 +74,6 @@ func start(cards: Array) -> void:
         _cards = cards
         _index = 0
         _answered_count = 0
-        _grade_counts = {}
         _started_ms = Time.get_ticks_msec()
         _busy = false
         if not is_node_ready():
@@ -591,7 +589,6 @@ func _answer(button: String) -> void:
         var card: CardScript = _cards[_index]
         answered.emit(card, button)
         _answered_count += 1
-        _grade_counts[button] = int(_grade_counts.get(button, 0)) + 1
         _advance(str(button) == "again")
 
 
@@ -670,29 +667,6 @@ func _duration() -> String:
                 return I18nScript.t("1 minute")
         return I18nScript.f("%d minutes", [minutes])
 
-## The grades of this session, one line, in their own colours -- a look back
-## at how it went, in the order the buttons stand.
-func _grades_line() -> String:
-        var parts := PackedStringArray()
-        var tones := {
-                "again": "#B4553F",
-                "hard": "#96762A",
-                "good": "#1E6B52",
-                "easy": "#14513D",
-        }
-        for key in ["again", "hard", "good", "easy"]:
-                var count := int(_grade_counts.get(key, 0))
-                if count > 0:
-                        # The count alone is dressed -- num() would reach
-                        # into the colour's own hex digits otherwise.
-                        parts.append(
-                                "[color=%s]%s %s[/color]"
-                                        % [tones[key], I18nScript.num(count), I18nScript.t(key)]
-                        )
-        if parts.is_empty():
-                return ""
-        return " · ".join(parts)
-
 func _show_done() -> void:
         _tween_bar(100.0)
         var progress: Label = get_node("Margin/Column/TopBar/Progress")
@@ -735,25 +709,6 @@ func _show_done() -> void:
         body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         ThemeScript.dress(body, ThemeScript.BODY, ThemeScript.INK)
         summary.add_child(body)
-
-        var grades_line := _grades_line()
-        if not grades_line.is_empty():
-                var grades := RichTextLabel.new()
-                grades.name = "Grades"
-                grades.bbcode_enabled = true
-                grades.fit_content = true
-                grades.scroll_active = false
-                # Fill the column and centre by alignment, the pattern every other
-                # RichTextLabel in this app uses: a shrink-centred fit-content label
-                # wraps itself to a column one character wide (RichTextLabel wraps by
-                # default, unlike Label).
-                grades.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-                grades.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-                grades.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                grades.add_theme_font_override("normal_font", ThemeScript.vazir(ThemeScript.CAPTION))
-                grades.add_theme_font_size_override("normal_font_size", ThemeScript.fs(ThemeScript.CAPTION))
-                grades.text = "[center]" + grades_line + "[/center]"
-                summary.add_child(grades)
 
         summary.add_child(ThemeScript.hairline())
 

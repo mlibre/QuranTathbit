@@ -6,10 +6,11 @@ extends SceneTree
 ## pinned before the first page stands, the choice written into the files it
 ## travels in from the very first boot, Settings carrying no question it
 ## would be wrong to ask, the page laid out from the right with its doors in
-## the reading's own order and the update coin keeping the corner it has
-## always stood in, and a deck arriving from an English phone
-## answered in this one. The standard build's asking is regression_boot's
-## own check; this suite proves the other clothes.
+## the reading's own order, the update coin keeping the corner it has
+## always stood in, the session's own last page resting in this tongue and
+## saying the day is done and nothing more, and a deck arriving from an
+## English phone answered in this one. The standard build's asking is
+## regression_boot's own check; this suite proves the other clothes.
 
 const FlavorScript := preload("res://scripts/data/flavor.gd")
 const I18nScript := preload("res://scripts/ui/i18n.gd")
@@ -33,6 +34,7 @@ func _init() -> void:
         _check_the_coin_keeps_its_corner(main)
         await _check_settings_never_asks(main)
         _check_an_english_deck_is_answered(main)
+        await _check_the_done_page_stays_quiet(main)
 
         if _failures > 0:
                 print("persian: %d FAILURE(S)" % _failures)
@@ -172,6 +174,37 @@ func _check_an_english_deck_is_answered(main: Control) -> void:
                         and str((progress as Dictionary).get("ui_lang", "")) == "fa",
                 "the answer is written into the deck's own file, so it travels back"
         )
+
+## The session's own last page: the day answered, the word said once, and
+## quiet. A coloured tally of the grades once stood under the count -- a
+## number said twice, in a tongue its own lookup never even reached -- and
+## the page is calmer with it gone for good.
+func _check_the_done_page_stays_quiet(main: Control) -> void:
+        main._start_session()
+        await create_timer(0.6).timeout
+        var study: Control = main.get_node("Study")
+        var guard := 0
+        while study._index < study._cards.size() and guard < 30:
+                study._reveal()
+                await create_timer(0.35).timeout
+                study._answer("good")
+                await create_timer(0.6).timeout
+                guard += 1
+        await create_timer(0.5).timeout
+        var summary: Node = study.get_node(study.PANEL + "/Padding").get_node_or_null("Summary")
+        _ok(summary != null, "the done page stands when the day's cards are answered")
+        if summary != null:
+                _is(
+                        (summary.get_node("Title") as Label).text,
+                        str(I18nScript.STRINGS["Session complete"]["fa"]),
+                        "the done page names itself in Persian"
+                )
+                _ok(
+                        summary.get_node_or_null("Grades") == null,
+                        "the done page keeps no tally of the grades"
+                )
+        study.closed.emit()
+        await create_timer(0.6).timeout
 
 func _ok(condition: bool, what: String) -> void:
         if not condition:
