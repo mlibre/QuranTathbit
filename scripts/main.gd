@@ -15,6 +15,7 @@ const SettingsScreenScript := preload("res://scripts/ui/settings_screen.gd")
 const BrowseScript := preload("res://scripts/ui/browse.gd")
 const I18nScript := preload("res://scripts/ui/i18n.gd")
 const LanguagePickerScript := preload("res://scripts/ui/language_picker.gd")
+const FlavorScript := preload("res://scripts/data/flavor.gd")
 const TouchScrollScript := preload("res://scripts/ui/touch_scroll.gd")
 const RtlFieldScript := preload("res://scripts/ui/rtl_field.gd")
 const CopyChipScript := preload("res://scripts/ui/copy_chip.gd")
@@ -90,6 +91,14 @@ func _ready() -> void:
                 push_error("QuranTathbit: the deck could not be read from %s" % USER_DECK)
                 get_tree().quit(1)
                 return
+        # A flavoured build is born speaking its tongue: the Persian APK's
+        # question is already answered by the build itself, so the pin is
+        # set before the adoption below can see anything else, and the
+        # first page is laid out from the right from its first frame -- no
+        # picker ever stands over it.
+        if FlavorScript.persian_build() and _settings.ui_lang != "fa":
+                _settings.ui_lang = "fa"
+                _settings.save()
         _adopt_deck_choices()
         I18nScript.set_lang(_settings.ui_lang)
         ThemeScript.set_ayah_face(_settings.ayah_font)
@@ -136,7 +145,9 @@ func _ready() -> void:
         _go_home()
         # The app's very first question, over the page it asks on: which
         # tongue do its own words speak? Only a reader who has never
-        # answered -- here or on any device the deck reached -- is asked.
+        # answered -- here or on any device the deck reached -- is asked;
+        # a flavoured build pinned its tongue before the first page was
+        # built, so its question is already answered and this never stands.
         if _settings.ui_lang.is_empty():
                 _show_language_picker()
         # A deck that is already connected says hello on its own, quietly: a
@@ -676,9 +687,25 @@ func _adopt_deck_choices() -> void:
                 if not _settings.ui_lang.is_empty():
                         _deck.ui_lang = _settings.ui_lang
                         _deck.ui_lang_mod = _now()
+                        # A flavoured build's inherited tongue is the build's
+                        # own answer, and an answer is written down when it
+                        # is made: the choice travels from the very first
+                        # boot, not from the first answered card.
+                        if FlavorScript.persian_build():
+                                _deck.save_progress()
         elif _deck.ui_lang != _settings.ui_lang:
-                _settings.ui_lang = _deck.ui_lang
-                _settings.save()
+                if FlavorScript.persian_build():
+                        # A Persian build is Persian all the way through: a
+                        # deck arriving from an English phone does not bring
+                        # its tongue here -- the deck is answered in this
+                        # one, and the answer is written down so every
+                        # device the deck reaches hears what this build said.
+                        _deck.ui_lang = "fa"
+                        _deck.ui_lang_mod = _now()
+                        _deck.save_progress()
+                else:
+                        _settings.ui_lang = _deck.ui_lang
+                        _settings.save()
 
 
 # --- the app's own tongue -------------------------------------------------------

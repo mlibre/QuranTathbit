@@ -113,14 +113,19 @@ jobs:
           GODOT_ANDROID_KEYSTORE_RELEASE_USER: qurantathbit
           GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: tathbit-keep-it-close
         run: |
-          mkdir -p builds/android
+          mkdir -p builds/android builds/android-persian
           touch builds/.gdignore
           godot --headless --path . --import
           godot --headless --path . --export-release "Android" builds/android/QuranTathbit.apk
+          godot --headless --path . --export-release "Android Persian" builds/android-persian/QuranTathbit-fa.apk
       - uses: actions/upload-artifact@v4
         with:
           name: QuranTathbit-android
           path: builds/android/QuranTathbit.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QuranTathbit-android-persian
+          path: builds/android-persian/QuranTathbit-fa.apk
 
   release:
     needs: [windows, linux, android]
@@ -137,13 +142,14 @@ jobs:
           zip -j QuranTathbit-Windows.zip QuranTathbit-windows/QuranTathbit.exe
           zip -j QuranTathbit-Linux.zip QuranTathbit-linux/QuranTathbit.x86_64
           cp QuranTathbit-android/QuranTathbit.apk QuranTathbit-Android.apk
+          cp QuranTathbit-android-persian/QuranTathbit-fa.apk QuranTathbit-Android-fa.apk
           # This job checks out nothing, so gh cannot discover the repository
           # from git; every call names it explicitly with -R.
           if gh release view -R "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload -R "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" QuranTathbit-Windows.zip QuranTathbit-Linux.zip QuranTathbit-Android.apk --clobber
+            gh release upload -R "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" QuranTathbit-Windows.zip QuranTathbit-Linux.zip QuranTathbit-Android.apk QuranTathbit-Android-fa.apk --clobber
           else
             gh release create -R "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" \
-              QuranTathbit-Windows.zip QuranTathbit-Linux.zip QuranTathbit-Android.apk \
+              QuranTathbit-Windows.zip QuranTathbit-Linux.zip QuranTathbit-Android.apk QuranTathbit-Android-fa.apk \
               --title "QuranTathbit $GITHUB_REF_NAME" \
-              --notes "One deck, kept as folders and files. Unzip, run, study. The Android APK is self-signed: allow installs from this source when your phone asks. Quran text, translation and recitation from https://quran.makarem.ir/"
+              --notes "One deck, kept as folders and files. Unzip, run, study. The Android APK is self-signed: allow installs from this source when your phone asks. QuranTathbit-Android-fa.apk is the same app pre-configured in Persian: no language question, no language in Settings. Quran text, translation and recitation from https://quran.makarem.ir/"
           fi

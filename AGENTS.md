@@ -138,7 +138,11 @@ Windows, web) in Godot 4.7 with GDScript only.
   The verses and their Persian translation are the deck's own content and
   are never translated. The language is asked once on first run and
   afterwards lives in Settings; like the day's pace, it travels with the
-  deck's `progress.json`, merging by its own moment. The formatting rules
+  deck's `progress.json`, merging by its own moment. A flavoured build
+  skips the asking entirely — the Persian APK pins its tongue before the
+  first page stands, never shows the language in Settings, and answers an
+  arriving deck's other tongue in its own (`scripts/data/flavor.gd`,
+  keyed off the export preset's custom feature). The formatting rules
   (`f()`, `num()`, and the traps around them) are documented in
   `docs/TEXT.md`.
 - **Fail visibly.** A deck that will not load, a sync that cannot finish, a

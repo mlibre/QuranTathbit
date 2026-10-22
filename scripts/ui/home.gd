@@ -253,6 +253,16 @@ func _next_fresh_card():
 
 func _build() -> void:
         set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        # A page whose tongue reads from the right is laid out from the
+        # right: the pills run the way the words do, and the dock's doors
+        # stand in the reading's own order -- the library first at the
+        # reading's start. The root says it once and every container below
+        # inherits it, the way every other page in the app does; a page
+        # said again in another tongue says its own direction again.
+        layout_direction = (
+                Control.LAYOUT_DIRECTION_RTL if I18nScript.is_rtl()
+                else Control.LAYOUT_DIRECTION_LTR
+        )
         add_child(ThemeScript.paper_backdrop())
         add_child(ThemeScript.paper_pattern())
 
@@ -499,7 +509,8 @@ func _dock() -> Control:
         pad.add_child(row)
         # The reading's own order: the library at the reading's start, then
         # the sync, then the settings -- and in a right-reading tongue the
-        # row itself turns around, so the library still stands first.
+        # row inherits its page's turned-around direction, so the library
+        # still stands first where the reading begins.
         row.add_child(_dock_item(
                 "Browse",
                 ThemeScript.BookMark.new(ThemeScript.INK_SOFT),

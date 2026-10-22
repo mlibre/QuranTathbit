@@ -179,6 +179,33 @@ func _init() -> void:
         if pkg_version != version:
                 push_error("package.json says %s; the app says %s" % [pkg_version, version])
                 failures += 1
+        # The Persian build: the same app in its own clothes, and everything
+        # the standard Android preset is held to, the Persian one is held to
+        # as well -- both ABIs, the same version name and code, the INTERNET
+        # permission -- plus its own one law: the custom feature that pins
+        # the tongue at boot, without which the preset would ship a standard
+        # build wearing a Persian label.
+        var fa_features := str(cfg.get_value("preset.4", "custom_features", ""))
+        if not fa_features.contains("persian"):
+                push_error("the Persian preset must carry the persian custom feature; without it the build boots asking its question like the standard one")
+                failures += 1
+        var fa_v7a: bool = cfg.get_value("preset.4.options", "architectures/armeabi-v7a", false)
+        var fa_v8a: bool = cfg.get_value("preset.4.options", "architectures/arm64-v8a", false)
+        if not (fa_v7a and fa_v8a):
+                push_error("the Persian preset must ship both 32- and 64-bit")
+                failures += 1
+        var fa_name_version := str(cfg.get_value("preset.4.options", "version/name", ""))
+        if fa_name_version != version:
+                push_error("Persian version/name is %s; the app says %s" % [fa_name_version, version])
+                failures += 1
+        var fa_code := int(cfg.get_value("preset.4.options", "version/code", 0))
+        if fa_code != code:
+                push_error("the Persian preset's version code (%d) must say the same word as the standard one (%d)" % [fa_code, code])
+                failures += 1
+        var fa_internet: bool = cfg.get_value("preset.4.options", "permissions/internet", false)
+        if not fa_internet:
+                push_error("the Persian preset must ask for the INTERNET permission; without it GitHub connect and sync die on every phone it reaches")
+                failures += 1
         print("export_presets.cfg: %s (guard at %d of %d chars; android code %d)" % [
                 "OK" if failures == 0 else "BROKEN", guard_at, include.length(), code,
         ])

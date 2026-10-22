@@ -10,6 +10,7 @@ const BackupPickerScript := preload("res://scripts/ui/backup_picker.gd")
 const VersionScript := preload("res://scripts/data/version.gd")
 const I18nScript := preload("res://scripts/ui/i18n.gd")
 const CopyChipScript := preload("res://scripts/ui/copy_chip.gd")
+const FlavorScript := preload("res://scripts/data/flavor.gd")
 
 ## The two ladders a size is stepped along: the interface in wider steps
 ## (it moves everything, so a small step is a big step) and the words in
@@ -600,7 +601,10 @@ func _step_new_per_day(delta: int) -> void:
 ## shown rather than explained (a font's name in the UI's own face beside a
 ## verse drawn in the font itself; a language named in its own script) -- the
 ## choice is judged on what it chooses -- and both travel with the deck: one
-## reader, one way of reading, every device.
+## reader, one way of reading, every device. The tongue is the standard
+## build's to choose; a Persian build was born speaking it, so there the
+## question would only offer to unmake what the build already is, and it
+## is not asked at all.
 func _reading_body() -> Control:
         var parts := _card("Reading")
         var card: PanelContainer = parts[0]
@@ -628,17 +632,23 @@ func _reading_body() -> Control:
                         str(face["key"]) == current_face, seg_height
                 ))
 
-        box.add_child(ThemeScript.hairline())
+        # The tongue the app's own words speak: the standard build's one
+        # question about itself. A Persian build never asks it here -- the
+        # build answered it the day it was exported, and a row offering to
+        # change what the build is would be a question with only wrong
+        # answers.
+        if not FlavorScript.persian_build():
+                box.add_child(ThemeScript.hairline())
 
-        box.add_child(_field_label(I18nScript.t("App language")))
-        var langs := HBoxContainer.new()
-        langs.name = "AppLanguages"
-        langs.add_theme_constant_override("separation", 8)
-        box.add_child(langs)
-        # The standing tongue, straight from the mouth that speaks it.
-        var current_lang := I18nScript.lang()
-        for code in I18nScript.LANGS:
-                langs.add_child(_language_segment(code, code == current_lang))
+                box.add_child(_field_label(I18nScript.t("App language")))
+                var langs := HBoxContainer.new()
+                langs.name = "AppLanguages"
+                langs.add_theme_constant_override("separation", 8)
+                box.add_child(langs)
+                # The standing tongue, straight from the mouth that speaks it.
+                var current_lang := I18nScript.lang()
+                for code in I18nScript.LANGS:
+                        langs.add_child(_language_segment(code, code == current_lang))
         return card
 
 ## The height every font segment in the row shares: the tallest face's
