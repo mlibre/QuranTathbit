@@ -123,9 +123,15 @@ func _check_touch_reach(home: Control) -> void:
                 var at := coin.get_global_rect().get_center()
                 _ok(_top_at(home, at) == coin,
                         "the %s coin is on top of everything at its own centre" % coin_name)
-        var sync_text: Label = home.get_node_or_null("Margin/Column/SyncLine/Text")
-        _ok(sync_text != null and sync_text.text.length() > 0,
-                "the sync state says itself on the page, not only in a tooltip")
+        var sync_coin: Button = home.get_node("SyncCoin")
+        _ok(
+                home.get_node_or_null("Margin/Column/SyncLine") == null,
+                "the page itself says nothing of sync -- the corner coin is the whole story"
+        )
+        _ok(
+                sync_coin.tooltip_text.length() > 0,
+                "the sync state says itself in the coin's own words"
+        )
 
 ## The card never asks a window for more room than it has.
 func _check_card_fits() -> void:

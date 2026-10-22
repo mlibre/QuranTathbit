@@ -30,12 +30,21 @@ const CopyChipScript := preload("res://scripts/ui/copy_chip.gd")
 const BUNDLED_DECK := "res://assets/decks/quran"
 const USER_DECK := "user://decks/quran"
 
-## How long a quiet sync waits before trying again after a network
-## failure, and how many times. The sync is resumable by design -- whatever
-## landed is the baseline the next attempt continues from -- so a retry is
-## a resume, and three of them carry an interrupted opening across most
-## bad connections without a hand on the button.
-const SYNC_RETRY_WAITS := [8.0, 25.0, 60.0]
+## How long a failed sync waits before being asked again, and how many
+## times. The first ask comes at once and takes the other road -- the
+## files arrive from raw.githubusercontent.com instead of the API, a
+## different door to the same bytes, the way a second downloader is tried
+## when the first stalls -- and the patient ladder behind it takes the
+## usual road: 8 seconds, then 25, then 60. Every ask is a resume --
+## whatever landed is the baseline the next attempt continues from -- so
+## four of them carry an interrupted sync across most bad connections
+## without a hand on the button, whatever hand started the first one.
+const SYNC_RETRY_WAITS := [1.0, 8.0, 25.0, 60.0]
+
+## How often Home looks at the deck's own clock: a learning card comes due
+## ten minutes after its answer, and the page must say so while the reader
+## sits on it -- not when they happen to leave and come back.
+const DUE_WATCH_PERIOD := 20.0
 
 var _settings: SettingsScript
 var _deck: DeckScript
@@ -50,9 +59,10 @@ var _sync_queued_quiet := true  # the queued ask's own voice -- a press of the b
 var _answers_waiting := 0  # answers given since the repo last heard from this deck
 var _deck_edited := false  # a card was edited in the app since the repo last heard
 var _sync_failed := false  # the last sync could not finish; the deck is honest about it
-var _sync_retrying := false  # a failed quiet sync is waiting to try again
-var _sync_attempts := 0  # how many retries this quiet run has made
+var _sync_retrying := false  # a failed sync is waiting to be asked again
+var _sync_attempts := 0  # how many retries this run has made
 var _sync_generation := 0  # a new run cancels the retries an older one left pending
+var _due_watch: Timer  # Home's own clock: a card that comes due on the open page is said by the page
 var _paste_callback: Variant = null  # the page's paste hook, kept alive for the app's whole life
 var _cut_callback: Variant = null  # the page's cut hook, kept beside it
 var _clip_state := ""  # what the page was last told the field in hand holds
@@ -135,6 +145,16 @@ func _ready() -> void:
         # pretends nothing has happened since yesterday.
         if _settings.has_token() and _settings.auto_sync:
                 get_tree().create_timer(1.2).timeout.connect(func() -> void: _run_sync(true))
+        # Home's own clock, ticking under everything: a card that comes due
+        # while the reader sits on the page is said by the page itself, the
+        # numbers and the day's news both -- never a page that waits for a
+        # hand to refresh it.
+        _due_watch = Timer.new()
+        _due_watch.name = "DueWatch"
+        _due_watch.wait_time = DUE_WATCH_PERIOD
+        _due_watch.timeout.connect(_on_due_watch)
+        add_child(_due_watch)
+        _due_watch.start()
         # The one line the release workflow's smoke test looks for: the deck is
         # installed, loaded, and the first screen is standing.
         print("QURAN_TATHBIT_BOOT_OK")
@@ -747,17 +767,18 @@ func _on_sync_pressed() -> void:
 ## phase in plain words, a bar that knows how far along it is, and the
 ## promise that the deck is safe on this machine whatever the network
 ## does. The app stays usable when it fails -- the deck is local first,
-## always. A quiet sync that the network interrupts is retried on the
-## app's own -- each retry a resume, because everything that landed is
-## already the baseline -- so an interrupted opening heals itself without
-## a hand on the button.
+## always. A sync the network interrupts is asked again on the app's own,
+## at once and by the other road, and then patiently up the ladder --
+## each ask a resume, because everything that landed is already the
+## baseline -- whatever hand started the first one, so an interrupted
+## sync heals itself without the reader pressing twice.
 ##
 ## One exchange at a time, always: two syncs racing one repo is the very
 ## race that loses work. But an ask that arrives while one runs is never
 ## dropped -- a session that closed, a choice that settled, a press of the
 ## button -- it waits for the running one to end and then goes itself, so
 ## every answer is carried without the reader having to ask twice.
-func _run_sync(quiet := false) -> void:
+func _run_sync(quiet := false, alternate := false, fresh := true) -> void:
         if _syncing:
                 _sync_queued = true
                 _sync_queued_quiet = _sync_queued_quiet and quiet
@@ -765,6 +786,11 @@ func _run_sync(quiet := false) -> void:
         _syncing = true
         _sync_generation += 1
         _sync_retrying = false
+        # A fresh ask -- the hand's own press, a session closing -- starts the
+        # ladder over; only an ask that is itself a retry keeps its place in
+        # it, so a promise that ran out is not a promise refused forever.
+        if fresh:
+                _sync_attempts = 0
         if _screen is HomeScript:
                 (_screen as HomeScript).set_syncing()
         var overlay: Control = null
@@ -775,7 +801,8 @@ func _run_sync(quiet := false) -> void:
         var result: Dictionary = await _sync.sync(
                 USER_DECK,
                 overlay.report if overlay != null else Callable(),
-                _ask_conflict
+                _ask_conflict,
+                alternate
         )
         if overlay != null:
                 overlay.finish(bool(result.get("ok", false)))
@@ -794,7 +821,7 @@ func _run_sync(quiet := false) -> void:
                 _sync_failed = false
         else:
                 _sync_failed = true
-                _maybe_schedule_sync_retry(quiet, result)
+                _maybe_schedule_sync_retry(result)
 
         # Progress may have merged in from another device -- the cards and the
         # deck's own choices alike (pace, verses' face, tongue); the folder's
@@ -870,17 +897,19 @@ func _sync_retryable(error: String) -> bool:
         return error != "no_token" and error != "auth_failed" and error != "conflict_declined"
 
 
-## The quiet promise kept: a network-failed sync schedules its own next
-## attempt, with a longer wait each time, until one lands or the waits run
-## out. A newer run -- the hand's own press, a session closing -- cancels
-## whatever this one left waiting, because that run speaks for itself.
-func _maybe_schedule_sync_retry(quiet: bool, result: Dictionary) -> bool:
-        if not quiet:
-                return false
+## The quiet promise kept: a network-failed sync is asked again by the app
+## itself -- the first ask at once, by the other road, and then a patient
+## ladder with a longer wait each time, until one lands or the waits run
+## out. Whatever hand started the failed run, the asking-back is quiet:
+## the page beneath is never covered twice. A newer run -- the hand's own
+## press, a session closing -- cancels whatever this one left waiting,
+## because that run speaks for itself.
+func _maybe_schedule_sync_retry(result: Dictionary) -> bool:
         if _sync_attempts >= SYNC_RETRY_WAITS.size():
                 return false
         if not _sync_retryable(str(result.get("error", ""))):
                 return false
+        var other_road := _sync_attempts == 0  # the first ask-back comes at once, differently
         var wait: float = SYNC_RETRY_WAITS[_sync_attempts]
         _sync_attempts += 1
         _sync_retrying = true
@@ -888,7 +917,7 @@ func _maybe_schedule_sync_retry(quiet: bool, result: Dictionary) -> bool:
         get_tree().create_timer(wait).timeout.connect(func() -> void:
                 if generation == _sync_generation and not _syncing:
                         _sync_retrying = false
-                        _run_sync(true)
+                        _run_sync(true, other_road, false)
         )
         return true
 
@@ -906,6 +935,26 @@ func _refresh_home() -> void:
                 _sync_line(),
                 _sync_state()
         )
+
+
+## The page's own tick: every little while the deck's numbers are read
+## again, and when they have moved -- a learning card's ten minutes
+## elapsed, the day's offer reset at rollover, another device's study
+## merged in -- the page is said again with the new numbers and the new
+## next card, never left telling the morning's story to the afternoon.
+## Only a true move earns the re-saying: a page that re-counts its pills
+## on every tick is a page that flickers.
+func _on_due_watch() -> void:
+        if not _screen is HomeScript:
+                return
+        var home: HomeScript = _screen
+        var counts := SchedulerScript.counts(_deck, _now(), _settings.new_per_day)
+        var said := home.current_counts()
+        if int(counts["due"]) == int(said.get("due", -1)) \
+                        and int(counts["new"]) == int(said.get("new", -1)) \
+                        and int(counts["learned"]) == int(said.get("learned", -1)):
+                return
+        _refresh_home()
 
 
 func _sync_line() -> String:

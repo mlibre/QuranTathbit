@@ -57,6 +57,10 @@ const GitHubAuthScript := preload("res://scripts/net/github_auth.gd")
 ## carries only the small text of the deck.
 
 const API := "https://api.github.com"
+## The other road a retry may take: the same bytes, off the repo's raw
+## shelf -- a different host and a different door, for the link that will
+## not open one way and opens another.
+const RAW_HOST := "https://raw.githubusercontent.com"
 const MANIFEST := "user://sync_manifest.json"
 const RAW := "application/vnd.github.raw"
 const JSON_MIME := "application/vnd.github+json"
@@ -75,6 +79,7 @@ var carry_media := not OS.has_feature("web")
 
 var _branch := "main"
 var _deck_path := ""
+var _alternate_fetch := false  # this run's downloads take the raw shelf, not the API's contents door
 
 func _init(p_http, p_auth: GitHubAuthScript) -> void:
         http = p_http
@@ -98,11 +103,21 @@ func _init(p_http, p_auth: GitHubAuthScript) -> void:
 ## replaced without the reader naming it. Without a callable the historic
 ## quiet default stands: this machine's copy (a scripted sync is never
 ## asked a question it cannot answer). Returns {ok, pushed, pulled, merged}
-## or {ok: false, error, conflicts?}.
+## or {ok: false, error, conflicts?} -- "auth_failed" is the token's own
+## refusal, "network" a link that never answered, and both are told apart
+## so only the network is asked again.
+##
+## alternate_fetch takes the other road for this run's downloads -- the
+## raw shelf instead of the API's contents door -- which is what a retry
+## wears: the same bytes by a different way.
 func sync(
-        deck_path: String, on_progress: Callable = Callable(), on_conflict: Callable = Callable()
+        deck_path: String,
+        on_progress: Callable = Callable(),
+        on_conflict: Callable = Callable(),
+        alternate_fetch := false
 ) -> Dictionary:
         _deck_path = deck_path
+        _alternate_fetch = alternate_fetch
         var settings = SettingsScript.load_settings()
         token = settings.token
         repo = settings.repo if not settings.repo.strip_edges().is_empty() else repo
@@ -112,7 +127,13 @@ func sync(
         _report(on_progress, "signing in", 0, 0)
         var me: Dictionary = await _get_json("/user")
         if not _ok(me):
-                return {"ok": false, "error": "auth_failed", "code": int(me.get("code", 0))}
+                # A 401 is the token's own word about itself, and no asking
+                # again changes it. Anything else -- no answer at all, a
+                # timeout, a link that broke mid-flight -- is the network's
+                # word, and the network is asked again.
+                if bool(me.get("status", false)) and int(me.get("code", 0)) == 401:
+                        return {"ok": false, "error": "auth_failed", "code": 401}
+                return {"ok": false, "error": "network", "code": int(me.get("code", 0))}
         owner = str((me.body_json as Dictionary).get("login", ""))
         if owner.is_empty():
                 return {"ok": false, "error": "auth_failed"}
@@ -446,14 +467,22 @@ func _head_sha() -> String:
 ## One fetched file, fetched alone: a single request, a single answer, the
 ## next one waiting for this one to land. The engine never asks the network
 ## for two things at once -- a parallel flight races the very files it
-## carries.
+## carries. The usual road is the API's contents door; an alternate run
+## takes the raw shelf instead -- a different host, a different door, the
+## same bytes -- because a link that will not open one way sometimes opens
+## another.
 func _fetch_file(path: String) -> Dictionary:
         var headers := _auth_headers()
         headers["Accept"] = RAW
-        return await http.request.call(
-                "GET", API + "/repos/%s/%s/contents/%s" % [owner, repo, _encode_path(path)],
-                headers, PackedByteArray()
-        )
+        return await http.request.call("GET", _download_url(path), headers, PackedByteArray())
+
+
+## Where a file is fetched from this run: the API's contents door, or --
+## when the run is itself a retry -- the raw shelf the same bytes sit on.
+func _download_url(path: String) -> String:
+        if _alternate_fetch:
+                return "%s/%s/%s/%s/%s" % [RAW_HOST, owner, repo, _branch, _encode_path(path)]
+        return "%s/repos/%s/%s/contents/%s" % [API, owner, repo, _encode_path(path)]
 
 ## One fetched file, written home: inside the deck, nowhere else, with its
 ## folders made if the file is new to this machine.
@@ -597,9 +626,7 @@ func _merge_progress(deck_path: String, remote: Dictionary, manifest: Dictionary
         var theirs: Dictionary = {}
         var their_choices: Dictionary = {}
         if not remote_sha.is_empty():
-                var fetched: Dictionary = await _get_raw(
-                        "/repos/%s/%s/contents/%s" % [owner, repo, _encode_path("progress.json")]
-                )
+                var fetched: Dictionary = await _get_raw("progress.json")
                 if int(fetched.get("code", 0)) != 200:
                         return {"merged": 0, "changed": false, "error": "progress_pull_failed"}
                 var remote_data: Variant = JSON.parse_string(fetched.body.get_string_from_utf8())
@@ -784,7 +811,7 @@ func _get_json(path: String) -> Dictionary:
 func _get_raw(path: String) -> Dictionary:
         var headers := _auth_headers()
         headers["Accept"] = RAW
-        return await http.request.call("GET", API + path, headers, PackedByteArray())
+        return await http.request.call("GET", _download_url(path), headers, PackedByteArray())
 
 func _request_json(method: String, path: String, payload: Variant) -> Dictionary:
         var headers := _auth_headers()

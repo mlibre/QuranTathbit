@@ -8,8 +8,10 @@ const AuthScript := preload("res://scripts/net/github_auth.gd")
 ## repo, ref, tree, blob, commit -- and check the three-way merge, file by
 ## file, the progress merge card by card, that everything a sync sends lands
 ## as one commit, that a failed transfer is retried on the next run instead
-## of being silently forgotten, and that Godot's editor metadata and (on the
-## web) media never travel.
+## of being silently forgotten, that Godot's editor metadata and (on the
+## web) media never travel, that a dropped signin is the network's failure
+## and not the token's, and that a download the API's door would not serve
+## lands by the raw shelf when the run takes the other road.
 
 const DECK := "user://test_sync_deck"
 
@@ -28,6 +30,8 @@ func _init() -> void:
         await _test_quiet_sync_transfers_nothing()
         await _test_quiet_sync_asks_for_nothing()
         await _test_failed_push_retries()
+        await _test_failed_download_retries_the_other_road()
+        await _test_signin_blip_is_the_network_not_the_token()
         await _test_ref_conflict_retries()
         await _test_head_short_circuit()
         await _test_foreign_files_are_left_alone()
@@ -69,6 +73,10 @@ class FakeGitHub:
         var head := "head-0"  # the ref the branch points at, one truth for every answer
         var tree_gets := 0  # full tree walks, the thing a settled sync never makes
         var fail_blobs := false  # every blob POST answers 500
+        var fail_contents := false  # every API contents GET answers as a link that never opened
+        var fail_user := 0  # the first N signins answer as a link that never opened
+        var refuse_user := 0  # the first N signins answer 401, the token's own refusal
+        var raw_gets := 0  # downloads off the raw shelf, the other road
         var ref_conflicts := 0  # the first ref updates answer 409
         var blob_posts := 0  # uploads, even the ones that fail
         var tree_posts := 0
@@ -86,6 +94,12 @@ class FakeGitHub:
                 order.append("%s %s" % [method, url])
                 var path := _content_path(url)
                 if url.ends_with("/user"):
+                        if refuse_user > 0:
+                                refuse_user -= 1
+                                return _json(401, {"message": "Bad credentials"})
+                        if fail_user > 0:
+                                fail_user -= 1
+                                return _dead()
                         return _json(200, {"login": "tester"})
                 if url.ends_with("/user/repos"):
                         return _json(201, {"default_branch": "main"})
@@ -125,8 +139,19 @@ class FakeGitHub:
                         return _json(200, {"sha": "tree-listed", "tree": tree})
                 if method == "GET" and url.contains("/repos/") and path.is_empty():
                         return _json(200, {"default_branch": "main"})
+                if method == "GET" and url.begins_with("https://raw.githubusercontent.com/"):
+                        # The raw shelf: owner/repo/branch, then the file -- the
+                        # same bytes the contents door serves, by another door.
+                        raw_gets += 1
+                        var parts := url.substr("https://raw.githubusercontent.com/".length()).split("/")
+                        var raw_path := ("/".join(parts.slice(3))).uri_decode()
+                        if not files.has(raw_path):
+                                return _json(404, {})
+                        return _raw(200, files[raw_path].content)
                 if method == "GET" and not path.is_empty():
                         content_gets += 1
+                        if fail_contents:
+                                return _dead()
                         if on_contents_get.is_valid():
                                 on_contents_get.call(path)
                         if not files.has(path):
@@ -175,6 +200,11 @@ class FakeGitHub:
 
         static func _raw(code: int, content: PackedByteArray) -> Dictionary:
                 return {"status": true, "code": code, "headers": {}, "body": content}
+
+        ## A link that never opened: no status, no code -- the shape a
+        ## dropped connection leaves behind, where no answer ever came.
+        static func _dead() -> Dictionary:
+                return {"status": false, "code": 0, "headers": {}, "body": PackedByteArray()}
 
         ## The checksums a real GitHub lists: git blob checksums of the content.
         static func _content_sha(content: PackedByteArray) -> String:
@@ -524,6 +554,50 @@ func _test_failed_push_retries() -> void:
         _ok(bool(again.get("ok", false)), "the retry succeeds")
         _ok(again.pushed >= 1, "the failed file is pushed on the retry (got %d)" % again.pushed)
         _is(fake.files["001/front.md"].content.get_string_from_utf8(), "Q1 changed", "the retried file's content is the local one")
+
+## A download the API's contents door would not serve can land by the raw
+## shelf instead: a run wearing alternate_fetch fetches the same files from
+## raw.githubusercontent.com, and a link that is dead one way is alive the
+## other -- the shape of the immediate retry the app asks itself.
+func _test_failed_download_retries_the_other_road() -> void:
+        _write_deck({"001": ["Q1", "A1"]})
+        var fake := FakeGitHub.new()
+        await _make_sync(fake).sync(DECK)  # this machine's word is already in the repo
+        # A fresh device pulls; the API's contents door will not open for it.
+        var target := "user://test_sync_alt_road"
+        _remove_tree(target)
+        DirAccess.make_dir_recursive_absolute(target)
+        fake.fail_contents = true
+        var broken: Dictionary = await _make_sync(fake).sync(target)
+        _ok(not bool(broken.get("ok", false)), "a dead contents door fails the sync, loudly")
+        _ok(fake.raw_gets == 0, "the usual road never touches the raw shelf")
+        var contents_asked := fake.content_gets
+        # The other road: the same run asked again, wearing alternate_fetch.
+        var landed: Dictionary = await _make_sync(fake).sync(
+                target, Callable(), Callable(), true
+        )
+        _ok(bool(landed.get("ok", false)), "the other road lands the same files (%s)" % str(landed.get("error", "")))
+        _ok(fake.raw_gets >= 3, "the other road is the raw shelf (got %d raw fetches)" % fake.raw_gets)
+        _is(
+                fake.content_gets, contents_asked,
+                "the alternate run asked the dead door nothing (api fetches %d -> %d)" % [contents_asked, fake.content_gets]
+        )
+        _ok(FileAccess.file_exists(target.path_join("001/front.md")), "the card arrives by the other road")
+        _remove_tree(target)
+
+## A signin that never got an answer is the network's failure, not the
+## token's: only the token's own 401 says the token is wrong, and the two
+## are told apart so the app asks the network again without sending the
+## reader to Settings for a token that never did anything wrong.
+func _test_signin_blip_is_the_network_not_the_token() -> void:
+        _write_deck({"001": ["Q1", "A1"]})
+        var fake := FakeGitHub.new()
+        fake.fail_user = 1
+        var blip: Dictionary = await _make_sync(fake).sync(DECK)
+        _is(str(blip.get("error", "")), "network", "a dropped signin is the network's word")
+        fake.refuse_user = 1
+        var refused: Dictionary = await _make_sync(fake).sync(DECK)
+        _is(str(refused.get("error", "")), "auth_failed", "a 401 is the token's own word")
 
 ## Two machines syncing at once: the ref has moved by the time this one
 ## commits, GitHub answers 409, and the engine re-commits onto the new head.

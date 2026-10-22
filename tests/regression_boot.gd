@@ -35,14 +35,17 @@ func _init() -> void:
                 return
 
         await _check_home_numbers(home)
+        _check_home_says_sync_by_coin_only(home)
         await _check_language_picker(main)
         await _check_study_session(main)
+        await _check_due_watch(main)
         _check_own_digits()
         await _check_settings(main)
         await _check_browse(main)
         await _check_marks_and_rtl(main)
         _check_settings_round_trip()
         _check_sync_retrying(main)
+        await _check_sync_retries_the_other_road(main)
 
         if _failures > 0:
                 print("boot: %d FAILURE(S)" % _failures)
@@ -1753,33 +1756,188 @@ func _check_marks_and_rtl(main: Node) -> void:
 ## failure does not heal with time.
 func _check_sync_retrying(main: Node) -> void:
         _ok(main._sync_retryable("head_failed"), "a network failure is worth retrying")
+        _ok(main._sync_retryable("network"), "a dropped connection is worth retrying")
         _ok(main._sync_retryable("blob_failed"), "a failed upload is worth retrying")
         _ok(not main._sync_retryable("no_token"), "a missing token is not retried")
         _ok(not main._sync_retryable("auth_failed"), "a refused token is not retried")
         main._sync_attempts = 0
         _ok(
-                main._maybe_schedule_sync_retry(true, {"ok": false, "error": "head_failed"}),
-                "a quiet failure schedules its own retry"
+                main._maybe_schedule_sync_retry({"ok": false, "error": "head_failed"}),
+                "a failed sync schedules its own ask-again"
         )
         _ok(main._sync_retrying, "the app says it will try again")
         _is(main._sync_attempts, 1, "the first retry is the first retry")
-        main._settings.token = "for-the-line"
+        main._settings.token = "for-the-coin"
         _ok(
                 main._sync_line().contains("try again"),
-                "the home line says the app will try again by itself"
+                "the coin's own words say the app will try again by itself"
         )
         main._settings.token = ""
         _ok(
-                not main._maybe_schedule_sync_retry(true, {"ok": false, "error": "auth_failed"}),
+                not main._maybe_schedule_sync_retry({"ok": false, "error": "auth_failed"}),
                 "a refused token schedules nothing"
         )
-        _ok(
-                not main._maybe_schedule_sync_retry(false, {"ok": false, "error": "head_failed"}),
-                "a hand-pressed sync is not retried behind the hand's back"
+        _is(
+                main.SYNC_RETRY_WAITS[0], 1.0,
+                "the first ask-again comes at once, not after a wait"
         )
+        _is(main.SYNC_RETRY_WAITS.size(), 4, "one ask at once, then the patient ladder of three")
         main._sync_retrying = false
         main._sync_attempts = 0
         main._sync_generation += 1  # cancels the pending timer's run
+
+
+## The smallest GitHub stand-in the app's own engine can land against:
+## signin, repo, ref, tree -- no files, nothing to say. The first signin can
+## be told to die the way a dropped connection dies, and every ask is
+## counted, so a check can prove the app asked itself again.
+class BootGitHub:
+        extends RefCounted
+        var signins := 0
+        var fail_user := 0
+        func request(method: String, url: String, _headers: Dictionary, _body: PackedByteArray) -> Dictionary:
+                if url.ends_with("/user"):
+                        signins += 1
+                        if fail_user > 0:
+                                fail_user -= 1
+                                return {"status": false, "code": 0, "headers": {}, "body": PackedByteArray()}
+                        return _json(200, {"login": "boot"})
+                if method == "POST" and url.ends_with("/user/repos"):
+                        return _json(201, {"default_branch": "main"})
+                if method == "GET" and url.contains("/git/ref/heads/"):
+                        return _json(200, {"object": {"sha": "head-0"}})
+                if method == "GET" and url.contains("/git/trees/"):
+                        return _json(200, {"sha": "tree-0", "tree": []})
+                if method == "GET" and url.contains("/repos/"):
+                        return _json(200, {"default_branch": "main"})
+                return _json(404, {})
+        static func _json(code: int, data: Variant) -> Dictionary:
+                return {"status": true, "code": code, "headers": {}, "body": JSON.stringify(data).to_utf8_buffer()}
+
+
+## The offline client the app's engine wears for a check: the same request
+## shape the real one answers, served by the stand-in, no network at all.
+class OfflineHttp:
+        extends "res://scripts/net/http_client.gd"
+        var fake: BootGitHub
+        func _init(p_fake: BootGitHub) -> void:
+                fake = p_fake
+        func request(
+                method: String, url: String, headers: Dictionary = {}, body: PackedByteArray = PackedByteArray()
+        ) -> Dictionary:
+                return fake.request(method, url, headers, body)
+        func request_json(
+                method: String, url: String, headers: Dictionary = {}, payload: Variant = null
+        ) -> Dictionary:
+                var full := headers.duplicate()
+                if not full.has("Accept"):
+                        full["Accept"] = "application/vnd.github+json"
+                var body := PackedByteArray()
+                if payload != null:
+                        body = JSON.stringify(payload).to_utf8_buffer()
+                return fake.request(method, url, full, body)
+
+
+## A network-failed sync is asked again at once, on the other road: this
+## drives the app's own ladder against an offline stand-in, where the first
+## ask dies on a dropped link and the ask that follows it lands -- and
+## lands in a breath, not after the patient ladder's eight seconds.
+func _check_sync_retries_the_other_road(main: Node) -> void:
+        _remove_tree("user://sync_manifest.json")
+        # The deck and the stand-in already agree -- every file's checksum
+        # recorded, the branch where the stand-in keeps it -- so the sync that
+        # lands is the short one a settled deck earns, and the check watches
+        # the app's own asking, not the engine's carrying.
+        var sync_script: GDScript = load("res://scripts/net/github_sync.gd")
+        var deck_path: String = main.USER_DECK
+        var files: Dictionary = {}
+        var local: Dictionary = sync_script._local_files(deck_path)
+        for path in local.keys():
+                files[str(path)] = str(local[path])
+        files["_head"] = "head-0"
+        var manifest_file := FileAccess.open("user://sync_manifest.json", FileAccess.WRITE)
+        manifest_file.store_string(JSON.stringify({"decks": {deck_path: files}}) + "\n")
+        manifest_file.close()
+        var fake := BootGitHub.new()
+        fake.fail_user = 1  # the first signin's link drops
+        var costume := OfflineHttp.new(fake)
+        var real_http: Node = main._http
+        main._http = costume
+        main._sync = sync_script.new(costume, main._auth)
+        main._settings.token = "boot-token"
+        main._settings.save()
+        main._sync_attempts = 0
+        main._sync_failed = false
+        var began := Time.get_ticks_msec()
+        main._run_sync(true)
+        var guard := 0
+        while (main._syncing or fake.signins < 2) and guard < 200:
+                await create_timer(0.1).timeout
+                guard += 1
+        var took := float(Time.get_ticks_msec() - began) / 1000.0
+        _is(fake.signins, 2, "the failed sync asked itself again (signins: %d)" % fake.signins)
+        _ok(main._settings.last_sync > 0, "the ask that followed landed, and set the clock of the last sync")
+        _ok(not main._sync_failed, "a landed ask-again leaves no failure standing")
+        _ok(took < 7.0, "the ask came at once, not up the ladder (%.1fs)" % took)
+        # The world is put back the way the app found it.
+        main._http = real_http
+        main._sync = sync_script.new(real_http, main._auth)
+        main._settings.token = ""
+        main._settings.save()
+        costume.free()
+        _remove_tree("user://sync_manifest.json")
+
+
+## A card that comes due while the reader sits on the page is said by the
+## page itself: the watch reads the deck's numbers again, and when they
+## have moved the page says them again -- no leaving and coming back, no
+## hand-refreshed page. The watch is wound tight for the check's own
+## sake: a second, not twenty, because the battery has more to do than
+## wait.
+func _check_due_watch(main: Node) -> void:
+        # The session that just closed swapped the page beneath the check, so
+        # the home that stands now is asked for by name, never one an earlier
+        # check held.
+        var home: Control = main.get_node("Home")
+        var watch: Timer = main.get_node("DueWatch")
+        watch.wait_time = 1.0
+        watch.start()
+        var card = main._deck.cards[0]
+        var before: Dictionary = card.state.duplicate()  # the deck is put back as the session left it
+        card.state = {
+                "status": "learning", "ivl": 0, "ease": 2.5, "reps": 1, "lapses": 0,
+                "mod": main._now(), "due_day": 0, "step": 0, "relearning": false,
+                "due_ts": main._now() - 10,
+        }
+        var said_due := ""
+        var guard := 0
+        while guard < 40:
+                await create_timer(0.25).timeout
+                guard += 1
+                var pill: Label = home.get_node("Margin/Column/Stats/Due/Box/Value")
+                said_due = pill.text
+                if said_due == "1":
+                        break
+        _is(said_due, "1", "a card that came due is said by the page that is already open")
+        var next_up: Label = home.get_node("Margin/Column/DeckCard/Pad/Box/NextUp")
+        _ok(next_up.text.length() > 0, "the day's own news is said again with the new number")
+        card.state = before
+        main._refresh_home()  # the page is said again with the world put back
+        watch.wait_time = 20.0
+        watch.start()
+        await create_timer(0.7).timeout
+
+
+## The sync state's words belong to the corner coin alone: the page keeps
+## its day, the coin carries the whole story in its tooltip and its tone,
+## and nothing of the plumbing stands under the day's button.
+func _check_home_says_sync_by_coin_only(home: Control) -> void:
+        _ok(
+                home.get_node_or_null("Margin/Column/SyncLine") == null,
+                "the page itself says nothing of sync -- the coin is the whole story"
+        )
+        var coin: Button = home.get_node("SyncCoin")
+        _ok(coin.tooltip_text.length() > 0, "the coin carries its state in its own words")
 
 
 ## The app's own memory must survive its own handwriting: JSON writes

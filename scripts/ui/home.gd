@@ -73,7 +73,6 @@ func _layout() -> void:
         extra.custom_minimum_size = Vector2(minf(340.0, avail), 50.0)
         var browse: Button = get_node("Margin/Column/Browse")
         browse.custom_minimum_size = Vector2(minf(340.0, avail), 50.0)
-        _fit_sync_line()
 
 func setup(deck: DeckScript, counts: Dictionary, sync_line: String, sync_state := "off") -> void:
         if not is_node_ready():
@@ -84,20 +83,7 @@ func setup(deck: DeckScript, counts: Dictionary, sync_line: String, sync_state :
 
         _apply_counts(counts)
         _set_sync_state(sync_line, sync_state)
-
-        # The one line that answers "what am I about to study?": the next
-        # card's own heading, read from its front, dressed for its script.
-        var next_up: Label = get_node("Margin/Column/DeckCard/Pad/Box/NextUp")
-        var eyebrow: Label = get_node("Margin/Column/DeckCard/Pad/Box/Eyebrow")
-        var reference := _next_reference()
-        next_up.visible = not reference.is_empty()
-        eyebrow.visible = not reference.is_empty()
-        if not reference.is_empty():
-                next_up.text = reference
-                var script := ThemeScript.reference_script(reference)
-                next_up.add_theme_font_override("font", ThemeScript.font_for(script, ThemeScript.BODY))
-                next_up.add_theme_font_size_override("font_size", ThemeScript.fs(_size_for(script)))
-                next_up.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
+        _say_next_reference()
 
 ## The three numbers and the one button, said once: setup() and refresh()
 ## both end here, so the page can never disagree with itself between the
@@ -143,9 +129,9 @@ func _apply_counts(counts: Dictionary) -> void:
 ## deck and the repo last agreed, a gold coin while answers still wait to
 ## travel or the promise is unkept, a turning green one while the exchange
 ## is actually happening, a red one when it could not finish, and a quiet
-## ink one when there is no connection at all. The words ride under the
-## day's button with a dot of the same tone, where a fingertip finds them
-## as surely as a cursor finds a tooltip.
+## ink one when there is no connection at all. The words live in the coin's
+## own tooltip -- the corner tells the whole story, and the page beneath it
+## belongs to the day, not to the plumbing.
 func _set_sync_state(text: String, state: String) -> void:
         var coin: Button = get_node("SyncCoin")
         var mark: ThemeScript.SyncMark = coin.get_node("Mark/SyncMark")
@@ -169,18 +155,31 @@ func _set_sync_state(text: String, state: String) -> void:
         mark.set_working(state == "syncing")
         mark.queue_redraw()
         coin.tooltip_text = text
-        var row: HBoxContainer = get_node_or_null("Margin/Column/SyncLine/Row")
-        if row != null:
-                (row.get_node("Text") as Label).text = text
-                (row.get_node("Dot") as ThemeScript.StatusDot).color = mark_tone
-                _fit_sync_line()
 
 
-## The coin turns and the line says so, while a sync runs quietly under
-## the page: the one honest thing between "you answered" and "it is safe
-## on GitHub".
+## The coin turns while a sync runs quietly under the page: the one honest
+## thing between "you answered" and "it is safe on GitHub".
 func set_syncing() -> void:
         _set_sync_state(I18nScript.t("Syncing…"), "syncing")
+
+
+## The one line that answers "what am I about to study?": the next card's
+## own heading, read from its front, dressed for its script. Said at setup
+## and said again whenever the numbers move, because the card the numbers
+## name moves with them -- a card that comes due while the page is already
+## open changes the day's own news.
+func _say_next_reference() -> void:
+        var next_up: Label = get_node("Margin/Column/DeckCard/Pad/Box/NextUp")
+        var eyebrow: Label = get_node("Margin/Column/DeckCard/Pad/Box/Eyebrow")
+        var reference := _next_reference()
+        next_up.visible = not reference.is_empty()
+        eyebrow.visible = not reference.is_empty()
+        if not reference.is_empty():
+                next_up.text = reference
+                var script := ThemeScript.reference_script(reference)
+                next_up.add_theme_font_override("font", ThemeScript.font_for(script, ThemeScript.BODY))
+                next_up.add_theme_font_size_override("font_size", ThemeScript.fs(_size_for(script)))
+                next_up.add_theme_color_override("font_color", ThemeScript.GREEN_DEEP)
 
 
 ## The next card's heading: the first line of its front, plain text. The
@@ -251,7 +250,6 @@ func _build() -> void:
         column.add_child(_study_button())
         column.add_child(_extra_new_button())
         column.add_child(_browse_button())
-        column.add_child(_sync_line())
 
         # The corner coins go on last, not first: children added later sit
         # above earlier ones in both drawing and hit-testing, and a full-rect
@@ -458,55 +456,6 @@ func _pill_fg(key: String) -> Color:
                 _:
                         return ThemeScript.INK_SOFT
 
-## The sync coin's state in words, under the day's button: a tooltip says
-## it to a mouse, but a fingertip has no hover to carry one, so the line
-## stands on the page itself -- a dot of the state's own tone, the words
-## beside it, quiet, small, and there for whichever kind of hand asks.
-## The dot and the words are one centered figure: the row they share
-## shrinks to what it holds and the page centers the pair, so the dot
-## stands beside its own sentence instead of stranded at the margin.
-func _sync_line() -> Control:
-        var wrap := VBoxContainer.new()
-        wrap.name = "SyncLine"
-        var row := HBoxContainer.new()
-        row.name = "Row"
-        row.alignment = BoxContainer.ALIGNMENT_CENTER
-        row.add_theme_constant_override("separation", 8)
-        row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-        var dot := ThemeScript.StatusDot.new(ThemeScript.INK_SOFT)
-        dot.name = "Dot"
-        dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-        row.add_child(dot)
-        var line := Label.new()
-        line.name = "Text"
-        line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        ThemeScript.dress(line, ThemeScript.CAPTION, ThemeScript.INK_SOFT)
-        line.text = ""
-        row.add_child(line)
-        wrap.add_child(row)
-        return wrap
-
-
-## The sentence takes the width its words need, and no more than the page
-## can hold: a long line wraps at the measure of the window rather than
-## pushing its dot off the edge, and a short one keeps the pair centred.
-func _fit_sync_line() -> void:
-        var label: Label = get_node_or_null("Margin/Column/SyncLine/Row/Text")
-        if label == null:
-                return
-        var font := ThemeScript.vazir(ThemeScript.CAPTION)
-        var widest := 0.0
-        for text_line in label.text.split("\n"):
-                widest = maxf(
-                        widest,
-                        font.get_string_size(
-                                text_line, HORIZONTAL_ALIGNMENT_LEFT, -1, ThemeScript.fs(ThemeScript.CAPTION)
-                        ).x
-                )
-        var avail := maxf(size.x - 120.0, 140.0)
-        label.custom_minimum_size = Vector2(minf(widest, avail), 0.0)
-
 func _study_button() -> Control:
         var button := ThemeScript.primary_button(I18nScript.t("Study"), 60)
         button.name = "Study"
@@ -545,8 +494,19 @@ func _extra_new_button() -> Control:
         button.pressed.connect(func() -> void: extra_new_pressed.emit())
         return button
 
+## The three numbers and the day's news, said again without the page being
+## rebuilt: a card that came due while the reader sat on the page, a
+## session that ended, a sync that merged another device's study -- the
+## numbers moved, and the card they name moves with them.
 func refresh(counts: Dictionary) -> void:
         _apply_counts(counts)
+        _say_next_reference()
+
+
+## The counts the page is saying right now -- the due watch's own
+## comparison, so the page is only re-said when its numbers truly moved.
+func current_counts() -> Dictionary:
+        return _counts.duplicate()
 
 ## A browser session can outlive the version it is running. When the engine
 ## reports a newer one waiting outside, Home offers it twice over: a gold

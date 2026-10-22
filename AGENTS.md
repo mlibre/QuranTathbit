@@ -35,10 +35,15 @@ Windows, web) in Godot 4.7 with GDScript only.
   does not exist.
 - **Local first.** The deck is fully usable offline, forever. Sync never
   blocks study and never loses work: a failed transfer is reported and
-  retried, and progress merges card by card so two offline devices both keep
-  their reviews. A file both sides changed is the reader's to settle, never
-  the engine's: the app asks which copy should win and hard-forces the other
-  by that word, and a question stood down from replaces nothing.
+  retried — the first ask-back at once and by the other road (downloads
+  off raw.githubusercontent.com, a different door to the same bytes), then
+  patiently up a ladder of waits, whatever hand started the run — and
+  progress merges card by card so two offline devices both keep their
+  reviews. A signin that never answered is the network's failure, never
+  the token's; only a 401 says the token is wrong. A file both sides
+  changed is the reader's to settle, never the engine's: the app asks
+  which copy should win and hard-forces the other by that word, and a
+  question stood down from replaces nothing.
 - **Gentle, never nagging.** No streaks, no timers-as-pressure, no FOMO. The
   app invites; it does not push. Leaving whenever is supported, and cards
   you miss simply wait.
@@ -67,9 +72,15 @@ Windows, web) in Godot 4.7 with GDScript only.
   offers the code to type. Text explains only what a picture cannot.
 - **Numbers die with the world, not on it**: what matters continuously — how
   many are due, how many learned — is stated once, plainly, on the home
-  card. The deck's whole holding is the one number no pill below says, so
-  it stands alone on the card; the day's own story (due, new, learned)
-  lives only in the pills, never said a second time above them.
+  card. The day's own story (due, new, learned) lives only in the pills
+  below, never said a second time above them, and the card between owns
+  the day's news — the next reference — not a figure. The
+  numbers keep themselves current while the page stands open: a quiet
+  watch re-reads the deck, and a card that comes due is said by the page
+  itself, never waiting for a hand to refresh it. The deck's other life on
+  GitHub says itself in the corner coin alone — its tone, and its words in
+  the coin's own tooltip — never in a line standing under the day's
+  button.
 - **Every size goes through fs()**: the font scale multiplies only the
   words, so every size a control displays — and every size a measurement
   takes beside it (a pill measured from its widest line, a mirror kept on
