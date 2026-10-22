@@ -10,9 +10,9 @@ const I18nScript := preload("res://scripts/ui/i18n.gd")
 ## button that matters. The page's whole second subject -- the deck's other
 ## life on GitHub, and the app's own settings -- lives with the library's
 ## door in a dock at the page's foot: three named places a thumb knows how
-## to find, the sync one saying its state in its tone, its dot and its own
-## tooltip. The page itself is dressed in a still lattice of stars, the way
-## a book's margins are.
+## to find, the sync one saying its state in its tone and its own tooltip.
+## The page itself is dressed in a still lattice of stars, the way a book's
+## margins are.
 
 signal study_pressed
 signal sync_pressed
@@ -152,42 +152,35 @@ func _apply_counts(counts: Dictionary) -> void:
 ## deck and the repo last agreed, gold while answers still wait to travel
 ## or the promise is unkept, a turning green mark while the exchange is
 ## actually happening, red when it could not finish, and a quiet ink one
-## when there is no connection at all. The state is worn three ways at
-## once -- the wash the item's own tone gives the door, the dot standing
-## at the mark's shoulder, and the tint mark and word share -- and the
-## words live in the item's own tooltip: the dock tells the whole story,
-## and the page above it belongs to the day, not to the plumbing.
+## when there is no connection at all. The state is worn twice at once --
+## the wash the item's own tone gives the door, and the tint the mark and
+## its word share -- and the words live in the item's own tooltip: the
+## dock tells the whole story, and the page above it belongs to the day,
+## not to the plumbing. The mark alone is the door's one figure; nothing
+## else stands beside it.
 func _set_sync_state(text: String, state: String) -> void:
         var item: Button = get_node("Dock/Pad/Row/Sync")
         var mark: ThemeScript.SyncMark = item.get_node("Stack/Icon/Mark/SyncMark")
-        var dot: ThemeScript.SyncDot = item.get_node("Stack/Icon/Dot")
         var label: Label = item.get_node("Stack/Text")
         var tone := ThemeScript.INK
         var mark_tone := ThemeScript.INK_SOFT
-        var dot_tone := ThemeScript.INK_SOFT
         match state:
                 "synced":
                         tone = ThemeScript.GREEN
                         mark_tone = ThemeScript.GREEN_DEEP
-                        dot_tone = ThemeScript.GREEN
                 "pending":
                         tone = ThemeScript.GOLD
                         mark_tone = ThemeScript.GOLD_DEEP
-                        dot_tone = ThemeScript.GOLD
                 "syncing":
                         tone = ThemeScript.GREEN
                         mark_tone = ThemeScript.GREEN_DEEP
-                        dot_tone = ThemeScript.GREEN
                 "error":
                         tone = ThemeScript.DANGER
                         mark_tone = ThemeScript.DANGER
-                        dot_tone = ThemeScript.DANGER
         ThemeScript.apply_mark_styles(item, ThemeScript.dock_button_styles(tone))
         mark.color = mark_tone
         mark.set_working(state == "syncing")
         mark.queue_redraw()
-        dot.color = dot_tone
-        dot.queue_redraw()
         label.add_theme_color_override("font_color", mark_tone)
         item.tooltip_text = text
 
@@ -563,9 +556,7 @@ func _dock_item(item_name: String, mark: Control, label_text: String, tooltip: S
         return item
 
 ## The mark's own ground: a quiet square the mark stands centred in, the
-## same height for all three doors so their marks share one line. The sync
-## door alone carries the shoulder dot, at the mark's upper corner and
-## outside the turning mark, so the state stays still while the mark turns.
+## same height for all three doors so their marks share one line.
 func _dock_icon(item_name: String, mark: Control) -> Control:
         var icon := Control.new()
         icon.name = "Icon"
@@ -579,10 +570,6 @@ func _dock_icon(item_name: String, mark: Control) -> Control:
         mark.name = item_name + "Mark"
         center.add_child(mark)
         icon.add_child(center)
-        if item_name == "Sync":
-                var dot := ThemeScript.SyncDot.new(ThemeScript.INK_SOFT)
-                dot.name = "Dot"
-                icon.add_child(dot)
         return icon
 
 ## The day is done and the deck is not: one more new card, offered where

@@ -1936,9 +1936,11 @@ func _check_due_watch(main: Node) -> void:
 
 
 ## The page's own flow says nothing of sync: the dock's sync door is the
-## whole story -- its tone, its shoulder dot, and its words in its own
-## tooltip -- and the corner coins that once stood for sync and settings
-## are gone entirely, their doors named in words at the page's foot.
+## whole story -- its tone, its turning mark, and its words in its own
+## tooltip -- the corner coins that once stood for sync and settings are
+## gone entirely, their doors named in words at the page's foot, and the
+## sync door carries no second badge beside its mark: the mark is the
+## door's one figure, as the reader asked.
 func _check_home_says_sync_by_the_dock_alone(home: Control) -> void:
         _ok(
                 home.get_node_or_null("Margin/Column/SyncLine") == null,
@@ -1955,8 +1957,8 @@ func _check_home_says_sync_by_the_dock_alone(home: Control) -> void:
         var sync: Button = home.get_node("Dock/Pad/Row/Sync")
         _ok(sync.tooltip_text.length() > 0, "the dock's sync door carries its state in its own words")
         _ok(
-                sync.get_node_or_null("Stack/Icon/Dot") != null,
-                "the dock's sync door wears its status dot at its mark's shoulder"
+                sync.get_node_or_null("Stack/Icon/Dot") == null,
+                "the sync door says its state by tone alone -- no second badge beside the mark"
         )
         for item_name in ["Browse", "Sync", "Settings"]:
                 var label: Label = home.get_node("Dock/Pad/Row/%s/Stack/Text" % item_name)

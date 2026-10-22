@@ -1170,24 +1170,6 @@ class SyncMark extends Control:
                 tween.tween_property(self, "rotation", upright, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 
-## The state the sync mark carries at its shoulder: a small dot in the
-## state's own colour, ringed in the surface it stands on, so the state is
-## told at a glance from anywhere on the page. It is drawn beside the
-## mark, never inside it -- the mark turns while a sync runs, and a dot
-## that turned with it would say motion, not state.
-class SyncDot extends Control:
-        var color := GREEN
-
-        func _init(p_color: Color = GREEN) -> void:
-                color = p_color
-                custom_minimum_size = Vector2(10, 10)
-                mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-        func _draw() -> void:
-                draw_circle(Vector2(5.0, 5.0), 3.4, color)
-                draw_arc(Vector2(5.0, 5.0), 4.4, 0.0, TAU, 20, CARD, 2.0, true)
-
-
 ## A title-page ornament: a small eight-pointed star riding a short rule,
 ## the way a reverent book dresses the space under its name. One mark, gold,
 ## quiet -- the paper pattern's lattice in miniature.
