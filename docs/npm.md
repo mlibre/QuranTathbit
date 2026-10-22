@@ -17,9 +17,9 @@ a phone's home screen like any app — full-screen, offline, its own icon.
 
 ## What's inside
 
-99 cards from Al-Fātiḥah and Al-Baqarah — each one a verse, its Persian
-translation and a recitation, all from
-[quran.makarem.ir](https://quran.makarem.ir) — on an SM-2
+151 cards from Al-Fātiḥah and Al-Baqarah (through 2:145) — each one a
+verse, its Persian translation and (for the original 99) a recitation, all
+from [quran.makarem.ir](https://quran.makarem.ir) — on an SM-2
 spaced-repetition schedule, with optional sync through your own private
 GitHub repository.
 

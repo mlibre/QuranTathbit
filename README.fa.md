@@ -5,7 +5,7 @@
 <img src="docs/media/qurantathbit_banner.svg" alt="تثبیت القرآن — اپلیکیشنی آرام برای حفظ قرآن" width="800"/>
 
 [![بازی در مرورگر](https://img.shields.io/badge/%E2%96%B6%EF%B8%8F%20Play%20in%20your%20browser-GitHub%20Pages-1E6B52?style=for-the-badge&labelColor=14513D)](https://mlibre.github.io/QuranTathbit/)
-[![دانلود APK اندروید](https://img.shields.io/badge/Download-Android%20APK-C29A3B?style=for-the-badge&labelColor=14513D)](https://github.com/mlibre/QuranTathbit/releases/latest/download/QuranTathbit-Android.apk)
+[![دانلود APK اندروید](https://img.shields.io/badge/Download-Android%20APK-C29A3B?style=for-the-badge&labelColor=14513D)](https://github.com/mlibre/QuranTathbit/releases/latest/download/QuranTathbit-Android-fa.apk)
 ![ساخته‌شده با گودو](https://img.shields.io/badge/made%20with-Godot%204.7-478cbf?style=for-the-badge&labelColor=14513D)
 
 [English](README.md) · **فارسی** · [العربية](README.ar.md)
@@ -38,16 +38,10 @@
 اپ به‌صورت یک APK ساده عرضه می‌شود — بدون فروشگاه، بدون حساب، بدون
 مرحله‌به‌مرحله کردن نصب:
 
-### **[⬇️ دانلود QuranTathbit-Android.apk](https://github.com/mlibre/QuranTathbit/releases/latest/download/QuranTathbit-Android.apk)**
+### **[⬇️ دانلود QuranTathbit-Android-fa.apk](https://github.com/mlibre/QuranTathbit/releases/latest/download/QuranTathbit-Android-fa.apk)**
 
 (اندروید ۵ به بالا؛ همین یک فایل، هم گوشی‌های ۳۲ بیتی و هم ۶۴ بیتی را
 پوشش می‌دهد.)
-
-همین برنامه به‌صورت از پیش فارسی هم عرضه می‌شود — بدون پرسیدن زبان در
-اولین اجرا و بدون بخش زبان در تنظیمات — برای جاهایی که برنامه تنها به
-فارسی خوانده می‌شود:
-
-### **[⬇️ دانلود QuranTathbit-Android-fa.apk](https://github.com/mlibre/QuranTathbit/releases/latest/download/QuranTathbit-Android-fa.apk)**
 
 ۱. لینک را روی گوشی باز کنید — فایل دانلود می‌شود.
 ۲. رویش بزنید (یا از Downloads بازش کنید). اندروید یک‌بار می‌پرسد که

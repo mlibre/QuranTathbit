@@ -94,13 +94,3 @@ func request_json(
                 body = JSON.stringify(payload).to_utf8_buffer()
         var response: Dictionary = await request(method, url, full, body)
         return response
-
-
-## A request for raw file bytes (deck content), not JSON.
-func request_raw(
-        method: String,
-        url: String,
-        headers: Dictionary = {},
-        body: PackedByteArray = PackedByteArray()
-) -> Dictionary:
-        return await request(method, url, headers, body)

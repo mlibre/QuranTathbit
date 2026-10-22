@@ -205,10 +205,6 @@ func take_focus() -> void:
 func holds_focus() -> bool:
         return _editor.has_focus()
 
-func set_caret_at_start() -> void:
-        _editor.set_caret_line(0, false)
-        _editor.set_caret_column(0, false)
-
 func set_caret_at_end() -> void:
         var last := _editor.get_line_count() - 1
         _editor.set_caret_line(maxi(last, 0), false)

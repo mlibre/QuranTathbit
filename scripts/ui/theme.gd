@@ -277,9 +277,8 @@ class CheckMark extends Control:
                 draw_circle(points[2], 2.75, GOLD)
 
 
-## A status dot for the sync caption: the coin's state, said small, beside
-## the words that explain it -- so the line reads at a glance even far from
-## the corner it belongs to.
+## A status dot for the library's rows: the card's standing, said small,
+## beside the word that explains it -- so the row reads at a glance.
 class StatusDot extends Control:
         var color := INK_SOFT
         var hollow := false
@@ -949,36 +948,6 @@ class VolumeRig extends RefCounted:
                 return null
 
 
-## A round grabber for a slider, drawn rather than typed: no icon font in
-## this app, and the engine's default grabber is a grey plastic bead from
-## another app. A white disc in a coloured ring, lifted off the page by a
-## breath of shadow -- a white disc on a white page, ring or no ring, reads
-## as a hole rather than a handle. Drawn at 4x and scaled down, so every
-## edge lands soft instead of stair-stepped.
-static func knob_icon(diameter: int, ring_color: Color) -> ImageTexture:
-        var scale := 4
-        var side := diameter * scale
-        var image := Image.create(side, side, false, Image.FORMAT_RGBA8)
-        var c := Vector2(side, side) / 2.0
-        var r_shade := float(side) / 2.0 - 0.5 * float(scale)
-        var r_ring := r_shade - 2.4 * float(scale)
-        var r_disc := r_ring - 2.2 * float(scale)
-        for y in side:
-                for x in side:
-                        var d := Vector2(x + 0.5, y + 0.5).distance_to(c)
-                        if d > r_shade:
-                                continue
-                        var col := Color(1, 1, 1, 1)
-                        if d > r_ring:
-                                # The breath of shadow under the knob: deepest
-                                # at the ring's foot, gone at its outer edge.
-                                col = Color(0, 0, 0, 0.16 * (r_shade - d) / (r_shade - r_ring))
-                        elif d > r_disc:
-                                col = ring_color
-                        image.set_pixel(x, y, col)
-        return ImageTexture.create_from_image(image)
-
-
 ## The switch a promise is made with: a rounded rule and the knob that
 ## crosses it, drawn -- on in the app's green, off in the page's own grey.
 ## The engine's checkbox is a grey plastic bead beside a dot; a promise this
@@ -1048,23 +1017,6 @@ class BackMark extends Control:
                 var bend := 4.0 if not flip else 10.0
                 draw_polyline(
                         PackedVector2Array([Vector2(tip, 3), Vector2(bend, 11), Vector2(tip, 19)]),
-                        color,
-                        2.4,
-                        true
-                )
-
-
-## The way onward, for the one button that begins a session.
-class AheadMark extends Control:
-        var color := Color.WHITE
-
-        func _init(p_color: Color = Color.WHITE) -> void:
-                color = p_color
-                custom_minimum_size = Vector2(14, 22)
-
-        func _draw() -> void:
-                draw_polyline(
-                        PackedVector2Array([Vector2(3, 3), Vector2(10, 11), Vector2(3, 19)]),
                         color,
                         2.4,
                         true
@@ -1442,11 +1394,11 @@ static func dress_ghost(button: Button, tone: Color, height := 46, radius := 23)
         pressable(button)
 
 
-## The styleboxes of a quiet square icon button (back marks, corner coins):
-## nothing at rest, a wash while visited, a soft ring while focused. With
-## `wash`, the coin is visible at rest too -- a tinted roundel in the
-## button's own tone, deepening when visited -- for the corner buttons a
-## first-time reader has to find.
+## The styleboxes of a quiet square icon button (back marks, the coins that
+## hang over a page: the pencil, the alif, the volume): nothing at rest, a
+## wash while visited, a soft ring while focused. With `wash`, the coin is
+## visible at rest too -- a tinted roundel in the button's own tone,
+## deepening when visited -- for the coins a first-time reader has to find.
 static func mark_button_styles(tone: Color = INK, wash := false) -> Dictionary:
         var rest := StyleBoxFlat.new()
         rest.bg_color = Color(tone.r, tone.g, tone.b, 0.08) if wash else Color(0, 0, 0, 0)
@@ -1572,31 +1524,6 @@ static func place_popover(popup: Control, coin: Control, gap := 8.0) -> void:
                 popup.call("set_caret", coin_rect.get_center().x - base.x - x)
 
 
-## A round grabber for a slider, drawn rather than typed: no icon font in
-## this app, and the engine's default grabber is a grey plastic bead from
-## another app. The circle is drawn at 4x and scaled down, so its edge
-## lands soft instead of stair-stepped.
-static func circle_icon(diameter: int, color: Color, ring := false) -> ImageTexture:
-        var scale := 4
-        var side := diameter * scale
-        var image := Image.create(side, side, false, Image.FORMAT_RGBA8)
-        var c := Vector2(side, side) / 2.0
-        var r_fill := float(side) / 2.0 - float(scale)
-        var r_ring := r_fill - 2.0 * float(scale)
-        for y in side:
-                for x in side:
-                        var d := Vector2(x + 0.5, y + 0.5).distance_to(c)
-                        var alpha := 0.0
-                        if d <= r_fill:
-                                alpha = 1.0
-                                if ring and d < r_ring:
-                                        alpha = 0.0
-                        if alpha > 0.0:
-                                image.set_pixel(x, y, Color(color.r, color.g, color.b, alpha))
-        var texture := ImageTexture.create_from_image(image)
-        return texture
-
-
 ## A small key cap, the way a key looks on the keyboard it names.
 static func key_chip(label_text: String) -> PanelContainer:
         var chip := PanelContainer.new()
@@ -1705,14 +1632,6 @@ static func vazir(size: int, bold := false) -> Font:
 
 static func amiri(size: int, bold := false) -> Font:
         return load(AMIRI_BOLD if bold else AMIRI) as Font
-
-
-static func quran() -> Font:
-        return load(AMIRI_QURAN) as Font
-
-
-static func noto_naskh(bold := false) -> Font:
-        return load(NOTO_NASKH_BOLD if bold else NOTO_NASKH) as Font
 
 
 ## The editor's own hand: the field is one font for both of its layers (the

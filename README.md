@@ -41,12 +41,6 @@ The app ships as a plain APK — no store, no account, no install wizard:
 
 (Android 5.0 or newer; the one file carries both 32- and 64-bit phones.)
 
-There is also a Persian build of the same APK, pre-configured in Persian —
-no language question on first run, no language in Settings — for places
-where the app is only ever read in Persian:
-
-### **[⬇️ Download QuranTathbit-Android-fa.apk](https://github.com/mlibre/QuranTathbit/releases/latest/download/QuranTathbit-Android-fa.apk)**
-
 1. Open the link on your phone — the file downloads.
 2. Tap it (or open it from Downloads). Android asks to *allow installs
    from this source* once — allow it.
