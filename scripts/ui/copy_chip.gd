@@ -8,15 +8,27 @@ const I18nScript := preload("res://scripts/ui/i18n.gd")
 ## the system's real text fields, never over the ink the app draws itself;
 ## no keyboard hangs over a drawn verse; and the engine's own label menu
 ## asks for a right-click a finger never makes. So the app offers the copy
-## itself -- one small gold pill standing over the very label that holds
-## the choice, on every platform (a phone browser has no Ctrl+C either).
-## It is furniture that exists only while a choice does: nothing shows at
-## rest, and it leaves the moment the selection does.
+## itself: a small dark toolbar standing over the very label that holds
+## the choice -- the shape every system selection menu taught the hand --
+## with a copy glyph and a hairline beside its word, and a little caret
+## reaching from the bar to the words it serves, on every platform (a
+## phone browser has no Ctrl+C either). It is furniture that exists only
+## while a choice does: nothing shows at rest, and it leaves the moment
+## the selection does.
 
-## The pill's own breathing room, and how long it says "Copied" before the
-## gold wash goes quiet and the choice is let go.
+## The bar's own breathing room, and how long it says "Copied" before the
+## green wash goes quiet and the choice is let go.
 const MARGIN := 8.0
 const CLEAR_AFTER := 0.9
+
+## The row the bar draws around the engine's word: a copy glyph, a
+## hairline, and the air between them, all said once here and handed to
+## the slab the wardrobe cuts -- the room the margins reserve and the row
+## the pen draws can then never drift apart.
+const GLYPH := 16.0
+const GAP := 7.0
+const HAIRLINE := 1.0
+const SIDE_PAD := 14.0
 
 ## What was carried away, told to whoever is listening (the tests are).
 signal copied(text: String)
@@ -32,9 +44,20 @@ static func watch(label: RichTextLabel) -> void:
                 return
         _watched.append(label)
 
-var _label: RichTextLabel = null  # whose choice the pill is standing over
-var _clearing := false  # a copy has landed; the pill is saying so
+var _label: RichTextLabel = null  # whose choice the bar is standing over
+var _clearing := false  # a copy has landed; the bar is saying so
 var _clear_gen := 0  # each copy's quiet beat answers only its own timer
+var _over := true  # the bar stands over the label's head; false, it slipped beneath
+var _words_w := 0.0  # the word's own width, measured anew each time it changes
+var _glyph_back := StyleBoxFlat.new()  # the copy glyph's far sheet
+var _glyph_front := StyleBoxFlat.new()  # the copy glyph's near sheet
+
+
+## The one width the wardrobe must reserve for the row: glyph, hairline,
+## and the air on both of its sides.
+func span() -> float:
+        return GLYPH + GAP * 2.0 + HAIRLINE
+
 
 func _ready() -> void:
         name = "CopyChip"
@@ -43,16 +66,22 @@ func _ready() -> void:
         # through the beat that follows the copy.
         focus_mode = Control.FOCUS_NONE
         mouse_filter = Control.MOUSE_FILTER_STOP
-        ThemeScript.dress_ghost(self, ThemeScript.GOLD_DEEP, 36, 18)
-        text = I18nScript.t("Copy")
+        ThemeScript.dress_toolbar_chip(self, 36.0, span(), SIDE_PAD)
+        # The glyph is two outlined sheets, the far one behind the near
+        # one -- a page being taken from a page, said in sixteen pixels.
+        for slab: StyleBoxFlat in [_glyph_back, _glyph_front]:
+                slab.draw_center = false
+                slab.set_corner_radius_all(2.5)
+                slab.set_border_width_all(1.4)
         tooltip_text = I18nScript.t("Copy the chosen words")
         visible = false
         pressed.connect(_copy)
+        _say(I18nScript.t("Copy"), false)
 
-## The whole life of the pill, asked every frame: find the one label
+## The whole life of the bar, asked every frame: find the one label
 ## holding a choice, stand over it, and leave when the choice is gone.
 ## RichTextLabel tells no one when its selection changes -- there is no
-## signal to hear -- so the pill looks for itself, the same quiet polling
+## signal to hear -- so the bar looks for itself, the same quiet polling
 ## the page's clipboard half already does.
 func _process(_delta: float) -> void:
         var found: RichTextLabel = null
@@ -82,14 +111,14 @@ func _process(_delta: float) -> void:
                         _hide()
                 return
         if _clearing:
-                # The beat plays on, but the pill is already following the
+                # The beat plays on, but the bar is already following the
                 # newer choice: its next copy answers what it stands over.
                 _label = found
                 _place(found)
                 return
         if _label != found:
                 _label = found
-                text = I18nScript.t("Copy")
+                _say(I18nScript.t("Copy"), false)
         if not visible:
                 visible = true
                 ThemeScript.settle_in(self, 0.0, 0.15)
@@ -100,8 +129,8 @@ func _process(_delta: float) -> void:
 ## scrolled mid-read. Never past the page's own edges.
 func _place(label: RichTextLabel) -> void:
         var rect := label.get_global_rect()
-        # The pill hangs from the window, not from any container, so it
-        # sizes itself: the measured minimum of the words it carries, taken
+        # The bar hangs from the window, not from any container, so it
+        # sizes itself: the measured minimum of the row it carries, taken
         # anew each time (the words change with the tongue and with the
         # beat that follows a copy).
         var own := get_combined_minimum_size()
@@ -110,14 +139,19 @@ func _place(label: RichTextLabel) -> void:
         var page := get_viewport_rect().size
         var x := rect.get_center().x - own.x * 0.5
         var y := rect.position.y - own.y - MARGIN
+        var over := true
         if y < MARGIN:
                 y = rect.end.y + MARGIN
+                over = false
         x = clampf(x, MARGIN, maxf(MARGIN, page.x - own.x - MARGIN))
         y = clampf(y, MARGIN, maxf(MARGIN, page.y - own.y - MARGIN))
         position = Vector2(x, y)
+        if _over != over:
+                _over = over
+                queue_redraw()
 
-## The words leave for the clipboard, the pill says so, and a quiet beat
-## later the gold wash goes and the choice is let go.
+## The words leave for the clipboard, the bar says so, and a quiet beat
+## later the green wash goes and the choice is let go.
 func _copy() -> void:
         if _label == null or not is_instance_valid(_label):
                 return
@@ -126,10 +160,10 @@ func _copy() -> void:
                 return
         _write(chosen)
         copied.emit(chosen)
-        text = I18nScript.t("Copied")
         _clearing = true
         _clear_gen += 1
         var gen := _clear_gen
+        _say(I18nScript.t("Copied"), true)
         get_tree().create_timer(CLEAR_AFTER).timeout.connect(func() -> void:
                 _finish_clear(gen)
         )
@@ -140,12 +174,83 @@ func _finish_clear(gen: int) -> void:
         _clearing = false
         if _label != null and is_instance_valid(_label):
                 _label.deselect()
-        if not visible:
-                text = I18nScript.t("Copy")
+        _say(I18nScript.t("Copy"), false)
+
+## The bar's word and its dress move together: offering the copy wears the
+## ink slab, saying it landed wears the deep green one, and the room the
+## slab reserves is re-cut for the direction the page is reading -- a
+## living session can change its tongue, and the margins follow it.
+func _say(words: String, said: bool) -> void:
+        text = words
+        var rtl := is_layout_rtl()
+        var room := span()
+        var tone := ThemeScript.TOOLBAR_COPIED if said else ThemeScript.TOOLBAR
+        var lifted := ThemeScript.TOOLBAR_COPIED if said else ThemeScript.TOOLBAR.lightened(0.07)
+        for state: String in ["normal", "hover", "pressed"]:
+                var slab_tone := tone if state == "normal" else lifted
+                add_theme_stylebox_override(state, ThemeScript.toolbar_chip_slab(slab_tone, rtl, room, SIDE_PAD))
+        # A fresh clone that has not met the editor yet has no imported
+        # fonts to measure with; the row then waits at its glyph alone
+        # until the fonts arrive, the way every other dressed control
+        # already waits on this machine.
+        var face := ThemeScript.vazir(ThemeScript.BODY)
+        if face != null:
+                _words_w = maxf(face.get_string_size(
+                        words, HORIZONTAL_ALIGNMENT_LEFT, -1, ThemeScript.fs(ThemeScript.BODY)).x, 1.0)
+        queue_redraw()
 
 func _hide() -> void:
         visible = false
         _label = null
+
+## The bar's own face, drawn over the engine's word: the glyph and its
+## hairline on the reading's own side, and the caret that reaches from the
+## bar toward the choice -- under the bar while it stands over the label's
+## head, above it on the frames it slipped beneath.
+func _draw() -> void:
+        var words := ThemeScript.TOOLBAR_COPIED_TEXT if _clearing else ThemeScript.TOOLBAR_TEXT
+        var tone := ThemeScript.TOOLBAR_COPIED if _clearing else ThemeScript.TOOLBAR
+        var rtl := is_layout_rtl()
+        var block := span() + _words_w
+        var left := (size.x - block) * 0.5
+        var glyph_x := left + block - GLYPH if rtl else left
+        var hair_x := glyph_x - GAP - HAIRLINE if rtl else glyph_x + GLYPH + GAP
+        draw_rect(Rect2(hair_x, (size.y - 18.0) * 0.5, HAIRLINE, 18.0), Color(words.r, words.g, words.b, 0.28))
+        var glyph_at := Vector2(glyph_x, (size.y - GLYPH) * 0.5)
+        if _clearing:
+                _draw_check(glyph_at, words)
+        else:
+                _draw_copy(glyph_at, words)
+        var middle := size.x * 0.5
+        if _over:
+                draw_colored_polygon(PackedVector2Array([
+                        Vector2(middle - 5.0, size.y - 0.5),
+                        Vector2(middle + 5.0, size.y - 0.5),
+                        Vector2(middle, size.y + 4.5),
+                ]), tone)
+        else:
+                draw_colored_polygon(PackedVector2Array([
+                        Vector2(middle - 5.0, 0.5),
+                        Vector2(middle + 5.0, 0.5),
+                        Vector2(middle, -4.5),
+                ]), tone)
+
+## The copy glyph: two outlined sheets, the near one over the far one's
+## corner -- a page being taken from a page.
+func _draw_copy(at: Vector2, color: Color) -> void:
+        _glyph_back.border_color = color
+        _glyph_front.border_color = color
+        _glyph_back.draw(get_canvas_item(), Rect2(at + Vector2(0.5, 0.5), Vector2(9.5, 9.5)))
+        _glyph_front.draw(get_canvas_item(), Rect2(at + Vector2(5.5, 5.5), Vector2(9.5, 9.5)))
+
+## The beat's check, the same stroke the medal wears at a session's end,
+## said small enough to live inside the glyph's own box.
+func _draw_check(at: Vector2, color: Color) -> void:
+        draw_polyline(PackedVector2Array([
+                at + Vector2(3.0, 8.5),
+                at + Vector2(6.5, 12.0),
+                at + Vector2(13.0, 4.5),
+        ]), color, 1.8, true)
 
 ## Where the words go: on the web, the page's own writer carries them --
 ## the same path the fields' Ctrl+C rides, with the hidden-field fallback

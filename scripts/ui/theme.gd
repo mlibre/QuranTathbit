@@ -30,6 +30,13 @@ const GOLD := Color("#C29A3B")
 const GOLD_DEEP := Color("#8D6E24")
 const GOLD_SOFT := Color("#F6EDD8")
 const DANGER := Color("#B4553F")
+# The copy chip's toolbar: a small slab of ink standing over a chosen
+# verse, the one dark thing on the page -- the reader's own system menus
+# taught the hand this shape, so the offer to carry words away wears it.
+const TOOLBAR := Color("#2A2E2B")
+const TOOLBAR_TEXT := Color("#F1EFE9")
+const TOOLBAR_COPIED := Color("#1E3A2E")
+const TOOLBAR_COPIED_TEXT := Color("#9BD8B8")
 
 const AMIRI := "res://assets/fonts/Amiri-Regular.ttf"
 const AMIRI_BOLD := "res://assets/fonts/Amiri-Bold.ttf"
@@ -1391,6 +1398,45 @@ static func dress_ghost(button: Button, tone: Color, height := 46, radius := 23)
         button.add_theme_stylebox_override("pressed", held)
         var ring := outline_stylebox(Color(tone.r, tone.g, tone.b, 0.55), 2, radius)
         button.add_theme_stylebox_override("focus", ring)
+        pressable(button)
+
+
+## A slab of the copy chip's toolbar: a rounded block of ink with a soft
+## shadow that lifts it off the page, and room reserved on the reading's
+## own side for the glyph the chip draws itself. The reservation lives in
+## the margins, so the word the engine centres lands exactly in the space
+## left for it, and glyph, hairline and word read as one row in either
+## direction.
+static func toolbar_chip_slab(tone: Color, rtl: bool, span := 31.0, pad := 14.0) -> StyleBoxFlat:
+        var slab := StyleBoxFlat.new()
+        slab.bg_color = tone
+        slab.set_corner_radius_all(12)
+        slab.shadow_color = Color(0, 0, 0, 0.30)
+        slab.shadow_size = 10
+        slab.shadow_offset = Vector2(0, 5)
+        if rtl:
+                slab.content_margin_left = pad
+                slab.content_margin_right = pad + span
+        else:
+                slab.content_margin_left = pad + span
+                slab.content_margin_right = pad
+        return slab
+
+
+## The copy chip's dress: a small dark toolbar over the chosen words --
+## the shape every system selection menu taught the hand -- carrying the
+## engine's word centred in the room the slab reserves. The chip itself
+## swaps the slabs as it speaks, offering the copy in ink and saying it
+## landed in the deep green; here only the type, the tone of the word and
+## the press's answer are set.
+static func dress_toolbar_chip(button: Button, height := 36.0, span := 31.0, pad := 14.0) -> void:
+        button.custom_minimum_size = Vector2(0, height)
+        button.add_theme_font_override("font", vazir(BODY))
+        button.add_theme_font_size_override("font_size", fs(BODY))
+        button.add_theme_color_override("font_color", TOOLBAR_TEXT)
+        button.add_theme_color_override("font_hover_color", TOOLBAR_TEXT)
+        button.add_theme_color_override("font_pressed_color", TOOLBAR_TEXT)
+        button.add_theme_color_override("font_focus_color", TOOLBAR_TEXT)
         pressable(button)
 
 
