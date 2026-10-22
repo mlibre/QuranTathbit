@@ -98,6 +98,15 @@ func _test_home_offer() -> void:
         _is(study.disabled, true, "a day of reviews alone rests the study button")
         _is(extra.visible, true, "the offer stands while an unseen card remains")
         _is(home._next_fresh_card().id, "001", "the offer points at the first unseen card")
+        # One corner for the page's stacked pair: the resting day's button
+        # and the one-more offer beneath it are one family, cut by the
+        # wardrobe's one radius -- a pixel's drift between the two once
+        # made the reader ask why they did not match.
+        _is(
+                (study.get_theme_stylebox("disabled") as StyleBoxFlat).corner_radius_top_left,
+                (extra.get_theme_stylebox("normal") as StyleBoxFlat).corner_radius_top_left,
+                "the caught-up button and the one-more offer share one corner"
+        )
 
         # The reader's own word about today: a deferred card is not offered
         # back by the button either.
