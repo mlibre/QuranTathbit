@@ -232,7 +232,7 @@ func _init() -> void:
         # The dock's own words, raised by the engine on a hover: a tooltip
         # that arrives in the engine's default face arrives in no language at
         # all -- this frame keeps the one the app now raises, in Vazirmatn.
-        var dock_settings_fa: Button = main.get_node_or_null("Home/Dock/Pad/Row/Settings")
+        var dock_settings_fa: Button = main.get_node_or_null("Dock/Pad/Row/Settings")
         if dock_settings_fa != null:
                 Input.warp_mouse(dock_settings_fa.get_global_rect().get_center())
                 await create_timer(1.4).timeout

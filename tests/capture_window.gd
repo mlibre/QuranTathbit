@@ -115,41 +115,25 @@ func _check_touch_reach(home: Control) -> void:
         var study: Control = home.get_node("Margin/Column/Study")
         _ok(window.grow(1.0).encloses(study.get_global_rect()),
                 "the study button is inside the window (%s in %s)" % [study.get_global_rect(), window])
-        var dock: Control = home.get_node("Dock")
+        # The bar at the foot is the root's own, raised once and carried
+        # above every swap of pages.
+        var dock: Control = _main.get_node("Dock")
         _ok(window.grow(1.0).encloses(dock.get_global_rect()),
                 "the dock is inside the window (%s in %s)" % [dock.get_global_rect(), window])
         for item_name in ["Home", "Study", "Library", "Settings"]:
-                var item: Button = home.get_node("Dock/Pad/Row/" + item_name)
-                # A door that is not standing holds no centre to tap: every
-                # nav door stands on every page, and the reach check asks
-                # only of the doors present.
-                if not item.visible:
-                        continue
+                var item: Button = _main.get_node("Dock/Pad/Row/" + item_name)
                 _ok(window.encloses(item.get_global_rect()),
                         "the dock's %s door is inside the window (%s)" % [item_name, item.get_global_rect()])
                 var at := item.get_global_rect().get_center()
-                _ok(_top_at(home, at) == item,
-                        "the dock's %s door is on top of everything at its own centre" % item_name)
+                _ok(_top_at(dock, at) == item,
+                        "the dock's %s door is the bar's own topmost at its centre" % item_name)
         var update_coin: Button = home.get_node("UpdateCoin")
         _ok(window.encloses(update_coin.get_global_rect()),
                 "the update coin is inside the window (%s)" % update_coin.get_global_rect())
-        # Sync's door stands in the foot while sync stands; when it does,
-        # it is reached like every door, and says its state in its own
-        # words. The corner keeps no sync coin any more.
-        var sync_door: Button = home.get_node_or_null("Dock/Pad/Row/Sync")
-        if sync_door != null and sync_door.visible:
-                _ok(window.encloses(sync_door.get_global_rect()),
-                        "the sync door is inside the window (%s)" % sync_door.get_global_rect())
-                _ok(
-                        sync_door.tooltip_text.length() > 0,
-                        "the sync state says itself in the door's own words"
-                )
         _ok(
                 home.get_node_or_null("Margin/Column/SyncLine") == null,
-                "the page itself says nothing of sync -- the foot's sync door is the whole story"
+                "the page itself says nothing of sync -- sync's words live in Settings"
         )
-        _ok(home.get_node_or_null("SyncCoin") == null,
-                "the corner keeps no sync coin -- the foot's door took its place")
 
 ## The card never asks a window for more room than it has.
 func _check_card_fits() -> void:

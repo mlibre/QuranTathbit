@@ -238,14 +238,13 @@ func _test_the_way_back() -> void:
         await process_frame
 
 
-## The page's foot, held where the reader saw it in the design: four doors
-## -- home, the session, the library, the settings -- each a mark above its
-## own word, the library's own door wearing the gold of a place already
-## stood in. The doors ring the page's own doors: home leaves the library,
-## the session and the settings ask the root through their own signals,
-## and the library's door steps out of a chapter onto its shelf. The
-## search the questions are asked in is the box the design draws: the
-## card's white under a gold rule, the lens waiting at the reading's start.
+## The foot below the library is the root's own bar -- the page raises no
+## doors of its own. What the library itself still owes the foot is the
+## one step only it knows: behind a chapter's page, the library's own door
+## (asked by the root) leads back to the shelf. The page's ground ends a
+## breath above the doors, and the search the questions are asked in is
+## the box the design draws: the card's white under a gold rule, the lens
+## waiting at the reading's start.
 func _test_the_foots_doors() -> void:
         var made := _library_deck()
         var deck = made["deck"]
@@ -253,103 +252,25 @@ func _test_the_foots_doors() -> void:
                 _ok(false, "the library deck loads for the foot's doors")
                 return
         var browse: Control = await _open_library(deck)
-        var dock: PanelContainer = browse.get_node_or_null("Dock")
-        _ok(dock != null, "the foot carries its dock")
-        if dock == null:
-                browse.queue_free()
-                await process_frame
-                return
-        var row: HBoxContainer = dock.get_node("Pad/Row")
-        _is(row.get_child_count(), 4, "the dock keeps its four doors")
-        var wanted := {
-                "Home": "Home",
-                "Study": "Study",
-                "Library": "Library",
-                "Settings": "Settings",
-        }
-        for door_name in wanted:
-                var door: Button = row.get_node_or_null(door_name)
-                if door == null:
-                        _ok(false, "the dock carries the %s door" % door_name)
-                        continue
-                _is(
-                        (door.get_node("Stack/Text") as Label).text,
-                        wanted[door_name],
-                        "the %s door says its own word" % door_name
-                )
-                _ok(
-                        door.get_node_or_null("Stack/Icon/Mark/%sMark" % door_name) != null,
-                        "the %s door wears its own mark" % door_name
-                )
-        # The library's own door wears the gold of a place already stood in;
-        # its neighbours wear the ink of places waiting.
-        var library_text: Label = row.get_node("Library/Stack/Text")
-        _is(
-                library_text.get_theme_color("font_color"),
-                ThemeScript.GOLD_DEEP,
-                "the library's own door wears the gold"
-        )
-        _is(
-                (row.get_node("Home/Stack/Text") as Label).get_theme_color("font_color"),
-                ThemeScript.INK_SOFT,
-                "the home door waits in ink"
-        )
-        # The doors ring the page's own doors.
-        var left := {"home": false, "study": false, "settings": false}
-        browse.closed.connect(func() -> void: left["home"] = true)
-        browse.study_requested.connect(func() -> void: left["study"] = true)
-        browse.settings_requested.connect(func() -> void: left["settings"] = true)
-        row.get_node("Home").pressed.emit()
-        row.get_node("Study").pressed.emit()
-        row.get_node("Settings").pressed.emit()
-        await create_timer(0.1).timeout
-        _ok(left["home"], "the home door leaves the library")
-        _ok(left["study"], "the study door asks for the session")
-        _ok(left["settings"], "the settings door asks for the settings")
-        # The library's own door, behind a chapter's page: one step back to
-        # the shelf, the library still standing.
-        browse._open_surah_view("Beta")
-        await create_timer(0.1).timeout
-        left["home"] = false
-        row.get_node("Library").pressed.emit()
-        await create_timer(0.3).timeout
-        _ok(_grid_of(browse) != null, "the library's door returns a chapter to its shelf")
-        _ok(not left["home"], "the library's door never leaves the library")
         # The page's ground ends above the bar: the margin under the shelf
-        # carries the dock's whole height, so no card flows under the doors.
-        var dock_h: float = dock.get_combined_minimum_size().y
+        # carries the foot's whole height, so no card flows under the doors.
         var margin: MarginContainer = browse.get_node("Margin")
         _ok(
-                margin.get_theme_constant("margin_bottom") >= int(dock_h),
+                margin.get_theme_constant("margin_bottom") >= int(ThemeScript.foot_height()),
                 "the shelf's ground ends a breath above the doors"
         )
-        # The reader's answer about the deck's other life arrives with the
-        # setup: sync standing raises sync's own door in the session door's
-        # place, and its press rings this page's own signal -- the root
-        # answers it the way it answers sync's every knock.
-        browse.setup(deck, 1.0, true)
-        await create_timer(0.2).timeout
-        var sync_door: Button = dock.get_node_or_null("Pad/Row/Sync")
-        _ok(sync_door != null, "sync standing raises sync's door in the library's foot")
-        _ok(
-                dock.get_node_or_null("Pad/Row/Study") == null,
-                "the session's door gives its place when sync stands"
-        )
-        var rang := {"sync": false}
-        browse.sync_requested.connect(func() -> void: rang["sync"] = true)
-        if sync_door != null:
-                sync_door.pressed.emit()
-                await create_timer(0.1).timeout
-        _ok(rang["sync"], "the library's sync door asks for the deck's other life")
-        # And a switch taken back gives the place home again -- one foot,
-        # whichever face the mid door wears.
-        browse.setup(deck, 1.0, false)
-        await create_timer(0.2).timeout
-        _ok(
-                dock.get_node_or_null("Pad/Row/Study") != null
-                        and dock.get_node_or_null("Pad/Row/Sync") == null,
-                "sync sleeping gives the mid place home to the session's door"
-        )
+        # The one step only the library knows: behind a chapter's page, the
+        # library's own door -- the root's bar asks it of the page the
+        # reader stands on -- returns to the shelf, the library still
+        # standing. On the shelf itself the door stands still.
+        browse._open_surah_view("Beta")
+        await create_timer(0.1).timeout
+        browse.foot_library_door()
+        await create_timer(0.3).timeout
+        _ok(_grid_of(browse) != null, "the library's door returns a chapter to its shelf")
+        browse.foot_library_door()
+        await create_timer(0.3).timeout
+        _ok(_grid_of(browse) != null, "on the shelf itself, the library's door stands still")
         # The question's box, the way the design draws it: the card's white
         # under a gold rule, the lens standing at the reading's start.
         var field: LineEdit = browse.get_node("Margin/Column/Search")

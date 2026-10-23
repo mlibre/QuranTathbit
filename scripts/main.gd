@@ -71,6 +71,8 @@ var _menu_free := -1  # what the page was last told the mouse stands on: paper (
 var _menu_mouse := Vector2(-1.0, -1.0)  # where the mouse stood when that was last measured
 var _menu_at := 0  # when, because the ground can move under a still mouse too
 var _copy_chip: CopyChipScript  # the floating copy pill, standing over whatever label holds a choice
+var _foot: Control  # the one bar at the app's foot, raised once and carried above every swap
+var _foot_active := ""  # the door that wears the gold -- moved, never rebuilt
 
 
 func _ready() -> void:
@@ -142,6 +144,18 @@ func _ready() -> void:
         _copy_chip = CopyChipScript.new()
         _copy_chip.name = "CopyChip"
         get_window().add_child.call_deferred(_copy_chip)
+        # The foot's bar: raised once here, before the first page stands,
+        # and carried above every swap of pages from this breath on -- the
+        # reader never watches it being built. A small clock keeps its
+        # standing current, whatever raises or lowers a sheet over a page.
+        _build_foot()
+        resized.connect(_lay_foot)
+        var foot_watch := Timer.new()
+        foot_watch.name = "FootWatch"
+        foot_watch.wait_time = 0.1
+        foot_watch.timeout.connect(_update_foot)
+        add_child(foot_watch)
+        foot_watch.start()
         _go_home()
         # The app's very first question, over the page it asks on: which
         # tongue do its own words speak? Only a reader who has never
@@ -416,6 +430,90 @@ func _deliver_cards() -> void:
                 print("QuranTathbit: delivered %d new card file(s)" % delivered)
 
 
+# --- the foot -------------------------------------------------------------------
+
+## The one bar every page stands on, raised here once and carried above
+## every swap of pages: the reader never watches it being built, and a
+## page change is only the gold moving to the door that names the page
+## they stand on -- the same nodes, the same row, the same words. The
+## doors ring the root's own doors, the same hands the pages' own buttons
+## ring; the library's door, behind a chapter's page, asks the library for
+## the one step only it knows. The session carries no foot -- a page
+## mid-answer has no place a thumb should wander to -- and a sheet opened
+## over a page (the pencil's page, the backup's) covers the reader's work,
+## so the bar steps aside while it stands.
+func _build_foot() -> void:
+        var made := ThemeScript.foot_dock("", I18nScript.is_rtl())
+        _foot = made["bar"]
+        _foot.name = "Dock"
+        (made["home"] as Button).pressed.connect(_go_home)
+        (made["study"] as Button).pressed.connect(_start_session)
+        (made["library"] as Button).pressed.connect(_on_foot_library)
+        (made["settings"] as Button).pressed.connect(_on_settings_pressed)
+        add_child(_foot)
+        _lay_foot()
+
+
+## The library's own door on the root's bar: on the library itself it is
+## the page's own step -- out of a chapter onto its shelf -- and anywhere
+## else it opens the library.
+func _on_foot_library() -> void:
+        if _screen is BrowseScript:
+                (_screen as BrowseScript).foot_library_door()
+                return
+        _on_browse_pressed()
+
+
+## The bar's own answering of the window: laid by the theme's one law,
+## above whatever the display keeps for itself, doors at a thumb's measure
+## on a desk and the whole hand's width on a phone.
+func _lay_foot() -> void:
+        if _foot != null:
+                ThemeScript.lay_foot_dock(_foot, size.x)
+
+
+## What the bar says of the moment, wherever it is asked from: the door
+## that names the screen on top wears the gold (moved in place, the bar
+## never rebuilt), and the bar itself stands down for a page mid-answer
+## and for a sheet standing over the page -- the pencil's page, the
+## backup's -- so it never crowds the work in hand.
+func _update_foot() -> void:
+        if _foot == null:
+                return
+        var hidden := _screen == null or _screen is StudyScript \
+                or (_screen is BrowseScript and _screen.get_node_or_null("Editor") != null) \
+                or (_screen is SettingsScreenScript and _screen.get_node_or_null("BackupPicker") != null)
+        var active := ""
+        if _screen is HomeScript:
+                active = "home"
+        elif _screen is BrowseScript:
+                active = "library"
+        elif _screen is SettingsScreenScript:
+                active = "settings"
+        if _foot.visible == hidden:
+                _foot.visible = not hidden
+        if active != _foot_active:
+                _foot_active = active
+                ThemeScript.focus_foot_door(_foot, active)
+
+
+## The bar said again -- a new tongue, or a new measure for the words:
+## raised fresh where it stood, wearing the same gold. Rare, and always
+## the app's own doing (a choice made in Settings, a tongue arrived with a
+## sync); never a page change.
+func _rebuild_foot() -> void:
+        if _foot == null:
+                return
+        var shown := _foot.visible
+        remove_child(_foot)
+        _foot.queue_free()
+        _foot = null
+        _foot_active = ""
+        _build_foot()
+        _foot.visible = shown
+        _update_foot()
+
+
 # --- screens -------------------------------------------------------------------
 
 ## The phone's back key, arriving as a window message the engine would
@@ -607,10 +705,10 @@ func _on_settings_pressed() -> void:
         screen.choice_push_requested.connect(_on_choice_push_requested)
         screen.account_changed.connect(_on_account_changed)
         screen.deck_imported.connect(_on_deck_imported)
-        # The foot's own doors: the session and the library, asked for from
-        # the settings themselves, ring the same doors home's page rings.
-        screen.study_requested.connect(_start_session)
-        screen.library_requested.connect(_on_browse_pressed)
+        # The page's own chrome -- a tongue re-said, a measure for the
+        # words -- is heard by the bar at the foot, which says itself
+        # again to match.
+        screen.chrome_changed.connect(_rebuild_foot)
 
 
 ## A travelling choice has settled -- the day's pace, the verses' face, the
@@ -745,6 +843,10 @@ func _apply_language(code: String) -> void:
         I18nScript.set_lang(code)
         _settings.ui_lang = code
         _settings.save()
+        # The bar at the foot says its four words in the app's own tongue,
+        # and reads from the right when the tongue does: said again here,
+        # once, wherever the choice was made.
+        _rebuild_foot()
         if _deck != null:
                 _deck.ui_lang = code
                 _deck.ui_lang_mod = _now()
@@ -770,17 +872,12 @@ func _on_browse_pressed() -> void:
         var browse := BrowseScript.new()
         browse.name = "Browse"
         _swap(browse)
-        browse.setup(_deck, _settings.volume, _settings.sync_enabled)
+        browse.setup(_deck, _settings.volume)
         browse.closed.connect(_go_home)
         browse.edited.connect(_on_card_edited)
         browse.volume_changed.connect(_on_volume_changed)
-        # The foot's own doors: the session and the settings, asked for from
-        # the library itself, ring the same doors home's page rings -- and
-        # sync's own door, while it stands in the foot, rings here the way
-        # it rings from home's page and the settings' button.
-        browse.study_requested.connect(_start_session)
-        browse.settings_requested.connect(_on_settings_pressed)
-        browse.sync_requested.connect(_on_sync_pressed)
+        # The foot below is the root's own bar; its doors ring here by
+        # their own wiring, and the page raises none of its own.
 
 
 func _on_account_changed() -> void:
@@ -845,9 +942,7 @@ func _run_sync(quiet := false, alternate := false, fresh := true) -> void:
         if _screen is HomeScript:
                 (_screen as HomeScript).set_syncing()
         elif _screen is SettingsScreenScript:
-                (_screen as SettingsScreenScript).note_sync_result(I18nScript.t("Syncing…"), "syncing")
-        elif _screen is BrowseScript:
-                (_screen as BrowseScript).note_sync_state(I18nScript.t("Syncing…"), "syncing")
+                (_screen as SettingsScreenScript).note_sync_result(I18nScript.t("Syncing…"))
         var overlay: Control = null
         if not quiet:
                 overlay = SyncOverlayScript.new()
@@ -915,12 +1010,9 @@ func _run_sync(quiet := false, alternate := false, fresh := true) -> void:
         if _screen is HomeScript:
                 _refresh_home()
         elif _screen is SettingsScreenScript:
-                var screen: SettingsScreenScript = _screen
-                screen.note_sync_result(line, _sync_state())
+                (_screen as SettingsScreenScript).note_sync_result(line)
                 # The settings screen keeps its own account of the moment; the
                 # home line recomputes when the user goes back to it.
-        elif _screen is BrowseScript:
-                (_screen as BrowseScript).note_sync_state(line, _sync_state())
 
         # The ask that waited behind this one goes now: one exchange at a
         # time, and none of them ever dropped.
@@ -1112,7 +1204,13 @@ func _swap(next: Control, from_above := false) -> void:
                         sibling.name = String(next.name) + "Leaving"
         _screen = next
         add_child(next)
+        # The bar is the one thing that does not arrive and does not
+        # leave: it rides above the page that just landed, where it rode
+        # above the one before it, and only its gold moves.
+        if _foot != null:
+                move_child(_foot, get_child_count() - 1)
         ThemeScript.appear(next, 0.0, -14.0 if from_above else 14.0)
+        _update_foot()
 
 
 # --- the web's clipboard ------------------------------------------------------------

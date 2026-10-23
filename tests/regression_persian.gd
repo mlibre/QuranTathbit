@@ -102,30 +102,27 @@ func _check_home_speaks_it(main: Control) -> void:
                 "۰",
                 "the day's numbers arrive in the reader's own script"
         )
-        # A fresh install has no GitHub life in this tongue either: sync's
-        # door waits, unwoken, until the reader switches sync on in
-        # Settings, and the session's door keeps the foot's mid place.
+        # The foot is the root's own bar, in this tongue as in every other:
+        # no sync door stands anywhere in it, and the session's door keeps
+        # the foot's mid place.
         _ok(
-                home.get_node_or_null("Dock/Pad/Row/Sync") == null,
-                "sync's door waits, unwoken, while sync is off"
+                main.get_node_or_null("Dock/Pad/Row/Sync") == null,
+                "the foot carries no sync door -- sync's own words live in Settings"
         )
-        # Raised for the order's sake -- the reading's own order is the law
-        # of the doors that stand, the same four doors every page's foot
-        # carries.
-        main._settings.sync_enabled = true
-        main._refresh_home()
-        await create_timer(0.2).timeout
+        _ok(
+                main.get_node_or_null("Dock/Pad/Row/Study") != null,
+                "the session's door keeps the foot's mid place"
+        )
         # The reading's own order: the home door stands where the reading
         # begins -- the right -- and settings stands last, where it ends,
-        # with sync's own door in the mid place sync's standing earns.
-        var home_door: Control = home.get_node("Dock/Pad/Row/Home")
-        var sync_door: Control = home.get_node("Dock/Pad/Row/Sync")
-        var library_door: Control = home.get_node("Dock/Pad/Row/Library")
-        var settings_door: Control = home.get_node("Dock/Pad/Row/Settings")
+        # with the session's own door in the mid place.
+        var home_door: Control = main.get_node("Dock/Pad/Row/Home")
+        var study_door: Control = main.get_node("Dock/Pad/Row/Study")
+        var library_door: Control = main.get_node("Dock/Pad/Row/Library")
+        var settings_door: Control = main.get_node("Dock/Pad/Row/Settings")
         _ok(
-                sync_door != null
-                        and home_door.get_global_rect().get_center().x > sync_door.get_global_rect().get_center().x
-                        and sync_door.get_global_rect().get_center().x
+                home_door.get_global_rect().get_center().x > study_door.get_global_rect().get_center().x
+                        and study_door.get_global_rect().get_center().x
                         > library_door.get_global_rect().get_center().x
                         and library_door.get_global_rect().get_center().x
                         > settings_door.get_global_rect().get_center().x,

@@ -45,15 +45,12 @@ const I18nScript := preload("res://scripts/ui/i18n.gd")
 signal closed
 signal volume_changed(value: float)
 signal edited(card: CardScript)
-## The foot's own doors, rung from the library: the session asked for and
-## the settings asked for -- both answered by the root, the same doors
-## home's own page rings. Home itself needs no new word: leaving the
-## library has always been the closed door above. When sync stands, its
-## own door takes the session door's place in the foot and rings here
-## instead -- the root answers it the way it answers sync's every knock.
-signal study_requested
-signal sync_requested
-signal settings_requested
+## The foot below is the root's own bar -- raised once, above every swap --
+## so the page raises no doors of its own; the bar's presses are answered
+## by the root directly. What the page still says of the foot is the one
+## step only it knows: the library's own door, behind a chapter's page,
+## leads back to the shelf (foot_library_door, asked by the root).
+
 
 var volume := 1.0  # the recitation's loudness here, as the last session left it
 var _player: AudioStreamPlayer
@@ -134,18 +131,14 @@ func _process(_delta: float) -> void:
                 set_process(false)
 
 ## The deck arrives with the volume the last session chose, so the first
-## recitation heard here already speaks at the remembered loudness. It
-## also arrives with the reader's answer about the deck's other life: sync
-## standing in Settings raises its own door in the foot, in the session
-## door's place.
-func setup(deck: DeckScript, p_volume: float, sync_on := false) -> void:
+## recitation heard here already speaks at the remembered loudness.
+func setup(deck: DeckScript, p_volume: float) -> void:
         volume = p_volume
         _rig.apply(volume)
         _deck = deck
         _due = SchedulerScript.counts(deck, int(Time.get_unix_time_from_system()))["due"]
         if not is_node_ready():
                 await ready
-        _say_foot(sync_on)
         _query = ""
         _filter = "all"
         _mode = "shelf"
@@ -154,30 +147,6 @@ func setup(deck: DeckScript, p_volume: float, sync_on := false) -> void:
         _dress_chrome()
         _rebuild_filters()
         _rebuild()
-
-## The foot's mid door follows the reader's answer about the deck's other
-## life: sync standing raises sync's own door in the session door's place,
-## sync sleeping gives the place home again. The swap is the theme's one
-## law; a door it raises here is wired to this page's own signal at once,
-## and a swap that never happened is never wired twice.
-func _say_foot(sync_on: bool) -> void:
-        var raised := ThemeScript.swap_foot_mid(get_node("Dock"), sync_on)
-        if raised != null:
-                if sync_on:
-                        (raised as Button).pressed.connect(func() -> void: sync_requested.emit())
-                else:
-                        (raised as Button).pressed.connect(func() -> void: study_requested.emit())
-
-## The root's word about the deck's other life, whenever it moves under
-## this page: the door's words and its tone -- a quiet sync's turning
-## mark included -- so the foot says the truth on every page that carries
-## it.
-func note_sync_state(text: String, state: String) -> void:
-        var door: Button = get_node_or_null("Dock/Pad/Row/Sync")
-        if door == null:
-                return
-        door.tooltip_text = text
-        ThemeScript.dress_foot_sync(door, state)
 
 func _build() -> void:
         set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -208,13 +177,12 @@ func _build() -> void:
         # It rides above the shelf, a sibling drawn after it, quiet and still.
         add_child(_build_sticky())
         add_child(_rig.popup())
-        # The page's foot: the four standing doors the design draws -- home,
-        # the session, the library, the settings -- riding the bottom edge
-        # on both of the page's steps, so no door is ever more than a
-        # thumb's reach from the shelf or the chapter alike.
-        add_child(_dock())
-        _layout_dock()
-        resized.connect(_layout_dock)
+        # The foot below is the root's own bar -- raised once, above every
+        # swap -- riding the bottom edge on both of the page's steps, so no
+        # door is ever more than a thumb's reach from the shelf or the
+        # chapter alike. The page's ground ends a breath above it in
+        # _layout.
+
 
 func _top_bar() -> Control:
         # The bar answers the reading's own direction: under a right-reading
@@ -320,36 +288,13 @@ func _search_field() -> Control:
         return field
 
 
-## The page's foot: the one bar the whole app carries -- home, the session,
-## the library, the settings, a mark above its own word -- built by the
-## theme's own hand so every page's foot is the same foot, and only the
-## door that names this page wears the gold. The doors ring the page's own
-## doors: home leaves the library, the session (or sync, while sync
-## stands) and the settings ask the root, and the library's own door,
-## behind a chapter's page, leads one step back to the shelf -- and on the
-## shelf itself it stands still.
-func _dock() -> Control:
-        var made := ThemeScript.foot_dock("library", I18nScript.is_rtl())
-        (made["home"] as Button).pressed.connect(func() -> void: closed.emit())
-        (made["study"] as Button).pressed.connect(func() -> void: study_requested.emit())
-        (made["library"] as Button).pressed.connect(func() -> void:
-                if _mode == "surah":
-                        _back_to_shelf()
-        )
-        (made["settings"] as Button).pressed.connect(func() -> void: settings_requested.emit())
-        return made["bar"]
-
-
-## The foot's own answering, the one law the theme lays down for every
-## page that carries the bar: above the display's own keepings, doors at
-## a thumb's measure on a desk, the whole hand's width on a phone. The
-## page's ground is answered in _layout, which reads this bar's height --
-## one writer, so the two answers never argue. Runs on every resize.
-func _layout_dock() -> void:
-        var dock: Control = get_node_or_null("Dock")
-        if dock == null:
-                return
-        ThemeScript.lay_foot_dock(dock, size.x)
+## The library's own door, behind a chapter's page: one step back to the
+## shelf, the library still standing. The root's bar asks it of the page
+## the reader stands on; on the shelf itself the door stands still -- the
+## page they are on is the place the door names.
+func foot_library_door() -> void:
+        if _mode == "surah":
+                _back_to_shelf()
 
 
 ## The shelf's other question, asked in pills: the whole story, or one
@@ -1686,12 +1631,9 @@ func _layout() -> void:
         var margin: MarginContainer = get_node("Margin")
         margin.add_theme_constant_override("margin_top", int(22.0 + ThemeScript.top_inset()))
         # The page's ground ends a breath above the doors at its foot: the
-        # dock's own height, and nothing of the shelf beneath it.
-        var dock_h := 0.0
-        var dock: PanelContainer = get_node_or_null("Dock")
-        if dock != null:
-                dock_h = dock.get_combined_minimum_size().y
-        margin.add_theme_constant_override("margin_bottom", int(dock_h + 12.0))
+        # height the theme says the root's bar takes, and nothing of the
+        # shelf beneath it.
+        margin.add_theme_constant_override("margin_bottom", int(ThemeScript.foot_height() + 12.0))
         var narrow := size.x < ThemeScript.NARROW
         margin.add_theme_constant_override("margin_left", 16 if narrow else 24)
         margin.add_theme_constant_override("margin_right", 16 if narrow else 24)

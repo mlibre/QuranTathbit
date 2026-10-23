@@ -1778,13 +1778,12 @@ static func _line_paste(line: LineEdit) -> void:
 ## page they stand on changes -- it wears the gold of a place already stood
 ## in, while its neighbours wait in ink. The doors stand in the reading's
 ## own order: a page that reads from the right begins its row with خانه at
-## the right hand. When sync stands (sync_door), the session's door gives
-## its place to sync's own -- the reader who keeps the deck's other life
-## keeps its door in the foot, and the session waits behind home's own
-## button. Returns the bar and its doors; the page connects
-## each door to its own arrival, lays the bar in lay_foot_dock(), and ends
-## its own ground a breath above the doors.
-static func foot_dock(active := "", rtl := false, sync_door := false) -> Dictionary:
+## the right hand. The bar is raised once, by the root, and lives above
+## every swap of pages -- the reader never watches it being built again;
+## only the gold moves. The root connects each door to its own arrival,
+## lays the bar in lay_foot_dock(), and every page ends its own ground a
+## breath above the doors (foot_height()).
+static func foot_dock(active := "", rtl := false) -> Dictionary:
         var dock := PanelContainer.new()
         dock.name = "Dock"
         var box := dock_stylebox()
@@ -1809,79 +1808,46 @@ static func foot_dock(active := "", rtl := false, sync_door := false) -> Diction
         pad.add_child(row)
         var doors := {
                 "home": _foot_door("Home", HomeMark.new(INK_SOFT), I18N.t("Home"), active == "home"),
+                "study": _foot_door("Study", StudyMark.new(INK_SOFT), I18N.t("Study"), active == "study"),
+                "library": _foot_door("Library", ShelfMark.new(INK_SOFT), I18N.t("Library"), active == "library"),
+                "settings": _foot_door("Settings", CogMark.new(INK_SOFT), I18N.t("Settings"), active == "settings"),
         }
-        if sync_door:
-                doors["sync"] = _foot_door("Sync", SyncMark.new(INK_SOFT), I18N.t("Sync"), false)
-        else:
-                doors["study"] = _foot_door("Study", StudyMark.new(INK_SOFT), I18N.t("Study"), active == "study")
-        doors["library"] = _foot_door("Library", ShelfMark.new(INK_SOFT), I18N.t("Library"), active == "library")
-        doors["settings"] = _foot_door("Settings", CogMark.new(INK_SOFT), I18N.t("Settings"), active == "settings")
         for door_name in doors:
                 row.add_child(doors[door_name])
-        return {"bar": dock, "home": doors["home"], "study": doors.get("study"),
-                "sync": doors.get("sync"), "library": doors["library"], "settings": doors["settings"]}
+        return {"bar": dock, "home": doors["home"], "study": doors["study"],
+                "library": doors["library"], "settings": doors["settings"]}
 
 
-## The foot's mid door changing its face while the page stands: sync
-## switched on takes the session door's place, and a switch taken back
-## gives it home again. The doors swap in place -- same slot, same row,
-## same order -- so the bar is never rebuilt and never relearned. Returns
-## the door just raised, so the page can wire its press; returns null when
-## the wanted door already stands, so a swap that never happened is never
-## wired twice.
-static func swap_foot_mid(dock: Control, sync_door: bool) -> Button:
+## The gold moving to the door that names the page they stand on, without
+## the bar ever being built again: the four doors are re-dressed in place
+## -- same nodes, same row, same order -- so a page change is one door
+## taking the gold and its neighbours giving it back to ink, and nothing
+## else on the bar moves by a pixel.
+static func focus_foot_door(dock: Control, active := "") -> void:
         var row: HBoxContainer = dock.get_node_or_null("Pad/Row")
         if row == null:
-                return null
-        var wanted := "Sync" if sync_door else "Study"
-        if row.get_node_or_null(wanted) != null:
-                return null
-        var mid := row.get_node_or_null("Study")
-        if mid == null:
-                mid = row.get_node_or_null("Sync")
-        if mid == null:
-                return null
-        var mark: Control = SyncMark.new(INK_SOFT) if sync_door else StudyMark.new(INK_SOFT)
-        var fresh := _foot_door(wanted, mark, I18N.t(wanted), false)
-        var at := mid.get_index()
-        row.remove_child(mid)
-        mid.queue_free()
-        row.add_child(fresh)
-        row.move_child(fresh, at)
-        return fresh
+                return
+        for door_name in ["Home", "Study", "Library", "Settings"]:
+                var door: Button = row.get_node_or_null(door_name)
+                if door == null:
+                        continue
+                var standing: bool = door_name.to_lower() == active
+                var tone := GOLD_DEEP if standing else INK_SOFT
+                apply_mark_styles(door, dock_button_styles(tone))
+                var label: Label = door.get_node("Stack/Text")
+                label.add_theme_color_override("font_color", tone)
+                var mark: Control = door.get_node("Stack/Icon/Mark/" + door_name + "Mark")
+                mark.set("color", tone)
+                mark.queue_redraw()
 
 
-## The sync door's own state, worn the way the corner coin wore it before
-## the door took its place: green when the deck and the repo last agreed,
-## gold while answers wait to travel or the ladder is still walking, red
-## when the last attempt could not finish, and the turning mark while the
-## exchange actually runs -- the one motion the app allows itself for work
-## under way. Anything else (sync waiting for its account, or nothing said
-## yet) waits in ink. The state's own words live in the door's tooltip; the
-## page that knows them says them.
-static func dress_foot_sync(door: Button, state := "") -> void:
-        var tone := INK
-        var mark_tone := INK_SOFT
-        match state:
-                "synced":
-                        tone = GREEN
-                        mark_tone = GREEN_DEEP
-                "pending":
-                        tone = GOLD
-                        mark_tone = GOLD_DEEP
-                "syncing":
-                        tone = GREEN
-                        mark_tone = GREEN_DEEP
-                "error":
-                        tone = DANGER
-                        mark_tone = DANGER
-        apply_mark_styles(door, dock_button_styles(tone))
-        var label: Label = door.get_node("Stack/Text")
-        label.add_theme_color_override("font_color", tone)
-        var mark: SyncMark = door.get_node("Stack/Icon/Mark/SyncMark")
-        mark.color = mark_tone
-        mark.set_working(state == "syncing")
-        mark.queue_redraw()
+## The foot's own height, said once for every page that ends its ground a
+## breath above the doors: the bar's padding (7 above, 9 below) over a
+## door a thumb tall (54), riding above whatever the display keeps for
+## itself. The same number lay_foot_dock() reads off the bar itself, so a
+## page that reserves this much never flows under the doors.
+static func foot_height() -> float:
+        return 70.0 + bottom_inset()
 
 
 ## One place on the shared foot: a mark above its own word, both in the

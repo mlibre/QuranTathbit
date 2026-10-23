@@ -7,14 +7,13 @@ const MarkdownScript := preload("res://scripts/ui/markdown.gd")
 const I18nScript := preload("res://scripts/ui/i18n.gd")
 
 ## The only front door: the deck's name, what is waiting today, and the one
-## button that matters. The page's foot carries the one bar the whole app
-## carries -- home, the session, the library, the settings, a mark above
-## its own word, built by the theme's own hand so every page's foot is the
-## same foot and only this page's own door wears the gold. The deck's other
-## life on GitHub says its state from the corner it has always kept, a coin
-## standing only while sync is on -- a deck with no GitHub life keeps its
-## corner to the update coin's place -- and saying its state in its tone
-## and its own tooltip while it stands.
+## button that matters. The foot below is the app's one bar -- raised once
+## by the root, carried above every swap of pages, only the gold moving --
+## so this page never builds it and never watches it being built. The
+## deck's other life on GitHub says its state from the corner it has always
+## kept, a coin standing only while sync is on -- a deck with no GitHub
+## life keeps its corner to the update coin's place -- and saying its
+## state in its tone and its own tooltip while it stands.
 ## The page itself is dressed in a still lattice of stars, the way a book's
 ## margins are.
 
@@ -56,14 +55,11 @@ func _layout() -> void:
         margin.add_theme_constant_override("margin_left", int(side))
         margin.add_theme_constant_override("margin_right", int(side))
         margin.add_theme_constant_override("margin_top", int(36.0 + inset))
-        # The dock rides the page's foot above whatever the display keeps
-        # for itself, and the page's own ground ends a breath above it --
-        # the column never flows under the bar that stands over it. The
-        # bar's height is asked of the theme's one layout law, the same law
-        # every page that carries the bar answers to.
-        var dock: PanelContainer = get_node("Dock")
-        var dock_h := ThemeScript.lay_foot_dock(dock, size.x)
-        margin.add_theme_constant_override("margin_bottom", int(dock_h + 12.0))
+        # The root's own bar stands at the page's foot -- raised once, above
+        # every swap -- and the page's own ground ends a breath above it: the
+        # height the theme says the bar takes, so the column never flows
+        # under the doors.
+        margin.add_theme_constant_override("margin_bottom", int(ThemeScript.foot_height() + 12.0))
         # The deck card's own padding leans in with the page: the phone's
         # card gives its words the room the tighter margins took. Its width
         # is said here too, so the middle box keeps a presence on the page
@@ -73,9 +69,10 @@ func _layout() -> void:
         pad.add_theme_constant_override("margin_left", 20 if narrow else 30)
         pad.add_theme_constant_override("margin_right", 20 if narrow else 30)
         deck.custom_minimum_size = Vector2(minf(324.0, size.x - 2.0 * side), 138.0)
-        # The corner's coin -- the gold one, when a version waits -- keeps
-        # its ride below whatever the display keeps for itself.
-        for coin_name in ["UpdateCoin"]:
+        # The corner's coins -- the sync one when sync is on, the gold one
+        # when a version waits -- keep their ride below whatever the
+        # display keeps for itself.
+        for coin_name in ["SyncCoin", "UpdateCoin"]:
                 var coin: Button = get_node(coin_name)
                 coin.offset_top = 22.0 + inset
                 coin.offset_bottom = 70.0 + inset
@@ -141,37 +138,44 @@ func _apply_counts(counts: Dictionary) -> void:
                 study.disabled = false
                 extra.visible = false
 
-## The foot's own sync door says the sync state before any words do: green
+## The corner's own coin says the sync state before any words do: green
 ## when the deck and the repo last agreed, gold while answers still wait
 ## to travel or the promise is unkept, a turning green mark while the
 ## exchange is actually happening, red when it could not finish, and a
 ## quiet ink one when the account has still to arrive. The state is worn
-## twice at once -- the wash the door's own tone gives it, and the tint
-## the mark shares -- and the words live in the door's own tooltip. While
-## sync sleeps (state "hidden") the session's door stands in its place:
-## the swap is the theme's one law, and a door it raises here is wired to
-## this page's own signal at once.
+## twice at once -- the wash the coin's own tone gives it, and the tint
+## the mark shares -- and the words live in the coin's own tooltip. A
+## coin that leads nowhere yet does not stand at all: a reader who has
+## not switched sync on finds the corner keeping only the update coin's
+## place, and the page says nothing of GitHub they never asked to hear.
 func _set_sync_state(text: String, state: String) -> void:
-        var dock: Control = get_node_or_null("Dock")
-        if dock == null:
-                return
-        if state == "hidden":
-                var back := ThemeScript.swap_foot_mid(dock, false)
-                if back != null:
-                        (back as Button).pressed.connect(func() -> void: study_pressed.emit())
-                return
-        var raised := ThemeScript.swap_foot_mid(dock, true)
-        if raised != null:
-                (raised as Button).pressed.connect(func() -> void: sync_pressed.emit())
-        var door: Button = get_node_or_null("Dock/Pad/Row/Sync")
-        if door == null:
-                return
-        door.tooltip_text = text
-        ThemeScript.dress_foot_sync(door, state)
+        var coin: Button = get_node("SyncCoin")
+        var mark: ThemeScript.SyncMark = coin.get_node("Mark/SyncMark")
+        coin.visible = state != "hidden"
+        coin.tooltip_text = text
+        var tone := ThemeScript.INK
+        var mark_tone := ThemeScript.INK_SOFT
+        match state:
+                "synced":
+                        tone = ThemeScript.GREEN
+                        mark_tone = ThemeScript.GREEN_DEEP
+                "pending":
+                        tone = ThemeScript.GOLD
+                        mark_tone = ThemeScript.GOLD_DEEP
+                "syncing":
+                        tone = ThemeScript.GREEN
+                        mark_tone = ThemeScript.GREEN_DEEP
+                "error":
+                        tone = ThemeScript.DANGER
+                        mark_tone = ThemeScript.DANGER
+        ThemeScript.apply_mark_styles(coin, ThemeScript.mark_button_styles(tone, true))
+        mark.color = mark_tone
+        mark.set_working(state == "syncing")
+        mark.queue_redraw()
 
 
-## The foot's sync door turns while a sync runs quietly under the page:
-## the one honest thing between "you answered" and "it is safe on GitHub".
+## The coin turns while a sync runs quietly under the page: the one honest
+## thing between "you answered" and "it is safe on GitHub".
 func set_syncing() -> void:
         _set_sync_state(I18nScript.t("Syncing…"), "syncing")
 
@@ -273,20 +277,24 @@ func _build() -> void:
         column.add_child(_study_button())
         column.add_child(_extra_new_button())
 
-        # The dock and the sleeping coins go on last, not first: children
-        # added later sit above earlier ones in both drawing and
-        # hit-testing, and a full-rect container added after them was
-        # covering the corner, so the click that opened a coin landed on
-        # the page instead. On top is where floating controls belong.
-        var made := ThemeScript.foot_dock("home", I18nScript.is_rtl())
-        # Home's own door stands still: its press is the page the reader
-        # is already on. The other three ring the page's own doors -- the
-        # session's door for now; setup() gives its place to sync's own
-        # when the reader keeps the deck's other life.
-        (made["study"] as Button).pressed.connect(func() -> void: study_pressed.emit())
-        (made["library"] as Button).pressed.connect(func() -> void: browse_pressed.emit())
-        (made["settings"] as Button).pressed.connect(func() -> void: settings_pressed.emit())
-        add_child(made["bar"])
+        # The sleeping coins go on last, not first: children added later
+        # sit above earlier ones in both drawing and hit-testing, and a
+        # full-rect container added after them was covering the corner, so
+        # the click that opened a coin landed on the page instead. On top
+        # is where floating controls belong. The foot below is the root's
+        # own bar -- the page raises no dock of its own.
+        # The sync coin sleeps beside the update coin's place until the
+        # reader switches sync on; then it is the corner's word for the
+        # deck's other life, green or gold or red by how it stands.
+        var sync_coin := _corner_coin(
+                "SyncCoin",
+                Vector2(-132.0, -84.0),
+                ThemeScript.SyncMark.new(ThemeScript.INK_SOFT),
+                I18nScript.t("Sync"),
+                func() -> void: sync_pressed.emit()
+        )
+        sync_coin.visible = false
+        add_child(sync_coin)
         # The one coin sleeps until the page hears that a newer version
         # waits outside; then it is the gold way to take it, alone in the
         # corner where the app's gold has always arrived.
@@ -301,8 +309,8 @@ func _build() -> void:
         add_child(update)
 
 ## One corner coin: a roundel in its own tone, a drawn mark centred in it,
-## the same press the whole app knows. The corner's tenant is the update
-## coin while a version waits -- sync's door stands in the foot now.
+## the same press the whole app knows. The corner's tenants are the sync
+## coin while sync stands, and the update coin while a version waits.
 func _corner_coin(coin_name: String, x_range: Vector2, mark: Control, tooltip: String, on_press: Callable) -> Button:
         var coin := Button.new()
         coin.name = coin_name

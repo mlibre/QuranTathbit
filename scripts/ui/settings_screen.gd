@@ -29,12 +29,12 @@ const FONT_SCALE_STEPS := [0.9, 1.0, 1.1, 1.2]
 ## accounts and tokens.
 
 signal closed
+## The page's own chrome was re-said in place -- a new tongue, or a new
+## measure for the words -- and the root's own standing furniture (the
+## foot's bar) is said again to match.
+signal chrome_changed
 signal account_changed
 signal sync_requested
-## The foot's own doors, asked from the settings themselves: the session
-## and the library ring the same doors their pages ring at the root.
-signal study_requested
-signal library_requested
 ## A travelling choice has settled (the day's pace, the verses' face, the
 ## app's tongue): the progress file carries it, and the repo should hear
 ## it without the user having to ask.
@@ -62,8 +62,6 @@ var _polling := false
 var _flow_uri := ""  # where "Open GitHub" sends the user while a flow is live
 var _choice_push: Timer  # one ask, once the hand stops choosing
 var _zip_callback: Variant = null  # the page's backup hook, held while this screen stands
-var _sync_note := ""  # the deck's other life, in words -- the foot door's tooltip
-var _sync_foot_state := ""  # the last state the root said about sync
 
 func _ready() -> void:
         _build()
@@ -179,16 +177,11 @@ func _build() -> void:
         tail.custom_minimum_size = Vector2(0, 14)
         column.add_child(tail)
 
-        # The page's foot: the one bar every page carries, the settings
-        # door wearing the gold of the page they stand on. Home leaves the
-        # page; the session and the library ask the root through their own
-        # doors. The bar rides above the scroll's ground -- _layout ends
-        # the page's own ground a breath above it.
-        var made := ThemeScript.foot_dock("settings", I18nScript.is_rtl())
-        (made["home"] as Button).pressed.connect(func() -> void: closed.emit())
-        (made["study"] as Button).pressed.connect(func() -> void: study_requested.emit())
-        (made["library"] as Button).pressed.connect(func() -> void: library_requested.emit())
-        add_child(made["bar"])
+        # The foot below is the root's own bar -- raised once, above every
+        # swap -- so the page raises no doors of its own; the bar rides
+        # above the scroll's ground, and _layout ends the page's own ground
+        # a breath above it.
+
 
 ## The page answers the window: the cards keep a reader's measure on a
 ## desktop -- never a stripe the width of a whole window -- and fill a phone
@@ -201,14 +194,10 @@ func _layout() -> void:
         if margin != null:
                 margin.add_theme_constant_override("margin_top", int(22.0 + ThemeScript.top_inset()))
                 # The page's ground ends a breath above the doors at its
-                # foot: the bar's own height, and nothing of the scroll
-                # beneath it -- no card ever flows under the doors.
-                var dock: Control = get_node_or_null("Dock")
-                if dock != null:
-                        var dock_h := ThemeScript.lay_foot_dock(dock, size.x)
-                        margin.add_theme_constant_override("margin_bottom", int(dock_h + 12.0))
-                else:
-                        margin.add_theme_constant_override("margin_bottom", int(28.0 + ThemeScript.bottom_inset()))
+                # foot: the height the theme says the root's bar takes, and
+                # nothing of the scroll beneath it -- no card ever flows
+                # under the doors.
+                margin.add_theme_constant_override("margin_bottom", int(ThemeScript.foot_height() + 12.0))
         var column: VBoxContainer = get_node_or_null("Margin/Scroll/Wrap/Column")
         if column == null:
                 return
@@ -835,6 +824,7 @@ func _choose_ui_lang(code: String) -> void:
                 _deck.ui_lang_mod = int(Time.get_unix_time_from_system())
                 _deck.save_progress()
         _rebuild()
+        chrome_changed.emit()
         _ask_deck_push()
 
 ## The chosen segment says itself, without rebuilding the page: the font
@@ -989,6 +979,7 @@ func _step_font_scale(delta: int) -> void:
         get_window().theme = ThemeScript.tooltip_theme()
         _say_scale_value("TextScale", value)
         _rebuild()
+        chrome_changed.emit()
 
 ## The chip says the new size without the page being rebuilt: a step is a
 ## small thing, and the row it was made on should answer it in place.
@@ -1278,18 +1269,11 @@ func _dress_promise_row(row: Button, on: bool) -> void:
 # --- state ---------------------------------------------------------------------
 
 ## The main screen reports how a sync went while Settings is the screen on
-## top; the note sits under the Sync button and clears when asked again. A
-## state said with the words dresses the foot's own sync door the same
-## breath -- the bar carries the deck's other life on every page that
-## holds it.
-func note_sync_result(text: String, state := "") -> void:
+## top; the note sits under the Sync button and clears when asked again.
+func note_sync_result(text: String) -> void:
         var note: RichTextLabel = get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/SyncNote")
         if note != null:
                 note.text = text
-        if not state.is_empty():
-                _sync_note = text
-                _sync_foot_state = state
-                _say_foot_sync()
 
 func _refresh() -> void:
         var box: Control = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box")
@@ -1337,27 +1321,6 @@ func _refresh() -> void:
         var pace_value: Label = get_node("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/NewPerDay/Chip/StepValue")
         pace_value.text = I18nScript.num(_settings.new_per_day)
         note_sync_result("")
-        _say_foot_sync()
-
-## The foot's mid door follows the master switch while this page stands:
-## sync on raises sync's own door in the session door's place, sync off
-## gives the place home again. The swap is the theme's one law; a door it
-## raises here is wired to this page's own signal at once, and a swap that
-## never happened is never wired twice.
-func _say_foot_sync() -> void:
-        var dock: Control = get_node_or_null("Dock")
-        if dock == null:
-                return
-        var raised := ThemeScript.swap_foot_mid(dock, _settings.sync_enabled)
-        if raised != null:
-                if _settings.sync_enabled:
-                        (raised as Button).pressed.connect(func() -> void: sync_requested.emit())
-                else:
-                        (raised as Button).pressed.connect(func() -> void: study_requested.emit())
-        var door: Button = get_node_or_null("Dock/Pad/Row/Sync")
-        if door != null:
-                door.tooltip_text = _sync_note if not _sync_note.is_empty() else I18nScript.t("Sync")
-                ThemeScript.dress_foot_sync(door, _sync_foot_state)
 
 # --- the device flow ------------------------------------------------------------
 
