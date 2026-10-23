@@ -22,7 +22,11 @@ const FONT_SCALE_STEPS := [0.9, 1.0, 1.1, 1.2]
 ## deck itself is edited as files -- in any editor, on any machine -- so
 ## there is deliberately nothing here to build a card with. What is here
 ## reads in the order a person arrives in: the deck in hand, the account
-## beside it, and where the words come from at the end.
+## beside it, and where the words come from at the end. The account's own
+## card begins with one master switch -- sync with GitHub, off in a fresh
+## install -- and everything GitHub keeps behind it: a reader who never
+## asked for sync meets a switch and one quiet line, not a page of
+## accounts and tokens.
 
 signal closed
 signal account_changed
@@ -36,6 +40,15 @@ signal choice_push_requested
 ## read it back -- adopting whatever choices arrived with it and speaking
 ## a tongue that changed underneath this page.
 signal deck_imported
+
+## The rows of the GitHub card that exist only while the master switch is
+## on: the switch hides them together, and the card folds to the switch
+## and the one line that says where things stand. State stays out of the
+## list -- it speaks in both worlds, saying what is and what is not yet.
+const SYNC_ONLY := [
+        "Flow", "Buttons", "TokenLabel", "Token", "TokenRow", "Sep",
+        "RepoLabel", "Repo", "RepoHint", "AutoRow", "Sync", "SyncNote",
+]
 
 var _http: HttpClientScript
 var _auth: GitHubAuthScript
@@ -300,6 +313,28 @@ func _github_body() -> Control:
         var box: VBoxContainer = parts[1]
         _card_header(box, I18nScript.t("GitHub sync"))
 
+        # The card's keeper, first in it: one master switch, and the deck's
+        # whole GitHub life stands or folds behind it. Off is the state a
+        # fresh install wakes in -- the rows below are hidden and the card
+        # says only that sync is off -- and turning it on opens the rows:
+        # the account, the token, the repo, the promise, the button. The
+        # switch saves at once, the way every choice on this page does.
+        var master_parts := _promise_row(
+                "SyncRow", "SyncPad", "SyncLine", I18nScript.t("Sync with GitHub")
+        )
+        var sync_row: Button = master_parts[0]
+        box.add_child(sync_row)
+        sync_row.toggled.connect(func(on: bool) -> void:
+                _settings.sync_enabled = on
+                _settings.save()
+                if not on:
+                        # A door closed mid-flow stops asking: the flow's
+                        # wait ends with the body it stood in.
+                        _polling = false
+                        _flow_uri = ""
+                _refresh()
+        )
+
         var state := _text("", ThemeScript.INK, ThemeScript.BODY)
         state.name = "State"
         box.add_child(state)
@@ -386,7 +421,9 @@ func _github_body() -> Control:
         disconnect.pressed.connect(_disconnect)
         buttons.add_child(disconnect)
 
-        box.add_child(_field_label(I18nScript.t("Personal access token")))
+        var token_label := _field_label(I18nScript.t("Personal access token"))
+        token_label.name = "TokenLabel"
+        box.add_child(token_label)
         # The field owns its whole row: a token is forty characters, and a
         # thumb needs the field's full width to find its place in it. Paste
         # is not a button any more -- in a browser the page hands the app its
@@ -430,9 +467,13 @@ func _github_body() -> Control:
         token_row.add_child(save_token)
 
         # The page's own division: the account above, the deck's home below.
-        box.add_child(ThemeScript.hairline())
+        var sep := ThemeScript.hairline()
+        sep.name = "Sep"
+        box.add_child(sep)
 
-        box.add_child(_field_label(I18nScript.t("Repository")))
+        var repo_label := _field_label(I18nScript.t("Repository"))
+        repo_label.name = "RepoLabel"
+        box.add_child(repo_label)
         var repo := LineEdit.new()
         repo.name = "Repo"
         repo.placeholder_text = I18nScript.t("Repository name")
@@ -459,51 +500,17 @@ func _github_body() -> Control:
         box.add_child(repo_hint)
 
         # The quiet promise, said plainly and changeable: after each session
-        # the deck tells GitHub on its own. A promise that matters is a row
-        # of its own -- a page's worth of surface with a switch that reads
+        # the deck tells GitHub on its own. It wears the same row the master
+        # switch wears -- a page's worth of surface with a switch that reads
         # as a switch from across the room, and the whole row is the
         # button, so a thumb cannot miss it the way it missed a caption
         # with a dot after it. The promise's own words stand on their own;
         # nothing beneath them explains what they already said.
-        var auto_row := Button.new()
-        auto_row.name = "AutoRow"
-        auto_row.toggle_mode = true
-        auto_row.custom_minimum_size = Vector2(0, 62)
-        _dress_promise_row(auto_row, false)
-        ThemeScript.pressable(auto_row)
-        var auto_pad := MarginContainer.new()
-        auto_pad.name = "AutoPad"
-        auto_pad.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-        auto_pad.add_theme_constant_override("margin_left", 16)
-        auto_pad.add_theme_constant_override("margin_right", 16)
-        auto_pad.add_theme_constant_override("margin_top", 10)
-        auto_pad.add_theme_constant_override("margin_bottom", 10)
-        auto_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        auto_row.add_child(auto_pad)
-        var auto_line := HBoxContainer.new()
-        auto_line.name = "AutoLine"
-        auto_line.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-        auto_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        auto_line.add_theme_constant_override("separation", 12)
-        auto_pad.add_child(auto_line)
-        var auto_words := VBoxContainer.new()
-        auto_words.name = "Words"
-        auto_words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        auto_words.alignment = BoxContainer.ALIGNMENT_CENTER
-        auto_words.add_theme_constant_override("separation", 2)
-        auto_words.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        auto_line.add_child(auto_words)
-        var auto_label := Label.new()
-        auto_label.name = "Label"
-        auto_label.text = I18nScript.t("Sync quietly after each session")
-        # LEFT is the reading's start under either layout (see _card_header).
-        auto_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-        ThemeScript.dress(auto_label, ThemeScript.BODY, ThemeScript.INK, true)
-        auto_words.add_child(auto_label)
-        var auto_switch := ThemeScript.SwitchMark.new(false)
-        auto_switch.name = "Switch"
-        auto_switch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-        auto_line.add_child(auto_switch)
+        var auto_parts := _promise_row(
+                "AutoRow", "AutoPad", "AutoLine", I18nScript.t("Sync quietly after each session")
+        )
+        var auto_row: Button = auto_parts[0]
+        var auto_switch: ThemeScript.SwitchMark = auto_parts[1]
         auto_row.toggled.connect(func(on: bool) -> void:
                 _settings.auto_sync = on
                 _settings.save()
@@ -1158,6 +1165,57 @@ func _about() -> Control:
         box.add_child(label)
         return box
 
+## One promise row: a page's worth of surface with a switch that reads as
+## a switch from across the room, and the whole row is the button, so a
+## thumb cannot miss it the way it missed a caption with a dot after it.
+## Both of Settings' switches wear it -- the master switch that keeps the
+## deck's whole GitHub life, and the quiet promise that carries it after
+## each session -- so the two read as kin wherever they stand. Returns the
+## row and its switch; the caller owns the wiring. The row is dressed for
+## its off state; say the on state through _dress_promise_row when it
+## arrives.
+func _promise_row(row_name: String, pad_name: String, line_name: String, label_text: String) -> Array:
+        var row := Button.new()
+        row.name = row_name
+        row.toggle_mode = true
+        row.custom_minimum_size = Vector2(0, 62)
+        _dress_promise_row(row, false)
+        ThemeScript.pressable(row)
+        var pad := MarginContainer.new()
+        pad.name = pad_name
+        pad.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        pad.add_theme_constant_override("margin_left", 16)
+        pad.add_theme_constant_override("margin_right", 16)
+        pad.add_theme_constant_override("margin_top", 10)
+        pad.add_theme_constant_override("margin_bottom", 10)
+        pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        row.add_child(pad)
+        var line := HBoxContainer.new()
+        line.name = line_name
+        line.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        line.add_theme_constant_override("separation", 12)
+        pad.add_child(line)
+        var words := VBoxContainer.new()
+        words.name = "Words"
+        words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        words.alignment = BoxContainer.ALIGNMENT_CENTER
+        words.add_theme_constant_override("separation", 2)
+        words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        line.add_child(words)
+        var label := Label.new()
+        label.name = "Label"
+        label.text = label_text
+        # LEFT is the reading's start under either layout (see _card_header).
+        label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+        ThemeScript.dress(label, ThemeScript.BODY, ThemeScript.INK, true)
+        words.add_child(label)
+        var switch := ThemeScript.SwitchMark.new(false)
+        switch.name = "Switch"
+        switch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+        line.add_child(switch)
+        return [row, switch]
+
 ## The promise row's two faces: kept is the app's own green ground, a
 ## decision already standing; unkept is the page's own paper, a decision
 ## still waiting to be made. The border says the same thing more quietly.
@@ -1198,11 +1256,27 @@ func note_sync_result(text: String) -> void:
                 note.text = text
 
 func _refresh() -> void:
-        var state: RichTextLabel = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/State")
-        var connect: Button = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Buttons/Connect")
-        var disconnect: Button = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Buttons/Disconnect")
-        var repo: LineEdit = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/Repo")
-        var auto: Button = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/AutoRow")
+        var box: Control = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box")
+        var state: RichTextLabel = box.get_node("State")
+        var connect: Button = box.get_node("Buttons/Connect")
+        var disconnect: Button = box.get_node("Buttons/Disconnect")
+        var repo: LineEdit = box.get_node("Repo")
+        var auto: Button = box.get_node("AutoRow")
+        # The master switch is said first, and it decides what stands under
+        # it: on, the card carries the whole account; off, the rows fold
+        # away and the line beneath the switch says what remains. No signal
+        # here either: this is the settings being said, not changed -- a
+        # refresh that toggled its own switch would overwrite the file it is
+        # only reading.
+        var on := _settings.sync_enabled
+        var sync_row: Button = box.get_node("SyncRow")
+        sync_row.set_pressed_no_signal(on)
+        _dress_promise_row(sync_row, on)
+        (sync_row.get_node("SyncPad/SyncLine/Switch") as ThemeScript.SwitchMark).set_on(on)
+        for child_name in SYNC_ONLY:
+                var child: Control = box.get_node_or_null(child_name)
+                if child != null:
+                        child.visible = on
         repo.text = _settings.repo
         # No signal: this is the settings being said, not the settings being
         # changed -- a refresh that toggled its own switch would overwrite
@@ -1210,7 +1284,9 @@ func _refresh() -> void:
         auto.set_pressed_no_signal(_settings.auto_sync)
         _dress_promise_row(auto, _settings.auto_sync)
         (auto.get_node("AutoPad/AutoLine/Switch") as ThemeScript.SwitchMark).set_on(_settings.auto_sync)
-        if _settings.has_token() and not _settings.owner.is_empty():
+        if not on:
+                state.text = I18nScript.t("Sync is off — your deck lives on this device only")
+        elif _settings.has_token() and not _settings.owner.is_empty():
                 state.text = I18nScript.t("Connected as @%s") % _settings.owner
         elif _settings.has_token():
                 state.text = I18nScript.t("Token saved")
@@ -1470,8 +1546,13 @@ func _disconnect() -> void:
         _settings.token = ""
         _settings.owner = ""
         _settings.setup_done = false
+        # Leaving GitHub is switching sync off: the account rows fold with
+        # the token that fed them, the door at home goes with them, and the
+        # switch above is where the way back begins -- turn it on, connect.
+        _settings.sync_enabled = false
         _settings.save()
         _polling = false
+        _flow_uri = ""
         _refresh()
         account_changed.emit()
 

@@ -120,6 +120,11 @@ func _check_touch_reach(home: Control) -> void:
                 "the dock is inside the window (%s in %s)" % [dock.get_global_rect(), window])
         for item_name in ["Browse", "Sync", "Settings"]:
                 var item: Button = home.get_node("Dock/Pad/Row/" + item_name)
+                # A door that is not standing holds no centre to tap: the
+                # sync door waits, unseen, until the reader switches sync
+                # on, and the reach check asks only of the doors present.
+                if not item.visible:
+                        continue
                 _ok(window.encloses(item.get_global_rect()),
                         "the dock's %s door is inside the window (%s)" % [item_name, item.get_global_rect()])
                 var at := item.get_global_rect().get_center()

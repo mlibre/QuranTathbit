@@ -81,7 +81,12 @@ Windows, web) in Godot 4.7 with GDScript only.
   GitHub says itself in the dock's sync door alone — its tone, and its
   words in its own tooltip — never in a line standing under the day's
   button, never as an unnamed icon, and never as a second badge beside
-  the mark: the mark is the door's one figure.
+  the mark: the mark is the door's one figure. And the door stands only
+  for a reader who asked for it: sync is off in a fresh install, a closed
+  sync keeps the dock to the library and settings and the GitHub card to
+  its one master switch in Settings, and turning the switch on is what
+  raises the door and opens the account rows — nothing of GitHub stands
+  in front of a reader who never wanted it.
 - **Every size goes through fs()**: the font scale multiplies only the
   words, so every size a control displays — and every size a measurement
   takes beside it (a pill measured from its widest line, a mirror kept on

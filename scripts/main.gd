@@ -154,7 +154,7 @@ func _ready() -> void:
         # sync that finds nothing to do is three small questions and a green
         # line, and the user never again opens the app to a status that
         # pretends nothing has happened since yesterday.
-        if _settings.has_token() and _settings.auto_sync:
+        if _sync_active() and _settings.auto_sync:
                 get_tree().create_timer(1.2).timeout.connect(func() -> void: _run_sync(true))
         # Home's own clock, ticking under everything: a card that comes due
         # while the reader sits on the page is said by the page itself, the
@@ -542,7 +542,7 @@ func _on_ayah_font_chosen(key: String) -> void:
                 _deck.ayah_font = key
                 _deck.ayah_font_mod = _now()
                 _deck.save_progress()
-        if _settings.has_token() and _settings.auto_sync:
+        if _sync_active() and _settings.auto_sync:
                 _run_sync(true)
 
 
@@ -553,7 +553,7 @@ func _on_ayah_font_chosen(key: String) -> void:
 ## same closing door, even when the session answered nothing.
 func _on_session_closed() -> void:
         _go_home()
-        if _settings.has_token() and _settings.auto_sync and _pending_answers() > 0:
+        if _sync_active() and _settings.auto_sync and _pending_answers() > 0:
                 _run_sync(true)
 
 
@@ -613,7 +613,7 @@ func _on_settings_pressed() -> void:
 ## app's tongue -- and the repo should hear it without the user having to
 ## ask, under whatever screen stands: the same door every quiet sync uses.
 func _on_choice_push_requested() -> void:
-        if _settings.has_token() and _settings.auto_sync:
+        if _sync_active() and _settings.auto_sync:
                 _run_sync(true)
 
 
@@ -638,7 +638,7 @@ func _on_deck_imported() -> void:
                 (_screen as SettingsScreenScript).deck_reloaded(_deck)
         elif _screen is HomeScript:
                 _refresh_home()
-        if _settings.has_token() and _settings.auto_sync:
+        if _sync_active() and _settings.auto_sync:
                 _run_sync(true)
 
 
@@ -773,17 +773,24 @@ func _on_browse_pressed() -> void:
 
 
 func _on_account_changed() -> void:
-        _settings = SettingsScript.load_settings()
+        # One settings object, held for the app's whole life: the page that
+        # raised this signal wrote the very object this root holds, and
+        # saved it -- re-reading the file here would fork the page's copy
+        # from the root's, and a switch pressed after a quiet sync would
+        # write yesterday's clock over today's. The object is the truth.
         _refresh_home()
         # Connecting is itself the request for a first sync: the user just
         # chose to keep their deck on GitHub, so carry it there without
         # making them find the button and wonder whether anything happened.
-        if _settings.has_token() and _settings.last_sync == 0:
+        if _sync_active() and _settings.last_sync == 0:
                 await _run_sync()
 
 
 func _on_sync_pressed() -> void:
-        if not _settings.has_token():
+        # A hand that found a sync door is taken to where the door is made:
+        # without the switch turned on, or without the account behind it,
+        # there is nothing to exchange yet -- Settings is where both live.
+        if not _sync_active():
                 _on_settings_pressed()
                 return
         _run_sync()
@@ -806,6 +813,12 @@ func _on_sync_pressed() -> void:
 ## button -- it waits for the running one to end and then goes itself, so
 ## every answer is carried without the reader having to ask twice.
 func _run_sync(quiet := false, alternate := false, fresh := true) -> void:
+        # No exchange runs behind a closed door: whatever asked -- the hand,
+        # a session closing, a retry the ladder still owed -- finds the
+        # switch off and stands down. The deck is local first; nothing here
+        # is lost, it only waits for the door to open again.
+        if not _sync_active():
+                return
         if _syncing:
                 _sync_queued = true
                 _sync_queued_quiet = _sync_queued_quiet and quiet
@@ -985,6 +998,8 @@ func _on_due_watch() -> void:
 
 
 func _sync_line() -> String:
+        if not _settings.sync_enabled:
+                return I18nScript.t("Sync is off — your deck lives on this device only")
         if not _settings.has_token():
                 return I18nScript.t("Not connected — your deck lives on this device only")
         if _syncing:
@@ -1007,11 +1022,14 @@ func _sync_line() -> String:
         return I18nScript.t("Connected — not synced yet")
 
 
-## Which of the coin's states the page is in: not connected at all; agreed
+## Which of the coin's states the page is in: switched off altogether (no
+## door on the page at all); on but with no account behind it yet; agreed
 ## with the repo at least once; connected but never yet taken there;
 ## holding work the repo has not seen; waiting to try a failed sync again;
 ## or the last attempt could not finish.
 func _sync_state() -> String:
+        if not _settings.sync_enabled:
+                return "hidden"
         if not _settings.has_token():
                 return "off"
         if _syncing:
@@ -1025,6 +1043,14 @@ func _sync_state() -> String:
         if _settings.last_sync > 0:
                 return "synced"
         return "pending"
+
+
+## Whether the deck's GitHub life is on at all: the door in Settings is
+## switched on and a token is in hand. Every ask reads this first -- the
+## quiet ones, the hand's own press, the ladder's retries -- so a sync can
+## never run behind a closed door, whatever hand knocked.
+func _sync_active() -> bool:
+        return _settings.sync_enabled and _settings.has_token()
 
 
 ## Answers the repo has not seen: the ones this session gave, a card the

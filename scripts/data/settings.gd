@@ -16,6 +16,15 @@ var deck_folder := ""  # absolute path of the synced deck (user://decks/quran)
 var last_sync := 0  # unix seconds
 var setup_done := false
 var auto_sync := true  # quiet sync after each session, and when the app opens
+## Whether the deck's GitHub life is on at all. Off is the newborn state --
+## a reader who has never asked for sync has no token, no repo and no sync
+## door on the home page, and the deck simply lives on this device. Turning
+## it on in Settings is what raises the door and opens the account rows
+## beside it, so nothing of GitHub stands in front of a reader who never
+## wanted it. A copy of the app that already carried a token when this
+## switch arrived wakes with it on (see load_settings): nobody asked to be
+## disconnected by an update.
+var sync_enabled := false
 var volume := 1.0  # recitation loudness, 0 (silent) to 1 (full); remembered between visits
 ## How many unseen cards a day offers. Anki's deck default (20 a day) is the
 ## starting point, not a law: a reader pacing their own memorisation chooses
@@ -56,7 +65,7 @@ static func load_settings():
         if typeof(data) != TYPE_DICTIONARY:
                 push_warning("Settings: %s unreadable; using defaults" % PATH)
                 return s
-        for key in ["token", "owner", "repo", "deck_folder", "last_sync", "setup_done", "auto_sync", "volume", "new_per_day", "ayah_font", "ui_lang", "ui_scale", "font_scale"]:
+        for key in ["token", "owner", "repo", "deck_folder", "last_sync", "setup_done", "auto_sync", "sync_enabled", "volume", "new_per_day", "ayah_font", "ui_lang", "ui_scale", "font_scale"]:
                 if not data.has(key):
                         continue
                 # JSON reads every number back as a float, and every saved int
@@ -73,6 +82,12 @@ static func load_settings():
                         s.set(key, float(value))
                 elif want == TYPE_BOOL and typeof(value) == TYPE_INT:
                         s.set(key, bool(value))
+        # The switch arrived after the token did: a file written by an older
+        # version says nothing about it, and a reader who already keeps their
+        # deck on GitHub never asked to wake up disconnected. Their token is
+        # the answer -- the switch wakes on with it.
+        if not data.has("sync_enabled"):
+                s.sync_enabled = s.has_token()
         return s
 
 
@@ -91,6 +106,7 @@ func save() -> bool:
                                 "last_sync": last_sync,
                                 "setup_done": setup_done,
                                 "auto_sync": auto_sync,
+                                "sync_enabled": sync_enabled,
                                 "volume": volume,
                                 "new_per_day": new_per_day,
                                 "ayah_font": ayah_font,

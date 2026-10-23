@@ -9,8 +9,10 @@ const I18nScript := preload("res://scripts/ui/i18n.gd")
 ## The only front door: the deck's name, what is waiting today, and the one
 ## button that matters. The page's whole second subject -- the deck's other
 ## life on GitHub, and the app's own settings -- lives with the library's
-## door in a dock at the page's foot: three named places a thumb knows how
-## to find, the sync one saying its state in its tone and its own tooltip.
+## door in a dock at the page's foot: named places a thumb knows how to
+## find, the sync one standing among them only while sync is on -- a deck
+## with no GitHub life keeps its dock to the library and settings -- and
+## saying its state in its tone and its own tooltip while it stands.
 ## The page itself is dressed in a still lattice of stars, the way a book's
 ## margins are.
 
@@ -152,16 +154,21 @@ func _apply_counts(counts: Dictionary) -> void:
 ## deck and the repo last agreed, gold while answers still wait to travel
 ## or the promise is unkept, a turning green mark while the exchange is
 ## actually happening, red when it could not finish, and a quiet ink one
-## when there is no connection at all. The state is worn twice at once --
+## when the account has still to arrive. The state is worn twice at once --
 ## the wash the item's own tone gives the door, and the tint the mark and
 ## its word share -- and the words live in the item's own tooltip: the
 ## dock tells the whole story, and the page above it belongs to the day,
 ## not to the plumbing. The mark alone is the door's one figure; nothing
-## else stands beside it.
+## else stands beside it. And a door that leads nowhere yet does not
+## stand at all: a reader who has not switched sync on finds the dock
+## keeping only the doors they have, and the page says nothing of GitHub
+## they never asked to hear.
 func _set_sync_state(text: String, state: String) -> void:
         var item: Button = get_node("Dock/Pad/Row/Sync")
         var mark: ThemeScript.SyncMark = item.get_node("Stack/Icon/Mark/SyncMark")
         var label: Label = item.get_node("Stack/Text")
+        item.visible = state != "hidden"
+        item.tooltip_text = text
         var tone := ThemeScript.INK
         var mark_tone := ThemeScript.INK_SOFT
         match state:
@@ -494,11 +501,11 @@ func _study_button() -> Control:
         return button
 
 ## The page's own foot: a bar of the card's white riding the bottom edge,
-## carrying the app's three standing doors -- the library, the sync, the
-## settings -- each a mark above its own word, so no door is ever a
-## mystery icon again. The dock is furniture rather than a button: one
-## surface, three places on it, a thumb's reach from everywhere the page's
-## own work happens.
+## carrying the app's standing doors -- the library, the sync, the
+## settings, the sync one present only while sync is on -- each a mark
+## above its own word, so no door is ever a mystery icon again. The dock
+## is furniture rather than a button: one surface, two or three places on
+## it, a thumb's reach from everywhere the page's own work happens.
 func _dock() -> Control:
         var dock := PanelContainer.new()
         dock.name = "Dock"

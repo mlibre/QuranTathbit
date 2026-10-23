@@ -30,7 +30,7 @@ func _init() -> void:
 
         _check_the_question_is_never_asked(main)
         _check_the_tongue_is_written_down()
-        _check_home_speaks_it(main)
+        await _check_home_speaks_it(main)
         _check_the_coin_keeps_its_corner(main)
         await _check_settings_never_asks(main)
         _check_an_english_deck_is_answered(main)
@@ -102,13 +102,23 @@ func _check_home_speaks_it(main: Control) -> void:
                 "۰",
                 "the day's numbers arrive in the reader's own script"
         )
+        # A fresh install has no GitHub life in this tongue either: the sync
+        # door waits, unseen, until the reader switches sync on in Settings.
+        var sync_door: Control = home.get_node("Dock/Pad/Row/Sync")
+        _ok(not sync_door.visible, "the sync door waits, unseen, while sync is off")
+        # Raised for the order's sake -- the reading's own order is the law
+        # of the doors that stand, and the sync door stands once it is on.
+        main._settings.sync_enabled = true
+        main._refresh_home()
+        await create_timer(0.2).timeout
         # The reading's own order: the library door stands where the reading
         # begins -- the right -- and settings stands last, where it ends.
         var browse: Control = home.get_node("Dock/Pad/Row/Browse")
         var sync: Control = home.get_node("Dock/Pad/Row/Sync")
         var settings_door: Control = home.get_node("Dock/Pad/Row/Settings")
         _ok(
-                browse.get_global_rect().get_center().x > sync.get_global_rect().get_center().x
+                sync.visible
+                        and browse.get_global_rect().get_center().x > sync.get_global_rect().get_center().x
                         and sync.get_global_rect().get_center().x
                         > settings_door.get_global_rect().get_center().x,
                 "the dock's doors stand in the reading's own order -- the library first, from the right"

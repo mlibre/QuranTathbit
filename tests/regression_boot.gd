@@ -34,7 +34,7 @@ func _init() -> void:
                 quit(1)
                 return
 
-        await _check_home_numbers(home)
+        await _check_home_numbers(home, main)
         _check_home_says_sync_by_the_dock_alone(home)
         await _check_language_picker(main)
         await _check_study_session(main)
@@ -105,7 +105,7 @@ func _is(got: Variant, expected: Variant, what: String) -> void:
                 _failures += 1
                 print("  FAIL: %s — got %s, expected %s" % [what, str(got), str(expected)])
 
-func _check_home_numbers(home: Control) -> void:
+func _check_home_numbers(home: Control, main: Node) -> void:
         var deck = load("res://scripts/data/deck.gd").load("user://decks/quran")
         _ok(deck != null, "the bundled deck installs itself on first run")
         if deck == null:
@@ -174,9 +174,18 @@ func _check_home_numbers(home: Control) -> void:
                 home.get_node_or_null("Margin/Column/Browse") == null,
                 "the library's door has left the page's own flow"
         )
+        # A fresh install has no GitHub life yet, and the dock says so by
+        # absence: the sync door waits, unseen, until the reader switches
+        # sync on in Settings. The dock keeps the two doors they have.
+        var sync_door: Button = home.get_node_or_null("Dock/Pad/Row/Sync")
+        _ok(sync_door != null and not sync_door.visible, "the sync door waits, unseen, while sync is off")
         # A turning sync mark stays inside its place: the turn is about the
         # mark's own centre, and a mark that swings out of its button is the
-        # mark that once left the outer circle.
+        # mark that once left the outer circle. The door is raised first --
+        # the mark turns only for a reader who switched sync on, and a
+        # hidden door's mark is never laid out to turn.
+        main._settings.sync_enabled = true
+        main._refresh_home()
         var sync_mark: ThemeScript.SyncMark = home.get_node("Dock/Pad/Row/Sync/Stack/Icon/Mark/SyncMark")
         sync_mark.set_working(true)
         await process_frame
@@ -1775,11 +1784,13 @@ func _check_sync_retrying(main: Node) -> void:
         _ok(main._sync_retrying, "the app says it will try again")
         _is(main._sync_attempts, 1, "the first retry is the first retry")
         main._settings.token = "for-the-coin"
+        main._settings.sync_enabled = true
         _ok(
                 main._sync_line().contains("try again"),
                 "the coin's own words say the app will try again by itself"
         )
         main._settings.token = ""
+        main._settings.sync_enabled = false
         _ok(
                 not main._maybe_schedule_sync_retry({"ok": false, "error": "auth_failed"}),
                 "a refused token schedules nothing"
@@ -1872,6 +1883,7 @@ func _check_sync_retries_the_other_road(main: Node) -> void:
         main._http = costume
         main._sync = sync_script.new(costume, main._auth)
         main._settings.token = "boot-token"
+        main._settings.sync_enabled = true
         main._settings.save()
         main._sync_attempts = 0
         main._sync_failed = false
@@ -1890,6 +1902,7 @@ func _check_sync_retries_the_other_road(main: Node) -> void:
         main._http = real_http
         main._sync = sync_script.new(real_http, main._auth)
         main._settings.token = ""
+        main._settings.sync_enabled = false
         main._settings.save()
         costume.free()
         _remove_tree("user://sync_manifest.json")
@@ -1955,6 +1968,11 @@ func _check_home_says_sync_by_the_dock_alone(home: Control) -> void:
                 "the settings coin has left the corner for the dock"
         )
         var sync: Button = home.get_node("Dock/Pad/Row/Sync")
+        # The check after this one raised the door (sync switched on for the
+        # mark's turn): once it is wanted, the door stands among its kin --
+        # the two laws, absence while off and presence while on, hold on
+        # one page.
+        _ok(sync.visible, "the sync door stands once sync is switched on")
         _ok(sync.tooltip_text.length() > 0, "the dock's sync door carries its state in its own words")
         _ok(
                 sync.get_node_or_null("Stack/Icon/Dot") == null,
@@ -1979,6 +1997,7 @@ func _check_settings_round_trip() -> void:
         settings.last_sync = 1792000123
         settings.setup_done = true
         settings.auto_sync = false
+        settings.sync_enabled = true
         settings.volume = 0.35
         settings.new_per_day = 7
         _ok(settings.save(), "settings save")
@@ -1987,6 +2006,7 @@ func _check_settings_round_trip() -> void:
         _is(back.last_sync, 1792000123, "the last sync time survives its own reload")
         _is(back.setup_done, true, "setup_done survives its own reload")
         _is(back.auto_sync, false, "a switched-off auto sync stays off")
+        _is(back.sync_enabled, true, "a switched-on sync stays on")
         _is(back.volume, 0.35, "a chosen loudness survives its own reload")
         _is(back.new_per_day, 7, "a chosen pace survives its own reload")
         # A file written by any older version of the app carries its ints as
@@ -1996,6 +2016,19 @@ func _check_settings_round_trip() -> void:
         file.close()
         var healed = script.load_settings()
         _is(healed.last_sync, 1792000456, "a whole float reads back as the int it was saved as")
+        # The sync switch arrived after the token did: a file that says
+        # nothing of it is an older app's file, and a reader who already
+        # kept their deck on GitHub wakes with sync still on -- never
+        # disconnected by an update. A file that does say the word is taken
+        # at that word.
+        _is(healed.sync_enabled, true, "a token without the switch wakes with sync on")
+        var silent = script.new()
+        _is(silent.sync_enabled, false, "a newborn app wakes with sync off")
+        file = FileAccess.open("user://settings.json", FileAccess.WRITE)
+        file.store_string("{\"token\": \"x\", \"sync_enabled\": false}\n")
+        file.close()
+        var said = script.load_settings()
+        _is(said.sync_enabled, false, "a switch the file says off stays off")
 
 ## The pills a card view offers, gathered from the flows they sit in: a
 ## verse's voices live side by side inside a flow, not directly on the page.
