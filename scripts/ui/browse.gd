@@ -45,6 +45,12 @@ const I18nScript := preload("res://scripts/ui/i18n.gd")
 signal closed
 signal volume_changed(value: float)
 signal edited(card: CardScript)
+## The foot's own doors, rung from the library: the session asked for and
+## the settings asked for -- both answered by the root, the same doors
+## home's own page rings. Home itself needs no new word: leaving the
+## library has always been the closed door above.
+signal study_requested
+signal settings_requested
 
 var volume := 1.0  # the recitation's loudness here, as the last session left it
 var _player: AudioStreamPlayer
@@ -171,6 +177,13 @@ func _build() -> void:
         # It rides above the shelf, a sibling drawn after it, quiet and still.
         add_child(_build_sticky())
         add_child(_rig.popup())
+        # The page's foot: the four standing doors the design draws -- home,
+        # the session, the library, the settings -- riding the bottom edge
+        # on both of the page's steps, so no door is ever more than a
+        # thumb's reach from the shelf or the chapter alike.
+        add_child(_dock())
+        _layout_dock()
+        resized.connect(_layout_dock)
 
 func _top_bar() -> Control:
         # The bar answers the reading's own direction: under a right-reading
@@ -203,24 +216,25 @@ func _top_bar() -> Control:
         right.add_child(coin)
         return row
 
-## It sits pressed into the paper as a line one writes on: no box, no
-## fill, no lens -- the placeholder itself says what the line is for, the
-## way a ledger's ruled line waits for its entry -- a hairline of ink
-## under the words, lifting to gold while it is being written in. A page
-## that reads from the right writes its entry line from the right too:
-## the tongue says the direction, and the placeholder stands where the
-## reading begins.
+## The page's first question, asked in the box the design draws it in: the
+## card's own white, a gold rule standing round it, and the lens waiting at
+## the reading's start -- the way a mushaf's frame holds the words it is
+## meant to find. While it is being written in, the rule lifts to the full
+## gold, the way the page's questions have always lifted; and a page that
+## reads from the right keeps its lens and its entry at the reading's own
+## start, the clear button at the reading's end.
 func _search_field() -> Control:
+        var rtl := I18nScript.is_rtl()
         var field := LineEdit.new()
         field.name = "Search"
         field.placeholder_text = I18nScript.t("Search the deck — a surah, a verse, 2:1…")
-        field.custom_minimum_size = Vector2(0, 44)
+        field.custom_minimum_size = Vector2(0, 46)
         field.clear_button_enabled = true
         field.text_direction = (
-                TextDirection.TEXT_DIRECTION_RTL if I18nScript.is_rtl()
+                TextDirection.TEXT_DIRECTION_RTL if rtl
                 else TextDirection.TEXT_DIRECTION_LTR
         )
-        if I18nScript.is_rtl():
+        if rtl:
                 field.alignment = HORIZONTAL_ALIGNMENT_RIGHT
         field.add_theme_font_override("font", ThemeScript.vazir(15))
         field.add_theme_font_size_override("font_size", ThemeScript.fs(15))
@@ -228,24 +242,188 @@ func _search_field() -> Control:
         field.add_theme_color_override("font_placeholder_color", ThemeScript.INK_SOFT)
         field.add_theme_color_override("caret_color", ThemeScript.GREEN_DEEP)
         field.add_theme_color_override("selection_color", ThemeScript.SELECT)
-        var page := ThemeScript.soft_stylebox(Color(0, 0, 0, 0), 0)
-        page.set_border_width_all(0)
-        page.set_border_width(SIDE_BOTTOM, 1)
-        page.border_color = Color(
-                ThemeScript.INK.r, ThemeScript.INK.g, ThemeScript.INK.b, 0.30
+        # The box itself: the card's white under a gold rule, rounded the
+        # way the cards are rounded.
+        var box := ThemeScript.soft_stylebox(ThemeScript.CARD, 14)
+        box.set_border_width_all(1)
+        box.border_color = Color(
+                ThemeScript.GOLD.r, ThemeScript.GOLD.g, ThemeScript.GOLD.b, 0.55
         )
-        page.content_margin_left = 2
-        page.content_margin_right = 8
-        page.content_margin_top = 6
-        page.content_margin_bottom = 7
-        field.add_theme_stylebox_override("normal", page)
-        var visited := page.duplicate() as StyleBoxFlat
-        visited.set_border_width(SIDE_BOTTOM, 2)
-        visited.border_color = ThemeScript.GOLD
-        field.add_theme_stylebox_override("hover", visited)
-        field.add_theme_stylebox_override("focus", visited)
+        # The lens keeps its own room at the reading's start, so the words
+        # written in never run beneath it.
+        box.content_margin_left = 12.0 if rtl else 36.0
+        box.content_margin_right = 36.0 if rtl else 12.0
+        box.content_margin_top = 10
+        box.content_margin_bottom = 10
+        field.add_theme_stylebox_override("normal", box)
+        var lit := box.duplicate() as StyleBoxFlat
+        lit.set_border_width_all(2)
+        lit.border_color = ThemeScript.GOLD
+        field.add_theme_stylebox_override("hover", lit)
+        field.add_theme_stylebox_override("focus", lit)
+        # The lens itself: a figure on the card, taking no hand and no
+        # room but the margin that was kept for it.
+        var lens := ThemeScript.SearchMark.new(Color(
+                ThemeScript.GOLD_DEEP.r,
+                ThemeScript.GOLD_DEEP.g,
+                ThemeScript.GOLD_DEEP.b,
+                0.85
+        ))
+        lens.name = "Lens"
+        lens.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        lens.anchor_left = 1.0 if rtl else 0.0
+        lens.anchor_right = 1.0 if rtl else 0.0
+        lens.anchor_top = 0.5
+        lens.anchor_bottom = 0.5
+        lens.offset_left = -30.0 if rtl else 12.0
+        lens.offset_right = -14.0 if rtl else 28.0
+        lens.offset_top = -8.0
+        lens.offset_bottom = 8.0
+        field.add_child(lens)
         field.text_changed.connect(_on_search_changed)
         return field
+
+
+## The page's foot: one bar of the card's white riding the bottom edge,
+## carrying the four standing doors the design draws -- home, the session,
+## the library, the settings -- each a mark above its own word, so no door
+## is ever a mystery icon. The doors stand in the reading's own order: a
+## page that reads from the right begins its row with خانه at the right
+## hand. The bar spans the page's whole foot; on a desk its doors keep to
+## the measure a thumb knows, standing centred in the bar.
+func _dock() -> Control:
+        var dock := PanelContainer.new()
+        dock.name = "Dock"
+        var box := ThemeScript.dock_stylebox()
+        # A bar that spans the page's foot meets the screen's own corners:
+        # the card's rounding belongs to the floating dock on home, not to
+        # this one, whose top edge is a ruled line across the page.
+        box.corner_radius_top_left = 0
+        box.corner_radius_top_right = 0
+        dock.add_theme_stylebox_override("panel", box)
+        dock.anchor_left = 0.0
+        dock.anchor_right = 1.0
+        dock.anchor_top = 1.0
+        dock.anchor_bottom = 1.0
+        dock.grow_vertical = Control.GROW_DIRECTION_BEGIN
+        var pad := MarginContainer.new()
+        pad.name = "Pad"
+        pad.add_theme_constant_override("margin_left", 10)
+        pad.add_theme_constant_override("margin_right", 10)
+        pad.add_theme_constant_override("margin_top", 7)
+        pad.add_theme_constant_override("margin_bottom", 9)
+        dock.add_child(pad)
+        var row := HBoxContainer.new()
+        row.name = "Row"
+        row.add_theme_constant_override("separation", 4)
+        if I18nScript.is_rtl():
+                row.layout_direction = Control.LAYOUT_DIRECTION_RTL
+        pad.add_child(row)
+        row.add_child(_dock_door(
+                "Home",
+                ThemeScript.HomeMark.new(ThemeScript.INK_SOFT),
+                I18nScript.t("Home"),
+                I18nScript.t("Back to home"),
+                ThemeScript.INK_SOFT,
+                func() -> void: closed.emit()
+        ))
+        row.add_child(_dock_door(
+                "Study",
+                ThemeScript.StudyMark.new(ThemeScript.INK_SOFT),
+                I18nScript.t("Study"),
+                I18nScript.t("Study"),
+                ThemeScript.INK_SOFT,
+                func() -> void: study_requested.emit()
+        ))
+        # The library's own door wears the gold of a place already stood
+        # in: behind a chapter's page it leads one step back to the shelf,
+        # and on the shelf itself it stands still.
+        row.add_child(_dock_door(
+                "Library",
+                ThemeScript.ShelfMark.new(ThemeScript.GOLD_DEEP),
+                I18nScript.t("Library"),
+                I18nScript.t("Library"),
+                ThemeScript.GOLD_DEEP,
+                func() -> void:
+                        if _mode == "surah":
+                                _back_to_shelf()
+        ))
+        row.add_child(_dock_door(
+                "Settings",
+                ThemeScript.CogMark.new(ThemeScript.INK_SOFT),
+                I18nScript.t("Settings"),
+                I18nScript.t("Settings"),
+                ThemeScript.INK_SOFT,
+                func() -> void: settings_requested.emit()
+        ))
+        return dock
+
+
+## One place on the dock, the way home's own dock dresses its places: a
+## mark above its own word, both in the door's own tone, a wash of that
+## tone while visited. The door that names the page it stands on wears
+## that tone at rest too -- gold for the library, here where the library
+## lives.
+func _dock_door(door_name: String, mark: Control, label_text: String, tooltip: String, tone: Color, on_press: Callable) -> Button:
+        var door := Button.new()
+        door.name = door_name
+        door.custom_minimum_size = Vector2(0, 54)
+        door.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        door.tooltip_text = tooltip
+        ThemeScript.apply_mark_styles(door, ThemeScript.dock_button_styles(tone))
+        ThemeScript.pressable(door)
+        door.pressed.connect(on_press)
+        var stack := VBoxContainer.new()
+        stack.name = "Stack"
+        stack.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        stack.alignment = BoxContainer.ALIGNMENT_CENTER
+        stack.add_theme_constant_override("separation", 3)
+        door.add_child(stack)
+        var icon := Control.new()
+        icon.name = "Icon"
+        icon.custom_minimum_size = Vector2(24, 24)
+        icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        var center := CenterContainer.new()
+        center.name = "Mark"
+        center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        mark.name = door_name + "Mark"
+        center.add_child(mark)
+        icon.add_child(center)
+        stack.add_child(icon)
+        var label := Label.new()
+        label.name = "Text"
+        label.text = label_text
+        label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        ThemeScript.dress(label, ThemeScript.CAPTION, tone, true)
+        stack.add_child(label)
+        return door
+
+
+## The foot's own answering, the way home answers its window: the bar rides
+## above whatever the display keeps for itself, and its doors keep a
+## thumb's measure on a desk and the whole hand's width on a phone. The
+## page's ground is answered in _layout, which reads this bar's height --
+## one writer, so the two answers never argue. Runs on every resize.
+func _layout_dock() -> void:
+        var dock: PanelContainer = get_node_or_null("Dock")
+        var pad: MarginContainer = get_node_or_null("Dock/Pad")
+        if dock == null or pad == null:
+                return
+        pad.add_theme_constant_override("margin_bottom", int(9.0 + ThemeScript.bottom_inset()))
+        var side := 10.0
+        var widest := 560.0
+        if size.x > widest:
+                side = (size.x - widest) / 2.0
+        pad.add_theme_constant_override("margin_left", int(side))
+        pad.add_theme_constant_override("margin_right", int(side))
+        var dock_h := dock.get_combined_minimum_size().y
+        dock.offset_left = 0
+        dock.offset_right = 0
+        dock.offset_top = -dock_h
+        dock.offset_bottom = 0.0
 
 ## The shelf's other question, asked in pills: the whole story, or one
 ## thread of it -- what the day is asking for, what has never been started,
@@ -1580,7 +1758,13 @@ func _layout() -> void:
                 return
         var margin: MarginContainer = get_node("Margin")
         margin.add_theme_constant_override("margin_top", int(22.0 + ThemeScript.top_inset()))
-        margin.add_theme_constant_override("margin_bottom", int(26.0 + ThemeScript.bottom_inset()))
+        # The page's ground ends a breath above the doors at its foot: the
+        # dock's own height, and nothing of the shelf beneath it.
+        var dock_h := 0.0
+        var dock: PanelContainer = get_node_or_null("Dock")
+        if dock != null:
+                dock_h = dock.get_combined_minimum_size().y
+        margin.add_theme_constant_override("margin_bottom", int(dock_h + 12.0))
         var narrow := size.x < ThemeScript.NARROW
         margin.add_theme_constant_override("margin_left", 16 if narrow else 24)
         margin.add_theme_constant_override("margin_right", 16 if narrow else 24)

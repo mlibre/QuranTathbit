@@ -770,6 +770,10 @@ func _on_browse_pressed() -> void:
         browse.closed.connect(_go_home)
         browse.edited.connect(_on_card_edited)
         browse.volume_changed.connect(_on_volume_changed)
+        # The foot's own doors: the session and the settings, asked for from
+        # the library itself, ring the same doors home's page rings.
+        browse.study_requested.connect(_start_session)
+        browse.settings_requested.connect(_on_settings_pressed)
 
 
 func _on_account_changed() -> void:

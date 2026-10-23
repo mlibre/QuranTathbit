@@ -395,6 +395,135 @@ class BookMark extends Control:
                 draw_line(Vector2(3.3, 17.1), Vector2(3.3, 4.6), color, 2.0, true)
 
 
+## The lens the page's question wears: a ring and its handle, drawn in the
+## gold of the box it stands in. It lives inside the search field itself,
+## at the reading's start, so the question reads as a question before a
+## word is written into it.
+class SearchMark extends Control:
+        var color := GOLD_DEEP
+
+        func _init(p_color: Color = GOLD_DEEP) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(16, 16)
+
+        func _draw() -> void:
+                draw_arc(Vector2(7.3, 7.3), 4.4, 0.0, TAU, 24, color, 1.4, true)
+                draw_line(Vector2(10.7, 10.7), Vector2(13.4, 13.4), color, 1.4, true)
+
+
+## The door the design draws for home: a roof over two walls, the ridge
+## open so the paper shows through -- a house named by its outline alone.
+class HomeMark extends Control:
+        var color := INK_SOFT
+
+        func _init(p_color: Color = INK_SOFT) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(20, 20)
+
+        func _draw() -> void:
+                draw_polyline(
+                        PackedVector2Array([
+                                Vector2(3.3, 9.3), Vector2(10.0, 3.8), Vector2(16.7, 9.3),
+                        ]),
+                        color, 1.5, true
+                )
+                draw_polyline(
+                        PackedVector2Array([
+                                Vector2(5.0, 8.5), Vector2(5.0, 15.8),
+                                Vector2(15.0, 15.8), Vector2(15.0, 8.5),
+                        ]),
+                        color, 1.5, true
+                )
+
+
+## The open book the design draws for the session: two leaves spreading
+## from one spine, their tops dipping where the pages turn -- the session
+## is reading done with the hand, and the mark says so.
+class StudyMark extends Control:
+        var color := INK_SOFT
+
+        func _init(p_color: Color = INK_SOFT) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(20, 20)
+
+        func _draw() -> void:
+                # The two leaves: out from the spine's head, down the far
+                # edge, and home to the spine's foot -- each half the same
+                # curve the page's own hand would draw.
+                draw_polyline(_leaf(
+                        Vector2(8.5, 4.1), Vector2(6.2, 3.9), Vector2(3.8, 4.7),
+                        Vector2(3.8, 15.6), Vector2(6.2, 14.8), Vector2(8.5, 15.0)
+                ), color, 1.4, true)
+                draw_polyline(_leaf(
+                        Vector2(11.5, 4.1), Vector2(13.8, 3.9), Vector2(16.2, 4.7),
+                        Vector2(16.2, 15.6), Vector2(13.8, 14.8), Vector2(11.5, 15.0)
+                ), color, 1.4, true)
+                # The spine itself, head to foot.
+                draw_line(Vector2(10.0, 5.3), Vector2(10.0, 16.2), color, 1.4, true)
+
+        ## One leaf, sampled out of its two curves: the head leaves the
+        ## spine by the top curve and returns to it by the bottom one.
+        func _leaf(c1: Vector2, c2: Vector2, top_far: Vector2,
+                        foot_far: Vector2, c3: Vector2, c4: Vector2) -> PackedVector2Array:
+                var points := PackedVector2Array()
+                var steps := 10
+                for i in steps + 1:
+                        points.append(Vector2(10.0, 5.3).bezier_interpolate(
+                                c1, c2, top_far, float(i) / float(steps)
+                        ))
+                for i in steps + 1:
+                        points.append(foot_far.bezier_interpolate(
+                                c3, c4, Vector2(10.0, 16.2), float(i) / float(steps)
+                        ))
+                return points
+
+
+## The shelf the design draws for the library: three spines standing side
+## by side, the third leaning the way a well-read book leans on its
+## neighbours -- the library named by its own furniture.
+class ShelfMark extends Control:
+        var color := INK_SOFT
+
+        func _init(p_color: Color = INK_SOFT) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(20, 20)
+
+        func _draw() -> void:
+                draw_polyline(PackedVector2Array([
+                        Vector2(4.2, 3.8), Vector2(6.8, 3.8),
+                        Vector2(6.8, 16.3), Vector2(4.2, 16.3), Vector2(4.2, 3.8),
+                ]), color, 1.4, true)
+                draw_polyline(PackedVector2Array([
+                        Vector2(8.7, 3.8), Vector2(11.3, 3.8),
+                        Vector2(11.3, 16.3), Vector2(8.7, 16.3), Vector2(8.7, 3.8),
+                ]), color, 1.4, true)
+                draw_polyline(PackedVector2Array([
+                        Vector2(13.2, 4.8), Vector2(15.8, 5.5),
+                        Vector2(12.8, 16.0), Vector2(10.2, 15.3), Vector2(13.2, 4.8),
+                ]), color, 1.4, true)
+
+
+## The cog the design draws for the settings: a ring wearing eight short
+## rays, the way a key's teeth stand round its head -- the page where the
+## app's own dials live.
+class CogMark extends Control:
+        var color := INK_SOFT
+
+        func _init(p_color: Color = INK_SOFT) -> void:
+                color = p_color
+                custom_minimum_size = Vector2(20, 20)
+
+        func _draw() -> void:
+                draw_arc(Vector2(10, 10), 2.6, 0.0, TAU, 24, color, 1.4, true)
+                for i in 8:
+                        var dir := Vector2(cos(TAU * float(i) / 8.0), sin(TAU * float(i) / 8.0))
+                        draw_line(
+                                Vector2(10, 10) + dir * 5.0,
+                                Vector2(10, 10) + dir * 7.0,
+                                color, 1.4, true
+                        )
+
+
 ## A speaker with its own breath of sound: the volume mark, for the one
 ## corner of a study session that says how loud the recitation is. A silent
 ## app wears the speaker alone -- no breath, nothing to hear -- so the eye
