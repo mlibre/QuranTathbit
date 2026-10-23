@@ -229,7 +229,30 @@ func _check_real_shelf() -> void:
         if scroll == null:
                 _ok(false, "the library carries its scroller")
                 return
-        _ok(scroll.get_v_scroll_bar().max_value > 300.0, "the shelf is long enough to scroll")
+        # The library opens on the shelf of surahs now; a finger's drag is
+        # judged on a chapter's own page, the way the reader reported it --
+        # so the test opens the deck's first chapter and waits for its rows.
+        var grid: GridContainer = browse.get_node_or_null(
+                "Margin/Column/Scroll/Wrap/Column/Shelf"
+        )
+        if grid == null:
+                _ok(false, "the library opens on the shelf of surahs")
+                return
+        var first: Button = null
+        for child in grid.get_children():
+                if child.name.begins_with("SurahCard"):
+                        first = child
+                        break
+        if first == null:
+                _ok(false, "the shelf carries a chapter's card")
+                return
+        browse._open_surah_view((first.get_node("Pad/Words/Name") as Label).text)
+        var waited := 0.0
+        while _entries_on(browse) < 1 and waited < 10.0:
+                await create_timer(0.2).timeout
+                waited += 0.2
+        await create_timer(0.6).timeout
+        _ok(scroll.get_v_scroll_bar().max_value > 300.0, "the chapter's page is long enough to scroll")
         scroll.scroll_vertical = 200.0
         var row: Button = null
         for child in browse.get_node("Margin/Column/Scroll/Wrap/Column").get_children():
@@ -251,6 +274,17 @@ func _check_real_shelf() -> void:
 
 
 # --- the finger, said in events ----------------------------------------------------
+
+## The chapter's own account of how many of its rows stand.
+func _entries_on(browse: Control) -> int:
+        var column := browse.get_node_or_null("Margin/Column/Scroll/Wrap/Column")
+        if column == null:
+                return 0
+        var count := 0
+        for child in column.get_children():
+                if child.name.begins_with("Entry"):
+                        count += 1
+        return count
 
 
 ## A position on the page, said the way the engine says it to a window:

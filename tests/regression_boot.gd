@@ -1115,12 +1115,16 @@ func _check_settings(main: Node) -> void:
         await create_timer(0.4).timeout
         _ok(main.get_node_or_null("Home") != null, "closing settings returns home")
 
-## The library: every card in the deck, grouped by surah, each row opening
-## its own verses and recitations in place. The search field keeps the
-## shelf to the cards that answer it -- by reference, by the verses' own
-## words, or by a verse's address, in whatever digits the hand prefers.
-## Nothing here schedules; reading, listening and the pencil are all it
-## does.
+## The library, read as a book: it opens on the shelf of surahs -- one card
+## a chapter, wearing its name, the mushaf's own number, a ring carrying
+## the share of its cards resting in review, and the day's gold dot when
+## the chapter holds a card the day asks for. The search field narrows the
+## shelf the same way it narrows the pages behind it -- by a verse's
+## address, in whatever digits the hand prefers, or by the verses' own
+## words. A card touched, the chapter's own page opens, and there the rows
+## the library has always read stand in their order, each opening its own
+## verses and recitations in place. Nothing here schedules; reading,
+## listening and the pencil are all it does.
 func _check_browse(main: Node) -> void:
         main._on_browse_pressed()
         await create_timer(0.5).timeout
@@ -1137,26 +1141,132 @@ func _check_browse(main: Node) -> void:
                 browse.closed.emit()
                 await create_timer(0.3).timeout
                 return
-        # The shelf streams its rows in, a slice a frame: the full deck
+        # The deck's chapters, said the way the shelf says them: a card's own
+        # surah, read from its reference's words before the dash.
+        var chapters: Array = []
+        for card in deck.cards:
+                var chapter: String = browse._surah_of(browse._reference_of(card))
+                if not chapters.has(chapter):
+                        chapters.append(chapter)
+        # The shelf streams its cards in, a slice a frame: the whole shelf
         # stands when the shelf says so, not when a clock does.
-        await _await_full_shelf(column, deck.cards.size())
-        var rows := 0
-        var headers := 0
+        await _await_shelf_cards(browse, chapters.size())
+        var shelf_cards := _surah_cards(browse)
+        _is(
+                shelf_cards.size(), chapters.size(),
+                "the shelf holds one card a chapter (%d)" % chapters.size()
+        )
+        if shelf_cards.is_empty():
+                browse.closed.emit()
+                await create_timer(0.3).timeout
+                return
+        # A chapter's card wears its own dress: the name inside its arch, a
+        # ring carrying the chapter's share in review, and the share said
+        # again in words beneath it.
+        var first_card: Button = shelf_cards[0]
+        _ok(
+                first_card.get_node_or_null("Pad/Words/Name") != null
+                        and first_card.get_node_or_null("Pad/Words/Ring") != null
+                        and first_card.get_node_or_null("Pad/Words/Count") != null,
+                "a chapter's card wears its name, its ring and its count"
+        )
+        _ok(
+                (first_card.get_node("Pad/Words/Count") as Label).text.ends_with("cards"),
+                "the card's count is said in the count's own words"
+        )
+        # The search field: a verse's address narrows the shelf to the one
+        # chapter that holds it, in the hand's own digits.
+        var search: LineEdit = browse.get_node_or_null("Margin/Column/Search")
+        _ok(search != null, "the library carries a search field")
+        if search != null:
+                search.text = "2:93"
+                browse._on_search_changed("2:93")
+                await create_timer(0.4).timeout
+                _is(
+                        _surah_cards(browse).size(), 1,
+                        "an address finds exactly its chapter (got %d)" % _surah_cards(browse).size()
+                )
+                _ok(
+                        (browse.get_node("Margin/Column/Summary") as Label).text.begins_with("1 of "),
+                        "the shelf says how many answered"
+                )
+                # Persian digits ask the same question.
+                browse._on_search_changed("۲:۹۳")
+                await create_timer(0.4).timeout
+                _is(
+                        _surah_cards(browse).size(), 1,
+                        "Persian digits ask the same question (got %d)" % _surah_cards(browse).size()
+                )
+                # A question nothing answers says so, quietly.
+                browse._on_search_changed("nothing matches this")
+                await create_timer(0.4).timeout
+                _ok(browse.get_node_or_null("Margin/Column/Scroll/Wrap/Column/Empty") != null, "an empty search says so")
+                browse._on_search_changed("")
+                await create_timer(0.4).timeout
+                await _await_shelf_cards(browse, chapters.size())
+                _is(_surah_cards(browse).size(), chapters.size(), "a cleared search brings the whole shelf back")
+        # The longest chapter is where the rows' own laws are read: a short
+        # chapter's page says nothing about a stream or a running head.
+        # The search's questions rebuilt the shelf, so the cards are read
+        # from the shelf that stands now, not the one that stood before.
+        shelf_cards = _surah_cards(browse)
+        var longest := ""
+        var longest_own := 0
+        for chapter in chapters:
+                var own := 0
+                for card in deck.cards:
+                        if browse._surah_of(browse._reference_of(card)) == chapter:
+                                own += 1
+                if own > longest_own:
+                        longest = chapter
+                        longest_own = own
+        var opened := false
+        for card in shelf_cards:
+                if (card.get_node("Pad/Words/Name") as Label).text == longest:
+                        card.pressed.emit()
+                        opened = true
+                        break
+        _ok(opened, "the longest chapter's card opens its page")
+        await create_timer(0.3).timeout
+        _is(
+                (browse.get_node("Margin/Column/TopBar/Title") as Label).text,
+                longest,
+                "the page's title carries the chapter's name"
+        )
+        await _await_entries(browse, longest_own)
+        var rows := _entries_of(browse)
+        _is(rows, longest_own, "the chapter's page holds its own cards alone (%d)" % rows)
+        # The chapter opens with its own header, and the count is said in
+        # words -- how many cards, how many resting in review -- never a
+        # broken-looking rule.
+        column = browse.get_node_or_null("Margin/Column/Scroll/Wrap/Column")
+        var header: VBoxContainer = null
         for child in column.get_children():
-                if child.name.begins_with("Entry"):
-                        rows += 1
-                elif child.name.begins_with("Header"):
-                        headers += 1
-        _is(rows, deck.cards.size(), "every card has its row in the library")
-        _ok(headers >= 2, "the cards are gathered under their surahs' names")
+                if child.name.begins_with("Header"):
+                        header = child
+        _ok(header != null, "the chapter's page opens with its own header")
+        if header != null:
+                browse._set_header_count(column, 7, 2)
+                var folio: Label = header.get_node_or_null("Line/Count")
+                _ok(
+                        folio != null and folio.text == "7 cards · 2 in review",
+                        "the chapter's count says in words how many rest in review"
+                )
+                _ok(
+                        header.get_node_or_null("Rule") == null,
+                        "the chapter opens without a half-rendered thread"
+                )
         # The shelf says what a card means, not only what it says: every row
         # carries its verse's Persian as a second quiet line under the Arabic,
         # flush right the way the verse is read, its tail trimmed with an
         # ellipsis rather than cut mid-letter.
         var carrying := 0
+        var first_entry: VBoxContainer = null
         for child in column.get_children():
                 if not child.name.begins_with("Entry"):
                         continue
+                if first_entry == null:
+                        first_entry = child
                 var translation: Label = child.get_node_or_null("Row/Pad/Line/Words/Translation")
                 if translation == null:
                         continue
@@ -1167,80 +1277,28 @@ func _check_browse(main: Node) -> void:
                                 and translation.text_overrun_behavior == TextServer.OVERRUN_TRIM_ELLIPSIS,
                         "a row's Persian stands at the reading's edge, trimmed with an ellipsis"
                 )
+        _ok(first_entry != null, "the chapter's first card stands in its row")
         _ok(carrying >= rows - 2, "the rows carry their Persian under the verse (got %d of %d)" % [carrying, rows])
-        # The chapter's opening: no thread under the name -- a partial green
-        # line reads as a line that failed to render -- and how many rest in
-        # review is said in the count's own words, never as a broken-looking
-        # rule.
-        var last_header: VBoxContainer = null
-        for child in column.get_children():
-                if child.name.begins_with("Header"):
-                        last_header = child
-        if last_header != null:
-                browse._set_header_count(column, 7, 2)
-                var folio: Label = last_header.get_node_or_null("Line/Count")
-                _ok(
-                        folio != null and folio.text == "7 cards · 2 in review",
-                        "the chapter's count says in words how many rest in review"
-                )
-                _ok(
-                        last_header.get_node_or_null("Rule") == null,
-                        "the chapter opens without a half-rendered thread"
-                )
-        # The search field: a verse's address finds its card, in the hand's
-        # own digits, and the shelf keeps only what answers.
-        var search: LineEdit = browse.get_node_or_null("Margin/Column/Search")
-        _ok(search != null, "the library carries a search field")
-        if search != null:
-                search.text = "2:93"
-                browse._on_search_changed("2:93")
-                await create_timer(0.4).timeout
-                var matched := 0
-                for child in column.get_children():
-                        if child.name.begins_with("Entry"):
-                                matched += 1
-                _is(matched, 1, "an address finds exactly its card (got %d)" % matched)
-                _ok(
-                        (browse.get_node("Margin/Column/Summary") as Label).text.begins_with("1 of "),
-                        "the shelf says how many answered"
-                )
-                # Persian digits ask the same question.
-                browse._on_search_changed("۲:۹۳")
-                await create_timer(0.4).timeout
-                matched = 0
-                for child in column.get_children():
-                        if child.name.begins_with("Entry"):
-                                matched += 1
-                _is(matched, 1, "Persian digits ask the same question (got %d)" % matched)
-                # A question nothing answers says so, quietly.
-                browse._on_search_changed("nothing matches this")
-                await create_timer(0.4).timeout
-                _ok(browse.get_node_or_null("Margin/Column/Scroll/Wrap/Column/Empty") != null, "an empty search says so")
-                browse._on_search_changed("")
-                await create_timer(0.4).timeout
-                await _await_full_shelf(column, deck.cards.size())
-                rows = 0
-                for child in column.get_children():
-                        if child.name.begins_with("Entry"):
-                                rows += 1
-                _is(rows, deck.cards.size(), "a cleared search brings the shelf back")
-        # A row opens its card in place: the verses, the recitations, the
-        # citation at the foot -- and only one row is open at a time.
-        var first_entry: VBoxContainer = null
-        for child in column.get_children():
-                if child.name.begins_with("Entry"):
-                        first_entry = child
-                        break
-        _ok(first_entry != null, "the library's first card stands in its row")
         if first_entry == null:
                 browse.closed.emit()
                 await create_timer(0.3).timeout
                 return
-        # The shelf's own scripture: the row's preview is the verse itself in
+        # The shelf's own scripture: a row's preview is the verse itself in
         # the mushaf cut, flush right the way the verse is read, at a size
         # its vowels survive -- the one place the app drew Amiri's harakat
-        # small enough to misread.
-        var preview: Label = first_entry.get_node_or_null("Row/Pad/Line/Words/Preview")
+        # small enough to misread. The mushaf cut belongs to the verse's own
+        # script, so the law is read on a row whose verse is Arabic -- the
+        # deck also carries Persian-scripted previews, and those wear their
+        # own face at their own size.
+        var preview: Label = null
+        for child in column.get_children():
+                if not child.name.begins_with("Entry"):
+                        continue
+                var one: Label = child.get_node_or_null("Row/Pad/Line/Words/Preview")
+                if one != null and ThemeScript.script_of(one.text) == "arabic":
+                        preview = one
+                        break
+        _ok(preview != null, "the chapter's rows carry a verse in the mushaf's own script")
         if preview != null:
                 _is(
                         preview.get_theme_font_size("font_size"),
@@ -1308,6 +1366,25 @@ func _check_browse(main: Node) -> void:
                 (second_entry.get_node("Row") as Button).pressed.emit()
                 await create_timer(0.3).timeout
                 _ok(not detail.visible, "opening one row folds the last one away")
+        # The running head: the chapter's own title that stays while its
+        # cards scroll.
+        _ok(browse.get_node_or_null("Sticky") != null, "the running head rides above the page")
+        var sticky: PanelContainer = browse.get_node_or_null("Sticky")
+        if sticky != null:
+                _ok(not sticky.visible, "the running head rests while the page is at its top")
+                (browse.get_node("Margin/Column/Scroll") as ScrollContainer).scroll_vertical = 900
+                await create_timer(0.3).timeout
+                _ok(sticky.visible, "scrolling into the chapter's cards raises its running head")
+                _ok(
+                        sticky.get_node("Row/Name").text.length() > 0,
+                        "the running head names the chapter it stands over"
+                )
+        # The way back: out of the chapter, onto the shelf, with the page
+        # standing beneath -- the pills' questions are asked there.
+        browse._go_back()
+        await create_timer(0.3).timeout
+        await _await_shelf_cards(browse, chapters.size())
+        _is(_surah_cards(browse).size(), chapters.size(), "the way back sets the whole shelf standing again")
         # The shelf's other question: the pills that keep one thread of the
         # story -- what is due, what has never been started, what rests.
         var filters: HFlowContainer = browse.get_node_or_null("Margin/Column/Filters")
@@ -1333,11 +1410,7 @@ func _check_browse(main: Node) -> void:
                 if due_pill != null:
                         due_pill.pressed.emit()
                         await create_timer(0.4).timeout
-                        var due_rows := 0
-                        for child in column.get_children():
-                                if child.name.begins_with("Entry"):
-                                        due_rows += 1
-                        _is(due_rows, 0, "a fresh deck has nothing due today (got %d)" % due_rows)
+                        _is(_surah_cards(browse).size(), 0, "a fresh deck has nothing due today (got %d)" % _surah_cards(browse).size())
                         _ok(
                                 browse.get_node_or_null("Margin/Column/Scroll/Wrap/Column/Empty") != null,
                                 "an empty due list says so, warmly"
@@ -1346,27 +1419,12 @@ func _check_browse(main: Node) -> void:
                         if due_pill != null:
                                 due_pill.pressed.emit()
                         await create_timer(0.4).timeout
-                        await _await_full_shelf(column, deck.cards.size())
-                        var back_rows := 0
-                        for child in column.get_children():
-                                if child.name.begins_with("Entry"):
-                                        back_rows += 1
-                        _is(back_rows, deck.cards.size(), "a pressed-again pill brings the whole shelf back")
-        # The running head: a surah's title that stays while its cards scroll.
-        _ok(browse.get_node_or_null("Sticky") != null, "the running head rides above the shelf")
-        var sticky: PanelContainer = browse.get_node_or_null("Sticky")
-        if sticky != null:
-                _ok(not sticky.visible, "the running head rests while the shelf is at its top")
-                (browse.get_node("Margin/Column/Scroll") as ScrollContainer).scroll_vertical = 900
-                await create_timer(0.3).timeout
-                _ok(sticky.visible, "scrolling into a surah's cards raises its running head")
-                _ok(
-                        sticky.get_node("Row/Name").text.length() > 0,
-                        "the running head names the chapter it stands over"
-                )
+                        await _await_shelf_cards(browse, chapters.size())
+                        _is(_surah_cards(browse).size(), chapters.size(), "a pressed-again pill brings the whole shelf back")
         browse.closed.emit()
         await create_timer(0.4).timeout
         _ok(main.get_node_or_null("Home") != null, "leaving the library returns home")
+
 
 
 ## The whole word, whatever it wears: a verse's marks reach past the box its
@@ -1429,10 +1487,29 @@ func _check_marks_and_rtl(main: Node) -> void:
         var browse: Control = main.get_node_or_null("Browse")
         if browse != null:
                 var found_room := false
-                var column: VBoxContainer = browse.get_node_or_null("Margin/Column/Scroll/Wrap/Column")
+                var deck = load("res://scripts/data/deck.gd").load("user://decks/quran")
+                # The verse's own chapter, said the way the shelf says it:
+                # its page stands first, for the rows live behind a card.
+                var holder := ""
+                var holder_own := 0
+                for card in deck.cards:
+                        if (card.front + "\n" + card.back).contains("نزِلَ"):
+                                holder = browse._surah_of(browse._reference_of(card))
+                                break
+                if holder != "":
+                        for card in deck.cards:
+                                if browse._surah_of(browse._reference_of(card)) == holder:
+                                        holder_own += 1
+                        browse._open_surah_view(holder)
+                        await _await_entries(browse, holder_own)
+                var column: VBoxContainer = browse.get_node_or_null(
+                        "Margin/Column/Scroll/Wrap/Column"
+                )
                 if column != null:
                         for entry in column.get_children():
-                                var preview: Label = entry.get_node_or_null("Row/Pad/Line/Words/Preview")
+                                var preview: Label = entry.get_node_or_null(
+                                        "Row/Pad/Line/Words/Preview"
+                                )
                                 if preview != null and preview.text.contains("نزِلَ"):
                                         var face: Font = ThemeScript.ayah_face_for("amiri")
                                         found_room = preview.get_combined_minimum_size().y > face.get_height(27)
@@ -1441,6 +1518,7 @@ func _check_marks_and_rtl(main: Node) -> void:
                 browse.closed.emit()
                 await create_timer(0.2).timeout
         ThemeScript.set_ayah_face("amiri_quran")
+
 
         # The editor's mirror gives the room back out of its separation, so
         # the lines stay on the engine's own pitch however tall the words.
@@ -2052,17 +2130,50 @@ func _remove_tree(path: String) -> void:
                         _remove_tree(path.path_join(entry))
                 DirAccess.remove_absolute(path)
 
-## The shelf streams its rows in, a slice a frame; a slow machine fills
+## The shelf streams its cards in, a slice a frame; a slow machine fills
 ## the same shelf a slower way. This waits for the shelf's own word -- the
-## count of standing rows reaching the deck's -- rather than a clock's,
-## and gives up quietly at twenty seconds so a broken shelf still fails
-## on the count, not on a hang.
-func _await_full_shelf(column: VBoxContainer, want: int) -> void:
+## count of standing chapter cards reaching the shelf's own -- rather than
+## a clock's, and gives up quietly at twenty seconds so a broken shelf
+## still fails on the count, not on a hang.
+func _await_shelf_cards(browse: Control, want: int) -> void:
         for _i in 66:
-                var stood := 0
-                for child in column.get_children():
-                        if child.name.begins_with("Entry"):
-                                stood += 1
-                if stood >= want:
+                if _surah_cards(browse).size() >= want:
                         return
                 await create_timer(0.3).timeout
+
+
+## The chapter's rows stream the same way; the same patience, said on the
+## entries the page has stood.
+func _await_entries(browse: Control, want: int) -> void:
+        for _i in 66:
+                if _entries_of(browse) >= want:
+                        return
+                await create_timer(0.3).timeout
+
+
+## The shelf's chapter cards, said the way the grid stands them.
+func _surah_cards(browse: Control) -> Array:
+        var grid := browse.get_node_or_null(
+                "Margin/Column/Scroll/Wrap/Column/Shelf"
+        ) as GridContainer
+        var cards := []
+        if grid != null:
+                for child in grid.get_children():
+                        if child.name.begins_with("SurahCard"):
+                                cards.append(child)
+        return cards
+
+
+## The rows standing on the page behind a chapter's card.
+func _entries_of(browse: Control) -> int:
+        var column := browse.get_node_or_null(
+                "Margin/Column/Scroll/Wrap/Column"
+        ) as VBoxContainer
+        if column == null:
+                return 0
+        var count := 0
+        for child in column.get_children():
+                if child.name.begins_with("Entry"):
+                        count += 1
+        return count
+

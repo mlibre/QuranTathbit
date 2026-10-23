@@ -77,32 +77,77 @@ func _check_browse(main: Node) -> void:
         _ok(browse != null, "the library opens")
         if browse == null:
                 return
-        # The shelf streams, not dumps: the opening breath lays a
-        # screenful and the rest arrive a batch a frame -- a phone meets
-        # a library, not a frozen page -- so one frame in, part of the
-        # shelf stands and the whole deck does not; and a moment later
-        # every card is there with the shelf's tail beside it.
-        var total: int = main._deck.cards.size()
-        var built := _entries_on(browse)
-        if total > 40:
-                _ok(
-                        built >= 1 and built < total,
-                        "the shelf opens on a screenful, not the whole deck (%d of %d)" % [built, total]
-                )
-        # The rest arrive frame by frame; the machine's own pace says how
-        # many frames that takes, so the test waits for the shelf's own
-        # word (every card standing, the tail beside them) rather than a
-        # clock's.
+        # The library opens on the shelf of surahs now: the deck's chapters
+        # as cards, streamed like every shelf -- and behind each card the
+        # chapter's own page, where the old streaming law is read in full.
+        var grid: GridContainer = browse.get_node_or_null(
+                "Margin/Column/Scroll/Wrap/Column/Shelf"
+        )
+        _ok(grid != null, "the library opens on the shelf of surahs")
+        if grid == null:
+                return
         var waited := 0.0
-        while built < total and waited < 20.0:
+        var chapters := _surahs_of(main._deck, browse)
+        while grid.get_child_count() < chapters.size() and waited < 20.0:
+                await create_timer(0.3).timeout
+                waited += 0.3
+        _ok(
+                grid.get_child_count() == chapters.size(),
+                "the shelf arrives whole: one card a chapter (%d)" % grid.get_child_count()
+        )
+        # Behind the longest chapter's card, the page streams: the opening
+        # breath lays a screenful and the rest arrive a batch a frame -- a
+        # phone meets a page, not a frozen one -- and a moment later every
+        # card is there with the tail beside it. The longest chapter is
+        # the one the streaming law is read on: a short chapter is laid
+        # whole in the first breath and says nothing about the stream.
+        var longest := ""
+        var longest_own := 0
+        for chapter in chapters:
+                var own := 0
+                for card in main._deck.cards:
+                        if browse._surah_of(browse._reference_of(card)) == chapter:
+                                own += 1
+                if own > longest_own:
+                        longest = chapter
+                        longest_own = own
+        var first: Button = null
+        for child in grid.get_children():
+                if child.name.begins_with("SurahCard"):
+                        if (child.get_node("Pad/Words/Name") as Label).text == longest:
+                                first = child
+                                break
+        if first == null:
+                _ok(false, "the shelf carries a chapter's card")
+                return
+        var chapter_name: String = (first.get_node("Pad/Words/Name") as Label).text
+        browse._open_surah_view(chapter_name)
+        await process_frame
+        var built := _entries_on(browse)
+        if longest_own > 40:
+                _ok(
+                        built >= 1 and built < longest_own,
+                        "the chapter's page opens on a screenful, not the whole chapter (%d of %d)" % [built, longest_own]
+                )
+        waited = 0.0
+        while built < longest_own and waited < 20.0:
                 await create_timer(0.3).timeout
                 waited += 0.3
                 built = _entries_on(browse)
-        _ok(built == total, "the streamed shelf arrives whole (%d of %d, %.1fs)" % [built, total, waited])
+        _ok(built == longest_own, "the streamed chapter arrives whole (%d of %d, %.1fs)" % [built, longest_own, waited])
         _ok(
                 browse.get_node_or_null("Margin/Column/Scroll/Wrap/Column/Tail") != null,
-                "the streamed shelf carries its tail"
+                "the streamed chapter carries its tail"
         )
+        # The back key's first step out of a chapter lands on the shelf,
+        # the page beneath it standing.
+        _back(main)
+        await create_timer(0.35).timeout
+        _ok(main.get_node_or_null("Browse") != null, "the back key leaves the chapter for the shelf")
+        grid = browse.get_node_or_null("Margin/Column/Scroll/Wrap/Column/Shelf")
+        _ok(grid != null, "the shelf stands again")
+        if grid == null:
+                return
         # The volume's popover closes first, the page beneath it stays.
         var popup: Node = browse.get_node_or_null("VolumePopup")
         if popup == null:
@@ -127,6 +172,17 @@ func _check_browse(main: Node) -> void:
         await create_timer(0.35).timeout
         _ok(main.get_node_or_null("Browse") == null, "the back key leaves the library")
         _ok(main.get_node_or_null("Home") != null, "the back key from the library lands on home")
+
+
+## The deck's chapters, said the way the shelf says them: a card's own
+## surah, read from its reference's words before the dash.
+func _surahs_of(deck, browse: Node) -> Array:
+        var names := []
+        for card in deck.cards:
+                var name: String = browse._surah_of(browse._reference_of(card))
+                if not names.has(name):
+                        names.append(name)
+        return names
 
 
 func _check_editor_over_browse(main: Node) -> void:

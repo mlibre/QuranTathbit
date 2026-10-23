@@ -9,8 +9,15 @@ const MarkdownScript := preload("res://scripts/ui/markdown.gd")
 const SchedulerScript := preload("res://scripts/data/scheduler.gd")
 const I18nScript := preload("res://scripts/ui/i18n.gd")
 
-## The deck's own library, read as a book's index: every card in its
-## order, gathered under its surah's name, each row a verse set directly
+## The deck's own library, read as a book: it opens on the shelf of
+## surahs -- the book's own table of contents -- where every surah stands
+## as one card wearing an arch the way a mushaf heads its chapters, its
+## name in the gold of citations, the mushaf's own number beneath it, a
+## ring carrying the share of its cards resting in review, and a gold dot
+## when the day asks something of it. The questions a reader brings -- the
+## search field, the filter pills -- narrow the shelf the same way they
+## narrow the pages behind it. A card is touched and its chapter opens:
+## every card of that surah in its order, each row a verse set directly
 ## on the page's own paper -- the mushaf cut, flush right the way the
 ## verse itself is read, its address and its standing sharing one quiet
 ## line beneath it, a hairline between one verse and the next -- because a
@@ -26,9 +33,12 @@ const I18nScript := preload("res://scripts/ui/i18n.gd")
 ## reader brings to a shelf: what is due today, what has not been started,
 ## what is resting between reviews.
 ##
-## A surah's name stays with its reader: while the shelf scrolls through a
-## long surah's cards, the chapter's own title rides along the top of the
-## page, the way a book's running head does -- never lost, never shouting.
+## A surah's name stays with its reader: behind a chapter's card the
+## page's own title carries the chapter's name, and while its cards
+## scroll, the title rides along the top of the page, the way a book's
+## running head does -- never lost, never shouting. The way back is the
+## way every book backs up: out of the chapter to its shelf, out of the
+## library to home.
 ## Nothing here schedules: reading, listening and the pencil are all it
 ## does, and the study session keeps its own work to itself.
 
@@ -44,6 +54,8 @@ var _deck: DeckScript
 var _due := 0
 var _query := ""
 var _filter := "all"  # the shelf's whole story, or one thread of it
+var _mode := "shelf"  # the shelf of surahs, or the page behind one of its cards
+var _open_surah := ""  # the chapter whose page stands open
 var _rebuild_tween: SceneTreeTimer = null
 var _sticky: PanelContainer
 var _sticky_name: Label
@@ -123,7 +135,10 @@ func setup(deck: DeckScript, p_volume: float) -> void:
                 await ready
         _query = ""
         _filter = "all"
+        _mode = "shelf"
+        _open_surah = ""
         (get_node("Margin/Column/Search") as LineEdit).text = ""
+        _dress_chrome()
         _rebuild_filters()
         _rebuild()
 
@@ -165,7 +180,7 @@ func _top_bar() -> Control:
         var row: HBoxContainer = bar["row"]
         var back: Button = bar["back"]
         back.tooltip_text = I18nScript.t("Back to home")
-        back.pressed.connect(func() -> void: closed.emit())
+        back.pressed.connect(_go_back)
         # The same corner every playing screen leaves for the question of
         # loudness: one quiet coin, the same page under it.
         var right: Control = bar["right"]
@@ -542,11 +557,12 @@ static func _normalize_digits(text: String) -> String:
 
 # --- the list ------------------------------------------------------------------------
 
-## The shelf itself, rebuilt whole: the cards that answer the search and the
-## filter, under their surahs' names, with the page's account of them above.
-## The column's own separation is nothing -- the rhythm of the page lives in
-## the rows and the hairlines between them, each element carrying its own
-## air, the way a book's typesetting does.
+## The shelf itself, rebuilt whole, after the page's two steps: on the
+## shelf of surahs the cards that answer gather by their chapters, and
+## behind a chapter's card the chapter's own rows stand in their order.
+## The column's own separation is nothing -- the rhythm of the page lives
+## in the rows and the hairlines between them, each element carrying its
+## own air, the way a book's typesetting does.
 func _rebuild() -> void:
         _rebuild_tween = null
         # A new question retires any build still streaming: its batches
@@ -558,15 +574,108 @@ func _rebuild() -> void:
                 column.remove_child(child)
                 child.queue_free()
         _open_row = null
-        var shown: Array = []
+        if _mode == "shelf":
+                _rebuild_shelf(column)
+        else:
+                _rebuild_pages(column)
+
+## The shelf of surahs: the deck's cards gathered by their chapters, each
+## chapter one card on the shelf -- its name, the mushaf's number, its
+## ring, its gold dot when the day asks something of it. The shelf answers
+## the same questions the pages answer: a chapter stands here when any of
+## its cards answers the search and the filter, so a verse's own words
+## lead to the chapter that holds it. The ring and the count are the
+## chapter's own facts, gathered from the whole chapter -- a chapter's
+## standing does not change because the shelf was narrowed to reach it.
+func _rebuild_shelf(column: VBoxContainer) -> void:
+        var stats := _surah_stats()
+        var groups: Array = []
+        var seen := {}
+        var shown := 0
         for card in _deck.cards:
-                if _matches(card):
-                        shown.append(card)
+                if not _matches(card):
+                        continue
+                shown += 1
+                var surah := _surah_of(_reference_of(card))
+                if not seen.has(surah):
+                        seen[surah] = true
+                        groups.append(surah)
         var summary: Label = get_node("Margin/Column/Summary")
         var asking := not _query.strip_edges().is_empty() or _filter != "all"
         # The shelf's account of itself is spoken only while a question
         # stands: at rest the pills already carry their counts, and a line
         # that repeats them is a dashboard, not a book.
+        summary.visible = asking
+        if asking:
+                summary.text = I18nScript.f("%d of %d cards", [shown, _deck.cards.size()])
+        if groups.is_empty():
+                _pending = []
+                _shelf = {}
+                column.add_child(_empty_state())
+                _update_sticky()
+                return
+        var grid := GridContainer.new()
+        grid.name = "Shelf"
+        grid.columns = 2
+        grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        grid.add_theme_constant_override("h_separation", 14)
+        grid.add_theme_constant_override("v_separation", 14)
+        grid.mouse_filter = Control.MOUSE_FILTER_PASS
+        column.add_child(grid)
+        _shelf = {"gen": _build_gen, "mode": "shelf", "stats": stats, "laid": 0}
+        _pending = groups
+        # The opening breath: a screenful laid at once, so the page opens
+        # on a shelf and not on a promise -- then the rest stream in.
+        _lay_batch(SHELF_FIRST)
+        call_deferred("_fit_rows")
+        if not asking:
+                ThemeScript.stagger_in(grid, minf(0.03, 0.55 / maxf(grid.get_child_count(), 1.0)), 0.18)
+        if _pending.is_empty():
+                _close_shelf()
+        else:
+                set_process(true)
+        _update_sticky()
+
+## Every chapter's own facts, gathered in one pass: how many cards it
+## holds, how many rest in review, whether the day asks anything of it,
+## and the mushaf's own number for it -- said by the first of its cards
+## that carries an address (2:1), the way the book numbers its chapters.
+## A chapter whose cards name no address stands unnumbered; the shelf
+## never invents what the deck does not say.
+func _surah_stats() -> Dictionary:
+        var stats := {}
+        var now := int(Time.get_unix_time_from_system())
+        for card in _deck.cards:
+                var surah := _surah_of(_reference_of(card))
+                if not stats.has(surah):
+                        stats[surah] = {"total": 0, "learned": 0, "due": 0, "number": 0}
+                var one: Dictionary = stats[surah]
+                one["total"] = int(one["total"]) + 1
+                if str(card.state["status"]) == "review":
+                        one["learned"] = int(one["learned"]) + 1
+                if _is_due(card):
+                        one["due"] = int(one["due"]) + 1
+                if int(one["number"]) == 0:
+                        for address in _addresses_of(card):
+                                var colon := address.find(":")
+                                if colon > 0:
+                                        var head := address.substr(0, colon)
+                                        if head.is_valid_int():
+                                                one["number"] = int(head)
+                                                break
+        return stats
+
+## One chapter's own page: the cards of the surah whose card the reader
+## touched, under the chapter's own header, in the deck's order -- the
+## rows the library has always read, answering the same search and the
+## same filter the shelf answered.
+func _rebuild_pages(column: VBoxContainer) -> void:
+        var shown: Array = []
+        for card in _deck.cards:
+                if _matches(card) and _surah_of(_reference_of(card)) == _open_surah:
+                        shown.append(card)
+        var summary: Label = get_node("Margin/Column/Summary")
+        var asking := not _query.strip_edges().is_empty() or _filter != "all"
         summary.visible = asking
         if asking:
                 summary.text = I18nScript.f("%d of %d cards", [shown.size(), _deck.cards.size()])
@@ -598,12 +707,20 @@ func _lay_batch(count: int) -> void:
                         return
                 _lay_one()
 
-## One card onto the shelf: the surah's header when the cards cross into
-## it, the card's row after, and the counts the header will stand by.
-## The walk is the page's own -- only its reach is a slice's.
+## One card onto the shelf, one step at a time: on the shelf of surahs a
+## chapter's card onto the grid, and behind a chapter's card the surah's
+## header when the rows cross into it, the card's row after, and the
+## counts the header will stand by. The walk is the page's own -- only
+## its reach is a slice's.
 func _lay_one() -> void:
         var column: VBoxContainer = get_node("Margin/Column/Scroll/Wrap/Column")
-        var card: CardScript = _pending.pop_front()
+        var item: Variant = _pending.pop_front()
+        if _mode == "shelf":
+                column.get_node("Shelf").add_child(
+                        _surah_card(str(item), _shelf["stats"])
+                )
+                return
+        var card: CardScript = item
         var reference := _reference_of(card)
         var card_surah := _surah_of(reference)
         if card_surah != str(_shelf["surah"]):
@@ -618,11 +735,13 @@ func _lay_one() -> void:
                 _shelf["resting"] = int(_shelf["resting"]) + 1
         column.add_child(_entry(card, reference))
 
-## The shelf's last word: the final header's count, the breathing room
-## under the last row, and the running head's own account of the page.
+## The shelf's last word: the final header's count where headers stand,
+## the breathing room under the last row or the last card, and the
+## running head's own account of the page.
 func _close_shelf() -> void:
         var column: VBoxContainer = get_node("Margin/Column/Scroll/Wrap/Column")
-        _set_header_count(column, int(_shelf["in_surah"]), int(_shelf["resting"]))
+        if _mode != "shelf":
+                _set_header_count(column, int(_shelf["in_surah"]), int(_shelf["resting"]))
         var tail := Control.new()
         tail.name = "Tail"
         tail.custom_minimum_size = Vector2(0, 18)
@@ -952,18 +1071,34 @@ func _entry(card: CardScript, reference: String) -> Control:
 ## standing and the pointer hang outside the box they belong to. This
 ## pass -- deferred to the end of the frame in which the shelf was built --
 ## says the number the pad now stands by; the pad's own signal answers
-## every later change the same way.
+## every later change the same way. The grid's cards answer the same law
+## and are fitted the same way.
 func _fit_rows() -> void:
         var column: VBoxContainer = get_node_or_null("Margin/Column/Scroll/Wrap/Column")
         if column == null:
                 return
         for entry in column.get_children():
-                if not entry.name.begins_with("Entry"):
-                        continue
-                var row: Button = entry.get_node_or_null("Row")
-                var pad: MarginContainer = entry.get_node_or_null("Row/Pad")
-                if row != null and pad != null:
-                        _fit_row(row, pad)
+                if entry.name.begins_with("Entry"):
+                        var row: Button = entry.get_node_or_null("Row")
+                        var row_pad: MarginContainer = entry.get_node_or_null("Row/Pad")
+                        if row != null and row_pad != null:
+                                _fit_row(row, row_pad)
+                elif entry.name.begins_with("Shelf"):
+                        for card in entry.get_children():
+                                if not card.name.begins_with("SurahCard"):
+                                        continue
+                                var card_pad: MarginContainer = card.get_node_or_null("Pad")
+                                if card_pad != null:
+                                        _fit_card(card, card_pad)
+
+## One card on the shelf says its own height: never below the least a
+## card can breathe (168 -- the arch's own measure), and never other than
+## what its words cost, the same law a row keeps.
+func _fit_card(card: Button, pad: MarginContainer) -> void:
+        var needed := maxf(pad.get_combined_minimum_size().y, 168.0)
+        if absf(card.custom_minimum_size.y - needed) < 0.5:
+                return
+        card.custom_minimum_size = Vector2(0, needed)
 
 ## One row says its own height: never below the least a row can breathe
 ## (92), and never other than what its words cost -- a row taller than its
@@ -986,6 +1121,219 @@ func _divider() -> Control:
         rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
         rule.add_theme_stylebox_override("panel", ThemeScript.soft_stylebox(ThemeScript.LINE, 0))
         return rule
+
+## One surah's card on the shelf: a white page wearing its arch -- the
+## outline a mushaf sets above its chapter's heading -- with the name in
+## the gold of citations inside it, the mushaf's own number beneath it
+## when the deck says one, the chapter's ring, and the share the ring
+## carries said again in words under it; the gold dot at the reading's
+## far corner when the day asks something of the chapter. The whole card
+## is one button: its press opens the chapter's own page. A Button is no
+## Container, so the card says its own height from the pad's account of
+## its words, the same law a row keeps.
+func _surah_card(surah: String, stats: Dictionary) -> Button:
+        var one: Dictionary = stats.get(
+                surah, {"total": 0, "learned": 0, "due": 0, "number": 0}
+        )
+        var card := Button.new()
+        card.name = "SurahCard" + str(int(_shelf.get("laid", 0)) + 1)
+        _shelf["laid"] = int(_shelf.get("laid", 0)) + 1
+        card.toggle_mode = false
+        card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        var rest := ThemeScript.card_stylebox()
+        var visited := rest.duplicate() as StyleBoxFlat
+        visited.bg_color = ThemeScript.GREEN_SOFT
+        card.add_theme_stylebox_override("normal", rest)
+        card.add_theme_stylebox_override("hover", visited)
+        card.add_theme_stylebox_override("pressed", visited)
+        card.add_theme_stylebox_override("focus", visited)
+        card.add_theme_stylebox_override("disabled", rest)
+        ThemeScript.pressable(card)
+        card.pressed.connect(_open_surah_view.bind(surah))
+
+        # The arch: a hairline of gold with no floor, drawn where the
+        # mushaf draws its chapter's heading. It anchors itself to the
+        # card's own height -- the upper half, down to where the ring
+        # begins -- and asks for no input, the way an outline drawn on the
+        # page asks for nothing but the eye.
+        var arch := Panel.new()
+        arch.name = "Arch"
+        arch.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        arch.set_anchors_preset(Control.PRESET_FULL_RECT)
+        arch.anchor_bottom = 0.54
+        arch.offset_left = 14.0
+        arch.offset_right = -14.0
+        arch.offset_top = 8.0
+        arch.offset_bottom = 0.0
+        var outline := ThemeScript.soft_stylebox(Color(0, 0, 0, 0), 0)
+        outline.border_color = Color(
+                ThemeScript.GOLD.r, ThemeScript.GOLD.g, ThemeScript.GOLD.b, 0.5
+        )
+        outline.set_border_width_all(1)
+        outline.set_border_width(SIDE_BOTTOM, 0)
+        outline.set_corner_radius_all(0)
+        outline.corner_radius_top_left = 120
+        outline.corner_radius_top_right = 120
+        arch.add_theme_stylebox_override("panel", outline)
+        card.add_child(arch)
+
+        # The day's gold dot at the reading's far corner: where the eye's
+        # sweep across the shelf lands last, the way a book's own margin
+        # carries its marks.
+        if int(one["due"]) > 0:
+                var dot := ThemeScript.StatusDot.new(ThemeScript.GOLD_DEEP)
+                dot.name = "Due"
+                if I18nScript.is_rtl():
+                        dot.anchor_left = 0.0
+                        dot.anchor_right = 0.0
+                        dot.offset_left = 14.0
+                        dot.offset_right = 23.0
+                else:
+                        dot.anchor_left = 1.0
+                        dot.anchor_right = 1.0
+                        dot.offset_left = -23.0
+                        dot.offset_right = -14.0
+                dot.anchor_top = 0.0
+                dot.anchor_bottom = 0.0
+                dot.offset_top = 14.0
+                dot.offset_bottom = 23.0
+                card.add_child(dot)
+
+        var pad := MarginContainer.new()
+        pad.name = "Pad"
+        pad.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        pad.add_theme_constant_override("margin_left", 12)
+        pad.add_theme_constant_override("margin_right", 12)
+        pad.add_theme_constant_override("margin_top", 26)
+        pad.add_theme_constant_override("margin_bottom", 14)
+        card.add_child(pad)
+
+        var words := VBoxContainer.new()
+        words.name = "Words"
+        words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+        words.add_theme_constant_override("separation", 5)
+        words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        pad.add_child(words)
+
+        # The chapter's name, inside its arch: the gold of citations at the
+        # size a chapter's own heading wears in a book's index -- present,
+        # never shouting -- centred the way a mushaf centres its headings.
+        var face := ThemeScript.font_for(
+                ThemeScript.reference_script(surah), 17, true
+        )
+        var fsize := ThemeScript.fs(17)
+        var name_label := Label.new()
+        name_label.name = "Name"
+        name_label.text = surah
+        name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        name_label.text_direction = TextDirection.TEXT_DIRECTION_AUTO
+        name_label.clip_text = true
+        name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+        name_label.add_theme_font_override("font", face)
+        name_label.add_theme_font_size_override("font_size", fsize)
+        name_label.add_theme_color_override("font_color", ThemeScript.GOLD_DEEP)
+        ThemeScript.give_label_room(name_label, surah, face, fsize)
+        words.add_child(name_label)
+
+        # The mushaf's own number for the chapter, said small beneath the
+        # name -- a folio's whisper, not a figure's shout. A chapter the
+        # deck numbers nowhere stands here with its name alone.
+        if int(one["number"]) > 0:
+                var number_label := Label.new()
+                number_label.name = "Number"
+                number_label.text = I18nScript.f("Surah %d", [int(one["number"])])
+                number_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                number_label.clip_text = true
+                number_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+                ThemeScript.dress(number_label, 12, ThemeScript.INK_SOFT)
+                words.add_child(number_label)
+
+        # The chapter's ring: the share of its cards resting in review,
+        # drawn around the share itself in the reader's own digits.
+        var share := 0
+        if int(one["total"]) > 0:
+                share = int(round(100.0 * int(one["learned"]) / int(one["total"])))
+        var ring := ThemeScript.ProgressRing.new(share)
+        ring.name = "Ring"
+        ring.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        words.add_child(ring)
+
+        # The ring's fraction in words: what rests and what the chapter
+        # holds -- the same numbers the ring is drawn from, named the way
+        # the headers name a chapter's count.
+        var count_label := Label.new()
+        count_label.name = "Count"
+        count_label.text = I18nScript.f(
+                "%d of %d cards", [int(one["learned"]), int(one["total"])]
+        )
+        count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        count_label.clip_text = true
+        count_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+        ThemeScript.dress(count_label, 12, ThemeScript.INK_SOFT)
+        words.add_child(count_label)
+
+        pad.minimum_size_changed.connect(_fit_card.bind(card, pad))
+        card.custom_minimum_size = Vector2(
+                0,
+                maxf(pad.get_combined_minimum_size().y, 168.0),
+        )
+        return card
+
+## The chapter's door: its card was touched, so the page behind it opens.
+## The page's own furniture follows -- the title carries the chapter's
+## name, and the way back at the reading's start points to the shelf.
+func _open_surah_view(surah: String) -> void:
+        _mode = "surah"
+        _open_surah = surah
+        _dress_chrome()
+        _rebuild()
+
+## The way back out of a chapter: the shelf again, the page's furniture
+## saying the library's own name once more.
+func _back_to_shelf() -> void:
+        _mode = "shelf"
+        _open_surah = ""
+        _dress_chrome()
+        _rebuild()
+
+## The back button's own door: on the shelf it leaves the library; behind
+## a chapter's card it returns to the shelf first. One button, the step
+## the page stands on.
+func _go_back() -> void:
+        if _mode == "surah":
+                _back_to_shelf()
+        else:
+                closed.emit()
+
+## The page's furniture follows its two steps: on the shelf the title is
+## the library's and the way back leads home; behind a chapter's card the
+## title is the chapter, in the face the chapter's own name is read in.
+## The running head needs no telling -- it rides only where chapters'
+## headers stand, and the shelf has none.
+func _dress_chrome() -> void:
+        var title: Label = get_node_or_null("Margin/Column/TopBar/Title")
+        var back: Button = get_node_or_null("Margin/Column/TopBar/Back")
+        if title == null or back == null:
+                return
+        if _mode == "surah":
+                title.text = _open_surah
+                title.add_theme_font_override(
+                        "font",
+                        ThemeScript.font_for(
+                                ThemeScript.reference_script(_open_surah),
+                                ThemeScript.TITLE,
+                                true,
+                        )
+                )
+                back.tooltip_text = I18nScript.t("Back to the shelf")
+        else:
+                title.text = I18nScript.t("Browse")
+                title.add_theme_font_override(
+                        "font", ThemeScript.vazir(ThemeScript.TITLE, true)
+                )
+                back.tooltip_text = I18nScript.t("Back to home")
 
 ## A row opens its card, and only one card is open at a time: the page it
 ## opens is read, then folded away by the next one a finger asks for. An
@@ -1257,12 +1605,21 @@ func _layout() -> void:
         if popup != null:
                 ThemeScript.place_popover(popup, get_node("Margin/Column/TopBar/Right/Volume"))
 
-## The shelf answers the keyboard as a shelf: the arrows walk the rows, one
-## card at a time, and Enter opens what stands under the hand.
+## The shelf answers the keyboard as a shelf: the arrows walk the rows or
+## the grid's cards, one at a time, and Enter opens what stands under the
+## hand.
 func _row_buttons() -> Array:
         var rows := []
         var column: VBoxContainer = get_node_or_null("Margin/Column/Scroll/Wrap/Column")
         if column == null:
+                return rows
+        if _mode == "shelf":
+                var grid: GridContainer = column.get_node_or_null("Shelf")
+                if grid == null:
+                        return rows
+                for card in grid.get_children():
+                        if card.name.begins_with("SurahCard"):
+                                rows.append(card)
                 return rows
         for entry in column.get_children():
                 if entry.name.begins_with("Entry"):
@@ -1291,6 +1648,8 @@ func _input(event: InputEvent) -> void:
                 if event.keycode == KEY_ESCAPE:
                         if writing:
                                 search.release_focus()
+                        elif _mode == "surah":
+                                _back_to_shelf()
                         else:
                                 closed.emit()
                         get_viewport().set_input_as_handled()
@@ -1314,7 +1673,8 @@ func _input(event: InputEvent) -> void:
 
 ## The phone's back key asks the same question Esc asks, in the same
 ## order: the editor over the page first, then the volume's popover, then
-## the search field's own keys, and only then the page itself.
+## the search field's own keys, then the way back out of a chapter to its
+## shelf, and only then the page itself.
 func request_back() -> bool:
         var editor := get_node_or_null("Editor") as CardEditorScript
         if editor != null:
@@ -1326,6 +1686,9 @@ func request_back() -> bool:
         var search: LineEdit = get_node_or_null("Margin/Column/Search")
         if search != null and search.has_focus():
                 search.release_focus()
+                return true
+        if _mode == "surah":
+                _back_to_shelf()
                 return true
         closed.emit()
         return true

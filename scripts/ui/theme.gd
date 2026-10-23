@@ -1178,6 +1178,60 @@ class StarMark extends Control:
                 draw_circle(c, 1.5, color)
 
 
+## A chapter's progress worn as a ring: the track in gold at a whisper,
+## the share of the surah's cards resting in review in the deck's green,
+## arriving from the top the way a clock's hands are read, a gold head at
+## the arc's end the way a mushaf's gold marks where the eye stops -- and
+## the share itself standing in the middle, in the reader's own digits.
+## Complete is all green and says so in the deep green; a chapter not yet
+## begun carries an empty track and says 0 without shame. The diameter,
+## the band and the words all pass through fs() at their own derivations,
+## so a larger hand scales the ring and its number together, and neither
+## ever drifts from the other.
+class ProgressRing extends Control:
+        var percent := 0
+        var diameter := 64
+        var band := 7
+
+        func _init(p_percent := 0) -> void:
+                percent = clampi(p_percent, 0, 100)
+                diameter = THEME.fs(64)
+                band = THEME.fs(7)
+                custom_minimum_size = Vector2(diameter, diameter)
+                mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+        func _draw() -> void:
+                var c := size / 2.0
+                var r := (diameter - band) / 2.0
+                var track := Color(GOLD.r, GOLD.g, GOLD.b, 0.22)
+                draw_arc(c, r, 0.0, TAU, 64, track, band, true)
+                var tone := GREEN_DEEP if percent >= 100 else GREEN
+                if percent > 0:
+                        var end := -PI / 2.0 + TAU * percent / 100.0
+                        draw_arc(c, r, -PI / 2.0, end, 64, tone, band, true)
+                        if percent < 100:
+                                var head := minf(end + TAU * 0.035, -PI / 2.0 + TAU)
+                                draw_arc(c, r, end, head, 12, GOLD, band, true)
+                draw_circle(c, r - band / 2.0 - 1.0, CARD)
+                var said := I18N.num("%d%%" % percent)
+                var face := THEME.vazir(THEME.fs(12), true)
+                var fsize := THEME.fs(12)
+                var said_size := face.get_string_size(
+                        said, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize
+                )
+                var ascent := face.get_ascent(fsize)
+                var descent := face.get_descent(fsize)
+                draw_string(
+                        face,
+                        c - Vector2(said_size.x / 2.0, (ascent - descent) / 2.0),
+                        said,
+                        HORIZONTAL_ALIGNMENT_LEFT,
+                        -1,
+                        fsize,
+                        GREEN_DEEP if percent >= 100 else INK
+                )
+
+
 ## A still lattice of eight-pointed stars behind the page: the margin
 ## decoration of a reverent book, drawn once in gold at a whisper. It never
 ## moves and never competes -- cards and words sit on top of it.
