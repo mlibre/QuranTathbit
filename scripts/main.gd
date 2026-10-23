@@ -770,14 +770,17 @@ func _on_browse_pressed() -> void:
         var browse := BrowseScript.new()
         browse.name = "Browse"
         _swap(browse)
-        browse.setup(_deck, _settings.volume)
+        browse.setup(_deck, _settings.volume, _settings.sync_enabled)
         browse.closed.connect(_go_home)
         browse.edited.connect(_on_card_edited)
         browse.volume_changed.connect(_on_volume_changed)
         # The foot's own doors: the session and the settings, asked for from
-        # the library itself, ring the same doors home's page rings.
+        # the library itself, ring the same doors home's page rings -- and
+        # sync's own door, while it stands in the foot, rings here the way
+        # it rings from home's page and the settings' button.
         browse.study_requested.connect(_start_session)
         browse.settings_requested.connect(_on_settings_pressed)
+        browse.sync_requested.connect(_on_sync_pressed)
 
 
 func _on_account_changed() -> void:
@@ -841,6 +844,10 @@ func _run_sync(quiet := false, alternate := false, fresh := true) -> void:
                 _sync_attempts = 0
         if _screen is HomeScript:
                 (_screen as HomeScript).set_syncing()
+        elif _screen is SettingsScreenScript:
+                (_screen as SettingsScreenScript).note_sync_result(I18nScript.t("Syncing…"), "syncing")
+        elif _screen is BrowseScript:
+                (_screen as BrowseScript).note_sync_state(I18nScript.t("Syncing…"), "syncing")
         var overlay: Control = null
         if not quiet:
                 overlay = SyncOverlayScript.new()
@@ -909,9 +916,11 @@ func _run_sync(quiet := false, alternate := false, fresh := true) -> void:
                 _refresh_home()
         elif _screen is SettingsScreenScript:
                 var screen: SettingsScreenScript = _screen
-                screen.note_sync_result(line)
+                screen.note_sync_result(line, _sync_state())
                 # The settings screen keeps its own account of the moment; the
                 # home line recomputes when the user goes back to it.
+        elif _screen is BrowseScript:
+                (_screen as BrowseScript).note_sync_state(line, _sync_state())
 
         # The ask that waited behind this one goes now: one exchange at a
         # time, and none of them ever dropped.

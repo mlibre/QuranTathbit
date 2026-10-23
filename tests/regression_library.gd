@@ -323,6 +323,33 @@ func _test_the_foots_doors() -> void:
                 margin.get_theme_constant("margin_bottom") >= int(dock_h),
                 "the shelf's ground ends a breath above the doors"
         )
+        # The reader's answer about the deck's other life arrives with the
+        # setup: sync standing raises sync's own door in the session door's
+        # place, and its press rings this page's own signal -- the root
+        # answers it the way it answers sync's every knock.
+        browse.setup(deck, 1.0, true)
+        await create_timer(0.2).timeout
+        var sync_door: Button = dock.get_node_or_null("Pad/Row/Sync")
+        _ok(sync_door != null, "sync standing raises sync's door in the library's foot")
+        _ok(
+                dock.get_node_or_null("Pad/Row/Study") == null,
+                "the session's door gives its place when sync stands"
+        )
+        var rang := {"sync": false}
+        browse.sync_requested.connect(func() -> void: rang["sync"] = true)
+        if sync_door != null:
+                sync_door.pressed.emit()
+                await create_timer(0.1).timeout
+        _ok(rang["sync"], "the library's sync door asks for the deck's other life")
+        # And a switch taken back gives the place home again -- one foot,
+        # whichever face the mid door wears.
+        browse.setup(deck, 1.0, false)
+        await create_timer(0.2).timeout
+        _ok(
+                dock.get_node_or_null("Pad/Row/Study") != null
+                        and dock.get_node_or_null("Pad/Row/Sync") == null,
+                "sync sleeping gives the mid place home to the session's door"
+        )
         # The question's box, the way the design draws it: the card's white
         # under a gold rule, the lens standing at the reading's start.
         var field: LineEdit = browse.get_node("Margin/Column/Search")

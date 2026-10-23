@@ -48,8 +48,11 @@ signal edited(card: CardScript)
 ## The foot's own doors, rung from the library: the session asked for and
 ## the settings asked for -- both answered by the root, the same doors
 ## home's own page rings. Home itself needs no new word: leaving the
-## library has always been the closed door above.
+## library has always been the closed door above. When sync stands, its
+## own door takes the session door's place in the foot and rings here
+## instead -- the root answers it the way it answers sync's every knock.
 signal study_requested
+signal sync_requested
 signal settings_requested
 
 var volume := 1.0  # the recitation's loudness here, as the last session left it
@@ -131,14 +134,18 @@ func _process(_delta: float) -> void:
                 set_process(false)
 
 ## The deck arrives with the volume the last session chose, so the first
-## recitation heard here already speaks at the remembered loudness.
-func setup(deck: DeckScript, p_volume: float) -> void:
+## recitation heard here already speaks at the remembered loudness. It
+## also arrives with the reader's answer about the deck's other life: sync
+## standing in Settings raises its own door in the foot, in the session
+## door's place.
+func setup(deck: DeckScript, p_volume: float, sync_on := false) -> void:
         volume = p_volume
         _rig.apply(volume)
         _deck = deck
         _due = SchedulerScript.counts(deck, int(Time.get_unix_time_from_system()))["due"]
         if not is_node_ready():
                 await ready
+        _say_foot(sync_on)
         _query = ""
         _filter = "all"
         _mode = "shelf"
@@ -147,6 +154,30 @@ func setup(deck: DeckScript, p_volume: float) -> void:
         _dress_chrome()
         _rebuild_filters()
         _rebuild()
+
+## The foot's mid door follows the reader's answer about the deck's other
+## life: sync standing raises sync's own door in the session door's place,
+## sync sleeping gives the place home again. The swap is the theme's one
+## law; a door it raises here is wired to this page's own signal at once,
+## and a swap that never happened is never wired twice.
+func _say_foot(sync_on: bool) -> void:
+        var raised := ThemeScript.swap_foot_mid(get_node("Dock"), sync_on)
+        if raised != null:
+                if sync_on:
+                        (raised as Button).pressed.connect(func() -> void: sync_requested.emit())
+                else:
+                        (raised as Button).pressed.connect(func() -> void: study_requested.emit())
+
+## The root's word about the deck's other life, whenever it moves under
+## this page: the door's words and its tone -- a quiet sync's turning
+## mark included -- so the foot says the truth on every page that carries
+## it.
+func note_sync_state(text: String, state: String) -> void:
+        var door: Button = get_node_or_null("Dock/Pad/Row/Sync")
+        if door == null:
+                return
+        door.tooltip_text = text
+        ThemeScript.dress_foot_sync(door, state)
 
 func _build() -> void:
         set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -293,9 +324,10 @@ func _search_field() -> Control:
 ## the library, the settings, a mark above its own word -- built by the
 ## theme's own hand so every page's foot is the same foot, and only the
 ## door that names this page wears the gold. The doors ring the page's own
-## doors: home leaves the library, the session and the settings ask the
-## root, and the library's own door, behind a chapter's page, leads one
-## step back to the shelf -- and on the shelf itself it stands still.
+## doors: home leaves the library, the session (or sync, while sync
+## stands) and the settings ask the root, and the library's own door,
+## behind a chapter's page, leads one step back to the shelf -- and on the
+## shelf itself it stands still.
 func _dock() -> Control:
         var made := ThemeScript.foot_dock("library", I18nScript.is_rtl())
         (made["home"] as Button).pressed.connect(func() -> void: closed.emit())
