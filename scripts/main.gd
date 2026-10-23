@@ -607,6 +607,10 @@ func _on_settings_pressed() -> void:
         screen.choice_push_requested.connect(_on_choice_push_requested)
         screen.account_changed.connect(_on_account_changed)
         screen.deck_imported.connect(_on_deck_imported)
+        # The foot's own doors: the session and the library, asked for from
+        # the settings themselves, ring the same doors home's page rings.
+        screen.study_requested.connect(_start_session)
+        screen.library_requested.connect(_on_browse_pressed)
 
 
 ## A travelling choice has settled -- the day's pace, the verses' face, the

@@ -334,6 +334,27 @@ func _test_the_foots_doors() -> void:
                 "the search stands under a gold rule"
         )
         _ok(field.get_node_or_null("Lens") != null, "the lens waits at the reading's start")
+        # The hand's own A: a keyboard wearing Persian sends Ctrl+A as
+        # Ctrl+ش -- the same physical key, a different letter -- and the
+        # field answers the physical key, taking the words whole whatever
+        # alphabet the keycaps carry. The tongue's own letters, unaccompanied
+        # by the control key, never select.
+        field.text = "2:93"
+        field.caret_column = field.text.length()
+        var fa_ctrl_a := InputEventKey.new()
+        fa_ctrl_a.physical_keycode = KEY_A
+        fa_ctrl_a.keycode = KEY_NONE
+        fa_ctrl_a.ctrl_pressed = true
+        fa_ctrl_a.pressed = true
+        field.gui_input.emit(fa_ctrl_a)
+        _ok(field.has_selection(), "a Persian keyboard's Ctrl+A takes the typed words whole")
+        field.deselect()
+        var fa_letter := InputEventKey.new()
+        fa_letter.physical_keycode = KEY_A
+        fa_letter.keycode = KEY_NONE
+        fa_letter.pressed = true
+        field.gui_input.emit(fa_letter)
+        _ok(not field.has_selection(), "the tongue's own letter, unaccompanied, never selects")
         browse.queue_free()
         await process_frame
 

@@ -164,6 +164,12 @@ func _ready() -> void:
         _editor.text_changed.connect(_on_text_changed)
         _editor.caret_changed.connect(_on_caret_changed)
         _editor.gui_input.connect(_on_editor_input)
+        # The hand's own A: a keyboard wearing Persian sends Ctrl+A as
+        # Ctrl+ش, and the field's Latin-born shortcuts never recognise it --
+        # the editor answers the physical keys instead (select-all, copy,
+        # cut, paste), so a verse typed in one hand can be taken whole in
+        # the other.
+        ThemeScript.answer_physical_shortcuts(_editor)
         add_child(_editor)
 
         _caret = CaretMark.new()

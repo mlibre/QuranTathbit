@@ -281,149 +281,44 @@ func _search_field() -> Control:
         lens.offset_bottom = 8.0
         field.add_child(lens)
         field.text_changed.connect(_on_search_changed)
+        # The hand's own A: a keyboard wearing Persian sends Ctrl+A as
+        # Ctrl+ش, and the field's Latin-born shortcuts never recognise it --
+        # the field answers the physical keys instead, so the words a reader
+        # typed can be taken whole whatever alphabet the keycaps carry.
+        ThemeScript.answer_physical_shortcuts(field)
         return field
 
 
-## The page's foot: one bar of the card's white riding the bottom edge,
-## carrying the four standing doors the design draws -- home, the session,
-## the library, the settings -- each a mark above its own word, so no door
-## is ever a mystery icon. The doors stand in the reading's own order: a
-## page that reads from the right begins its row with خانه at the right
-## hand. The bar spans the page's whole foot; on a desk its doors keep to
-## the measure a thumb knows, standing centred in the bar.
+## The page's foot: the one bar the whole app carries -- home, the session,
+## the library, the settings, a mark above its own word -- built by the
+## theme's own hand so every page's foot is the same foot, and only the
+## door that names this page wears the gold. The doors ring the page's own
+## doors: home leaves the library, the session and the settings ask the
+## root, and the library's own door, behind a chapter's page, leads one
+## step back to the shelf -- and on the shelf itself it stands still.
 func _dock() -> Control:
-        var dock := PanelContainer.new()
-        dock.name = "Dock"
-        var box := ThemeScript.dock_stylebox()
-        # A bar that spans the page's foot meets the screen's own corners:
-        # the card's rounding belongs to the floating dock on home, not to
-        # this one, whose top edge is a ruled line across the page.
-        box.corner_radius_top_left = 0
-        box.corner_radius_top_right = 0
-        dock.add_theme_stylebox_override("panel", box)
-        dock.anchor_left = 0.0
-        dock.anchor_right = 1.0
-        dock.anchor_top = 1.0
-        dock.anchor_bottom = 1.0
-        dock.grow_vertical = Control.GROW_DIRECTION_BEGIN
-        var pad := MarginContainer.new()
-        pad.name = "Pad"
-        pad.add_theme_constant_override("margin_left", 10)
-        pad.add_theme_constant_override("margin_right", 10)
-        pad.add_theme_constant_override("margin_top", 7)
-        pad.add_theme_constant_override("margin_bottom", 9)
-        dock.add_child(pad)
-        var row := HBoxContainer.new()
-        row.name = "Row"
-        row.add_theme_constant_override("separation", 4)
-        if I18nScript.is_rtl():
-                row.layout_direction = Control.LAYOUT_DIRECTION_RTL
-        pad.add_child(row)
-        row.add_child(_dock_door(
-                "Home",
-                ThemeScript.HomeMark.new(ThemeScript.INK_SOFT),
-                I18nScript.t("Home"),
-                I18nScript.t("Back to home"),
-                ThemeScript.INK_SOFT,
-                func() -> void: closed.emit()
-        ))
-        row.add_child(_dock_door(
-                "Study",
-                ThemeScript.StudyMark.new(ThemeScript.INK_SOFT),
-                I18nScript.t("Study"),
-                I18nScript.t("Study"),
-                ThemeScript.INK_SOFT,
-                func() -> void: study_requested.emit()
-        ))
-        # The library's own door wears the gold of a place already stood
-        # in: behind a chapter's page it leads one step back to the shelf,
-        # and on the shelf itself it stands still.
-        row.add_child(_dock_door(
-                "Library",
-                ThemeScript.ShelfMark.new(ThemeScript.GOLD_DEEP),
-                I18nScript.t("Library"),
-                I18nScript.t("Library"),
-                ThemeScript.GOLD_DEEP,
-                func() -> void:
-                        if _mode == "surah":
-                                _back_to_shelf()
-        ))
-        row.add_child(_dock_door(
-                "Settings",
-                ThemeScript.CogMark.new(ThemeScript.INK_SOFT),
-                I18nScript.t("Settings"),
-                I18nScript.t("Settings"),
-                ThemeScript.INK_SOFT,
-                func() -> void: settings_requested.emit()
-        ))
-        return dock
+        var made := ThemeScript.foot_dock("library", I18nScript.is_rtl())
+        (made["home"] as Button).pressed.connect(func() -> void: closed.emit())
+        (made["study"] as Button).pressed.connect(func() -> void: study_requested.emit())
+        (made["library"] as Button).pressed.connect(func() -> void:
+                if _mode == "surah":
+                        _back_to_shelf()
+        )
+        (made["settings"] as Button).pressed.connect(func() -> void: settings_requested.emit())
+        return made["bar"]
 
 
-## One place on the dock, the way home's own dock dresses its places: a
-## mark above its own word, both in the door's own tone, a wash of that
-## tone while visited. The door that names the page it stands on wears
-## that tone at rest too -- gold for the library, here where the library
-## lives.
-func _dock_door(door_name: String, mark: Control, label_text: String, tooltip: String, tone: Color, on_press: Callable) -> Button:
-        var door := Button.new()
-        door.name = door_name
-        door.custom_minimum_size = Vector2(0, 54)
-        door.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        door.tooltip_text = tooltip
-        ThemeScript.apply_mark_styles(door, ThemeScript.dock_button_styles(tone))
-        ThemeScript.pressable(door)
-        door.pressed.connect(on_press)
-        var stack := VBoxContainer.new()
-        stack.name = "Stack"
-        stack.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-        stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        stack.alignment = BoxContainer.ALIGNMENT_CENTER
-        stack.add_theme_constant_override("separation", 3)
-        door.add_child(stack)
-        var icon := Control.new()
-        icon.name = "Icon"
-        icon.custom_minimum_size = Vector2(24, 24)
-        icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        var center := CenterContainer.new()
-        center.name = "Mark"
-        center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-        center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        mark.name = door_name + "Mark"
-        center.add_child(mark)
-        icon.add_child(center)
-        stack.add_child(icon)
-        var label := Label.new()
-        label.name = "Text"
-        label.text = label_text
-        label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        ThemeScript.dress(label, ThemeScript.CAPTION, tone, true)
-        stack.add_child(label)
-        return door
-
-
-## The foot's own answering, the way home answers its window: the bar rides
-## above whatever the display keeps for itself, and its doors keep a
-## thumb's measure on a desk and the whole hand's width on a phone. The
+## The foot's own answering, the one law the theme lays down for every
+## page that carries the bar: above the display's own keepings, doors at
+## a thumb's measure on a desk, the whole hand's width on a phone. The
 ## page's ground is answered in _layout, which reads this bar's height --
 ## one writer, so the two answers never argue. Runs on every resize.
 func _layout_dock() -> void:
-        var dock: PanelContainer = get_node_or_null("Dock")
-        var pad: MarginContainer = get_node_or_null("Dock/Pad")
-        if dock == null or pad == null:
+        var dock: Control = get_node_or_null("Dock")
+        if dock == null:
                 return
-        pad.add_theme_constant_override("margin_bottom", int(9.0 + ThemeScript.bottom_inset()))
-        var side := 10.0
-        var widest := 560.0
-        if size.x > widest:
-                side = (size.x - widest) / 2.0
-        pad.add_theme_constant_override("margin_left", int(side))
-        pad.add_theme_constant_override("margin_right", int(side))
-        var dock_h := dock.get_combined_minimum_size().y
-        dock.offset_left = 0
-        dock.offset_right = 0
-        dock.offset_top = -dock_h
-        dock.offset_bottom = 0.0
+        ThemeScript.lay_foot_dock(dock, size.x)
+
 
 ## The shelf's other question, asked in pills: the whole story, or one
 ## thread of it -- what the day is asking for, what has never been started,

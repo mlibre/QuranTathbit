@@ -118,11 +118,11 @@ func _check_touch_reach(home: Control) -> void:
         var dock: Control = home.get_node("Dock")
         _ok(window.grow(1.0).encloses(dock.get_global_rect()),
                 "the dock is inside the window (%s in %s)" % [dock.get_global_rect(), window])
-        for item_name in ["Browse", "Sync", "Settings"]:
+        for item_name in ["Home", "Study", "Library", "Settings"]:
                 var item: Button = home.get_node("Dock/Pad/Row/" + item_name)
-                # A door that is not standing holds no centre to tap: the
-                # sync door waits, unseen, until the reader switches sync
-                # on, and the reach check asks only of the doors present.
+                # A door that is not standing holds no centre to tap: every
+                # nav door stands on every page, and the reach check asks
+                # only of the doors present.
                 if not item.visible:
                         continue
                 _ok(window.encloses(item.get_global_rect()),
@@ -133,15 +133,19 @@ func _check_touch_reach(home: Control) -> void:
         var update_coin: Button = home.get_node("UpdateCoin")
         _ok(window.encloses(update_coin.get_global_rect()),
                 "the update coin is inside the window (%s)" % update_coin.get_global_rect())
-        var sync_item: Button = home.get_node("Dock/Pad/Row/Sync")
+        var sync_coin: Button = home.get_node("SyncCoin")
+        if sync_coin.visible:
+                _ok(window.encloses(sync_coin.get_global_rect()),
+                        "the sync coin is inside the window (%s)" % sync_coin.get_global_rect())
         _ok(
                 home.get_node_or_null("Margin/Column/SyncLine") == null,
-                "the page itself says nothing of sync -- the dock's sync door is the whole story"
+                "the page itself says nothing of sync -- the corner's sync coin is the whole story"
         )
-        _ok(
-                sync_item.tooltip_text.length() > 0,
-                "the sync state says itself in the dock door's own words"
-        )
+        if sync_coin.visible:
+                _ok(
+                        sync_coin.tooltip_text.length() > 0,
+                        "the sync state says itself in the coin's own words"
+                )
 
 ## The card never asks a window for more room than it has.
 func _check_card_fits() -> void:

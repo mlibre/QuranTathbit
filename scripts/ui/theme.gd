@@ -1682,6 +1682,215 @@ static func dress(label: Label, size: int, color: Color, bold := false) -> Label
         return label
 
 
+## The hand's own A, wherever the keys were born: a keyboard wearing Persian
+## or Arabic sends Ctrl+A as Ctrl+ش, and a field's built-in shortcuts --
+## written for the Latin letters on the same keycaps -- never recognise it.
+## So the field answers the PHYSICAL keys itself: select-all, copy, cut,
+## paste -- the same four answers under either alphabet. accept_event() in
+## the gui_input signal stands before the field's own built-in handling (a
+## Latin keyboard's Ctrl+V is answered once, here), and on the web the
+## page's own paste bridge keeps the engine's keys to itself, so this hand
+## only answers what actually reaches the field.
+static func answer_physical_shortcuts(field: Control) -> void:
+        field.gui_input.connect(_on_field_key.bind(field))
+
+
+static func _on_field_key(event: InputEvent, field: Control) -> void:
+        var key := event as InputEventKey
+        if key == null or not key.pressed or key.echo:
+                return
+        if not key.ctrl_pressed or key.alt_pressed or key.meta_pressed:
+                return
+        var line := field as LineEdit
+        var editor := field as TextEdit
+        if line == null and editor == null:
+                return
+        var handled := false
+        match key.physical_keycode:
+                KEY_A:
+                        if line != null:
+                                line.select_all()
+                        else:
+                                editor.select_all()
+                        handled = true
+                KEY_C:
+                        if line != null and line.has_selection():
+                                DisplayServer.clipboard_set(line.get_selected_text())
+                                handled = true
+                        elif editor != null and editor.has_selection():
+                                editor.copy()
+                                handled = true
+                KEY_X:
+                        if line != null and line.has_selection():
+                                DisplayServer.clipboard_set(line.get_selected_text())
+                                _line_delete_selection(line)
+                                handled = true
+                        elif editor != null and editor.has_selection():
+                                editor.cut()
+                                handled = true
+                KEY_V:
+                        if line != null:
+                                _line_paste(line)
+                                handled = true
+                        elif editor != null:
+                                editor.paste()
+                                handled = true
+        if handled:
+                field.accept_event()
+
+
+## A one-line field's own cut: the words leave and the field keeps its
+## caret where they stood -- the same answer the web's cut gives.
+static func _line_delete_selection(line: LineEdit) -> void:
+        var from := line.get_selection_from_column()
+        var to := line.get_selection_to_column()
+        line.text = line.text.substr(0, from) + line.text.substr(to)
+        line.caret_column = from
+        line.deselect()
+
+
+## A one-line field's own paste: a selection is replaced, never prepended
+## to, and a multi-line clipboard pastes its first line -- the way every
+## single-line field everywhere treats it. (The web page's own paste
+## bridge answers pastes there; this hand serves the machine's keyboard,
+## whose clipboard reads straight.)
+static func _line_paste(line: LineEdit) -> void:
+        var raw := DisplayServer.clipboard_get().replace("\r\n", "\n").replace("\r", "\n")
+        var text := raw.split("\n")[0].strip_edges()
+        if text.is_empty():
+                return
+        if line.has_selection():
+                var from := line.get_selection_from_column()
+                var to := line.get_selection_to_column()
+                line.text = line.text.substr(0, from) + text + line.text.substr(to)
+                line.caret_column = from + text.length()
+                line.deselect()
+        else:
+                line.insert_text_at_caret(text)
+
+
+## The page's foot, the way the design draws it on every page that has one:
+## one bar of the card's white riding the bottom edge, carrying the four
+## standing doors -- home, the session, the library, the settings -- each a
+## mark above its own word, so no door is ever a mystery icon. One bar
+## everywhere: whatever page the reader walks to, the foot keeps its doors,
+## its words, its marks and their order, and only the door that names the
+## page they stand on changes -- it wears the gold of a place already stood
+## in, while its neighbours wait in ink. The doors stand in the reading's
+## own order: a page that reads from the right begins its row with خانه at
+## the right hand. Returns the bar and its four doors; the page connects
+## each door to its own arrival, lays the bar in lay_foot_dock(), and ends
+## its own ground a breath above the doors.
+static func foot_dock(active := "", rtl := false) -> Dictionary:
+        var dock := PanelContainer.new()
+        dock.name = "Dock"
+        var box := dock_stylebox()
+        # A bar that spans the page's foot meets the screen's own corners: the
+        # card's rounding belongs to a floating card, not to this bar, whose top
+        # edge is a ruled line across the page.
+        box.corner_radius_top_left = 0
+        box.corner_radius_top_right = 0
+        dock.add_theme_stylebox_override("panel", box)
+        var pad := MarginContainer.new()
+        pad.name = "Pad"
+        pad.add_theme_constant_override("margin_left", 10)
+        pad.add_theme_constant_override("margin_right", 10)
+        pad.add_theme_constant_override("margin_top", 7)
+        pad.add_theme_constant_override("margin_bottom", 9)
+        dock.add_child(pad)
+        var row := HBoxContainer.new()
+        row.name = "Row"
+        row.add_theme_constant_override("separation", 4)
+        if rtl:
+                row.layout_direction = Control.LAYOUT_DIRECTION_RTL
+        pad.add_child(row)
+        var doors := {
+                "home": _foot_door("Home", HomeMark.new(INK_SOFT), I18N.t("Home"), active == "home"),
+                "study": _foot_door("Study", StudyMark.new(INK_SOFT), I18N.t("Study"), active == "study"),
+                "library": _foot_door("Library", ShelfMark.new(INK_SOFT), I18N.t("Library"), active == "library"),
+                "settings": _foot_door("Settings", CogMark.new(INK_SOFT), I18N.t("Settings"), active == "settings"),
+        }
+        for door_name in doors:
+                row.add_child(doors[door_name])
+        return {"bar": dock, "home": doors["home"], "study": doors["study"], "library": doors["library"], "settings": doors["settings"]}
+
+
+## One place on the shared foot: a mark above its own word, both in the
+## door's own tone -- the gold of a place already stood in for the door
+## that names this page, the ink of places waiting for the rest -- and a
+## wash of that tone while visited. The door that leads where the reader
+## already stands stands still: its press is its page's own to answer or
+## to leave.
+static func _foot_door(door_name: String, mark: Control, label_text: String, standing: bool) -> Button:
+        var tone := GOLD_DEEP if standing else INK_SOFT
+        var door := Button.new()
+        door.name = door_name
+        door.custom_minimum_size = Vector2(0, 54)
+        door.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        door.tooltip_text = label_text
+        apply_mark_styles(door, dock_button_styles(tone))
+        pressable(door)
+        var stack := VBoxContainer.new()
+        stack.name = "Stack"
+        stack.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        stack.alignment = BoxContainer.ALIGNMENT_CENTER
+        stack.add_theme_constant_override("separation", 3)
+        door.add_child(stack)
+        var icon := Control.new()
+        icon.name = "Icon"
+        icon.custom_minimum_size = Vector2(26, 26)
+        icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        var center := CenterContainer.new()
+        center.name = "Mark"
+        center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        mark.name = door_name + "Mark"
+        mark.set("color", tone)
+        center.add_child(mark)
+        icon.add_child(center)
+        stack.add_child(icon)
+        var label := Label.new()
+        label.name = "Text"
+        label.text = label_text
+        label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        dress(label, CAPTION, tone, true)
+        stack.add_child(label)
+        return door
+
+
+## The foot's own answering of the window, one law for every page that
+## carries the bar: it rides the page's whole width above whatever the
+## display keeps for itself, and its doors keep a thumb's measure on a
+## desk -- capped at the width a hand knows, centred -- and the whole
+## hand's width on a phone. Answers only the bar's own geometry; the page's
+## ground is each screen's own law. Returns the bar's height, so the page
+## that calls it can end its ground a breath above the doors.
+static func lay_foot_dock(dock: Control, page_width: float) -> float:
+        if dock == null or page_width <= 0.0:
+                return 0.0
+        var pad: MarginContainer = dock.get_node("Pad")
+        pad.add_theme_constant_override("margin_bottom", int(9.0 + bottom_inset()))
+        var side := 10.0
+        var widest := 560.0
+        if page_width > widest:
+                side = (page_width - widest) / 2.0
+        pad.add_theme_constant_override("margin_left", int(side))
+        pad.add_theme_constant_override("margin_right", int(side))
+        var dock_h := dock.get_combined_minimum_size().y
+        dock.anchor_left = 0.0
+        dock.anchor_right = 1.0
+        dock.anchor_top = 1.0
+        dock.anchor_bottom = 1.0
+        dock.grow_vertical = Control.GROW_DIRECTION_BEGIN
+        dock.offset_left = 0
+        dock.offset_right = 0
+        dock.offset_top = -dock_h
+        dock.offset_bottom = 0.0
+        return dock_h
+
+
 ## One shared header for the screens that sit on top of home: a back mark
 ## that says where it goes, a title in the middle, room on the right for
 ## whatever only that screen needs. The same bones everywhere, so leaving is

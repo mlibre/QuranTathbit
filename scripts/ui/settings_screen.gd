@@ -31,6 +31,10 @@ const FONT_SCALE_STEPS := [0.9, 1.0, 1.1, 1.2]
 signal closed
 signal account_changed
 signal sync_requested
+## The foot's own doors, asked from the settings themselves: the session
+## and the library ring the same doors their pages ring at the root.
+signal study_requested
+signal library_requested
 ## A travelling choice has settled (the day's pace, the verses' face, the
 ## app's tongue): the progress file carries it, and the repo should hear
 ## it without the user having to ask.
@@ -173,6 +177,17 @@ func _build() -> void:
         tail.custom_minimum_size = Vector2(0, 14)
         column.add_child(tail)
 
+        # The page's foot: the one bar every page carries, the settings
+        # door wearing the gold of the page they stand on. Home leaves the
+        # page; the session and the library ask the root through their own
+        # doors. The bar rides above the scroll's ground -- _layout ends
+        # the page's own ground a breath above it.
+        var made := ThemeScript.foot_dock("settings", I18nScript.is_rtl())
+        (made["home"] as Button).pressed.connect(func() -> void: closed.emit())
+        (made["study"] as Button).pressed.connect(func() -> void: study_requested.emit())
+        (made["library"] as Button).pressed.connect(func() -> void: library_requested.emit())
+        add_child(made["bar"])
+
 ## The page answers the window: the cards keep a reader's measure on a
 ## desktop -- never a stripe the width of a whole window -- and fill a phone
 ## to its edges. The top margin also answers the display: on a phone with a
@@ -183,7 +198,15 @@ func _layout() -> void:
         var margin: MarginContainer = get_node_or_null("Margin")
         if margin != null:
                 margin.add_theme_constant_override("margin_top", int(22.0 + ThemeScript.top_inset()))
-                margin.add_theme_constant_override("margin_bottom", int(28.0 + ThemeScript.bottom_inset()))
+                # The page's ground ends a breath above the doors at its
+                # foot: the bar's own height, and nothing of the scroll
+                # beneath it -- no card ever flows under the doors.
+                var dock: Control = get_node_or_null("Dock")
+                if dock != null:
+                        var dock_h := ThemeScript.lay_foot_dock(dock, size.x)
+                        margin.add_theme_constant_override("margin_bottom", int(dock_h + 12.0))
+                else:
+                        margin.add_theme_constant_override("margin_bottom", int(28.0 + ThemeScript.bottom_inset()))
         var column: VBoxContainer = get_node_or_null("Margin/Scroll/Wrap/Column")
         if column == null:
                 return
@@ -446,6 +469,9 @@ func _github_body() -> Control:
         token.add_theme_font_size_override("font_size", ThemeScript.fs(ThemeScript.CAPTION))
         _style_field(token)
         _paste_on_hold(token)
+        # The hand's own A: a keyboard wearing Persian sends Ctrl+A as
+        # Ctrl+ش, and the field's Latin-born shortcuts never recognise it.
+        ThemeScript.answer_physical_shortcuts(token)
         token.text_submitted.connect(func(_text: String) -> void: _save_token())
         box.add_child(token)
         var token_row := HBoxContainer.new()
@@ -483,6 +509,7 @@ func _github_body() -> Control:
         repo.add_theme_font_override("font", ThemeScript.vazir(ThemeScript.BODY))
         repo.add_theme_font_size_override("font_size", ThemeScript.fs(ThemeScript.BODY))
         _style_field(repo)
+        ThemeScript.answer_physical_shortcuts(repo)
         repo.text_submitted.connect(_save_repo)
         box.add_child(repo)
         _paste_on_hold(repo)

@@ -168,25 +168,26 @@ func _check_home_numbers(home: Control, main: Node) -> void:
         # The library's door stands in the dock at the page's foot, named
         # in words beside its kin -- and the page's own flow no longer
         # carries it.
-        var dock_browse: Button = home.get_node_or_null("Dock/Pad/Row/Browse")
-        _ok(dock_browse != null, "the library's door stands in the dock at the page's foot")
+        var dock_library: Button = home.get_node_or_null("Dock/Pad/Row/Library")
+        _ok(dock_library != null, "the library's door stands in the dock at the page's foot")
         _ok(
                 home.get_node_or_null("Margin/Column/Browse") == null,
                 "the library's door has left the page's own flow"
         )
-        # A fresh install has no GitHub life yet, and the dock says so by
-        # absence: the sync door waits, unseen, until the reader switches
-        # sync on in Settings. The dock keeps the two doors they have.
-        var sync_door: Button = home.get_node_or_null("Dock/Pad/Row/Sync")
-        _ok(sync_door != null and not sync_door.visible, "the sync door waits, unseen, while sync is off")
+        # A fresh install has no GitHub life yet, and the corner says so by
+        # absence: the sync coin waits, unseen, until the reader switches
+        # sync on in Settings. The foot keeps the four nav doors alone.
+        var sync_coin: Button = home.get_node("SyncCoin")
+        _ok(sync_coin != null and not sync_coin.visible, "the sync coin waits, unseen, while sync is off")
         # A turning sync mark stays inside its place: the turn is about the
-        # mark's own centre, and a mark that swings out of its button is the
-        # mark that once left the outer circle. The door is raised first --
+        # mark's own centre, and a mark that swings out of its coin is the
+        # mark that once left the outer circle. The coin is raised first --
         # the mark turns only for a reader who switched sync on, and a
-        # hidden door's mark is never laid out to turn.
+        # hidden coin's mark is never laid out to turn.
         main._settings.sync_enabled = true
         main._refresh_home()
-        var sync_mark: ThemeScript.SyncMark = home.get_node("Dock/Pad/Row/Sync/Stack/Icon/Mark/SyncMark")
+        _ok(sync_coin.visible, "the sync coin stands once sync is switched on")
+        var sync_mark: ThemeScript.SyncMark = home.get_node("SyncCoin/Mark/SyncMark")
         sync_mark.set_working(true)
         await process_frame
         await process_frame
@@ -2026,42 +2027,58 @@ func _check_due_watch(main: Node) -> void:
         await create_timer(0.7).timeout
 
 
-## The page's own flow says nothing of sync: the dock's sync door is the
+## The page's own flow says nothing of sync: the corner's sync coin is the
 ## whole story -- its tone, its turning mark, and its words in its own
-## tooltip -- the corner coins that once stood for sync and settings are
-## gone entirely, their doors named in words at the page's foot, and the
-## sync door carries no second badge beside its mark: the mark is the
-## door's one figure, as the reader asked.
+## tooltip -- the settings door is named in words at the page's foot with
+## its three kin, and the coin carries no second badge beside its mark:
+## the mark is the coin's one figure, as the reader asked.
 func _check_home_says_sync_by_the_dock_alone(home: Control) -> void:
         _ok(
                 home.get_node_or_null("Margin/Column/SyncLine") == null,
-                "the page's own flow says nothing of sync -- the dock is the whole story"
-        )
-        _ok(
-                home.get_node_or_null("SyncCoin") == null,
-                "the sync coin has left the corner for the dock"
+                "the page's own flow says nothing of sync -- the corner coin is the whole story"
         )
         _ok(
                 home.get_node_or_null("SettingsCorner") == null,
                 "the settings coin has left the corner for the dock"
         )
-        var sync: Button = home.get_node("Dock/Pad/Row/Sync")
-        # The check after this one raised the door (sync switched on for the
-        # mark's turn): once it is wanted, the door stands among its kin --
+        # The check after this one raised the coin (sync switched on for the
+        # mark's turn): once it is wanted, the coin stands in the corner --
         # the two laws, absence while off and presence while on, hold on
         # one page.
-        _ok(sync.visible, "the sync door stands once sync is switched on")
-        _ok(sync.tooltip_text.length() > 0, "the dock's sync door carries its state in its own words")
+        var sync: Button = home.get_node("SyncCoin")
+        _ok(sync.visible, "the sync coin stands once sync is switched on")
+        _ok(sync.tooltip_text.length() > 0, "the corner's sync coin carries its state in its own words")
         _ok(
-                sync.get_node_or_null("Stack/Icon/Dot") == null,
-                "the sync door says its state by tone alone -- no second badge beside the mark"
+                sync.get_node_or_null("Dot") == null,
+                "the sync coin says its state by tone alone -- no second badge beside the mark"
         )
-        for item_name in ["Browse", "Sync", "Settings"]:
+        # The foot is the one foot: four nav doors, named in words, and no
+        # sync door among them -- sync lives in the corner.
+        var row: HBoxContainer = home.get_node("Dock/Pad/Row")
+        for item_name in ["Home", "Study", "Library", "Settings"]:
                 var label: Label = home.get_node("Dock/Pad/Row/%s/Stack/Text" % item_name)
                 _ok(
                         label != null and not label.text.is_empty(),
                         "the dock's %s door is named in words, not a riddle icon" % item_name.to_lower()
                 )
+        _is(
+                row.get_child_count(),
+                4,
+                "the home foot keeps its four nav doors -- sync stands in the corner"
+        )
+        # The door that names the page they stand on wears the gold of a
+        # place already stood in; its neighbours wait in ink.
+        var home_label: Label = home.get_node("Dock/Pad/Row/Home/Stack/Text")
+        _is(
+                home_label.get_theme_color("font_color"),
+                ThemeScript.GOLD_DEEP,
+                "the home foot wears its own gold"
+        )
+        _is(
+                (home.get_node("Dock/Pad/Row/Study/Stack/Text") as Label).get_theme_color("font_color"),
+                ThemeScript.INK_SOFT,
+                "the study door waits in ink"
+        )
 
 
 ## The app's own memory must survive its own handwriting: JSON writes
