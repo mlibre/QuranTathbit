@@ -1091,21 +1091,25 @@ class VolumeRig extends RefCounted:
 class SwitchMark extends Control:
         var on := false
         var track_on := GREEN
-        var track_off := Color("#D8CFBC")
+        var track_off := Color("#CBBFA6")
 
         func _init(p_on := false) -> void:
                 on = p_on
-                custom_minimum_size = Vector2(40, 22)
+                custom_minimum_size = Vector2(46, 26)
                 mouse_filter = Control.MOUSE_FILTER_IGNORE
 
         func _draw() -> void:
-                var r := 10.0
-                draw_rect(Rect2(1, 1, 38, 20), track_on if on else track_off, true)
+                # The track is a pill, not a square: draw_rect knows only
+                # corners, and a switch's whole grammar is its roundness.
+                var track := StyleBoxFlat.new()
+                track.bg_color = track_on if on else track_off
+                track.set_corner_radius_all(13)
+                track.draw(get_canvas_item(), Rect2(1, 1, 44, 24))
                 # A breath of light on the track's far side, so the knob has
                 # somewhere to have come from.
-                var knob := Vector2(30.0, 11.0) if on else Vector2(11.0, 11.0)
-                draw_circle(knob, 8.0, Color.WHITE)
-                draw_circle(knob, 8.0, Color(0, 0, 0, 0.06))
+                var knob := Vector2(33.0, 13.0) if on else Vector2(13.0, 13.0)
+                draw_circle(knob, 10.5, Color.WHITE)
+                draw_circle(knob, 10.5, Color(0, 0, 0, 0.06))
 
         func set_on(p_on: bool) -> void:
                 on = p_on
@@ -1467,13 +1471,20 @@ static func style_scroll(scroll: ScrollContainer) -> void:
 # --- the shared buttons -----------------------------------------------------------
 
 
-## Every button answers the hand before the click lands. Three states, one
-## voice: visited grows a breath (2%), held settles toward its centre
-## (3.5%), let go returns to whichever of the two it is still in -- so a
-## click while hovering never pops, and leaving while held never jumps.
-## One helper, wired once, so the whole app agrees on what a press feels
-## like -- on the mouse and, through the same scale, on the keyboard.
-static func pressable(button: Button, press_scale := 0.965, hover_scale := 1.02) -> void:
+## Every button answers the hand before the click lands. Two states, one
+## voice: held settles toward its centre (3.5%), let go returns to rest --
+## so a click never pops and a release never jumps. A passing hover is no
+## state at all: the hand crossing the page is not a question, so nothing
+## grows under it -- the foot's doors stand still, and every button in the
+## app keeps the same manners. One helper, wired once, so the whole app
+## agrees on what a press feels like -- on the mouse and, through the same
+## scale, on the keyboard.
+static func pressable(button: Button, press_scale := 0.965, hover_scale := 1.0) -> void:
+        # Hover says nothing: the hand crossing the page is not a question to
+        # answer, and furniture that swells at a passing touch reads as nerves
+        # -- the foot's doors already stand still under the hand, and the whole
+        # app's furniture keeps the same manners now. A deliberate press still
+        # settles, the way a door that is actually held does.
         button.resized.connect(func() -> void:
                 if button.size.x > 0.0:
                         button.pivot_offset = button.size / 2.0

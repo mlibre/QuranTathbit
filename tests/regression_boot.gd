@@ -937,22 +937,25 @@ func _check_settings(main: Node) -> void:
                                 and int((paced as Dictionary).get("new_per_day", -1)) == 2,
                         "a chosen pace is stamped into the deck's own progress file"
                 )
-                # The caption shares the row of 44-tall buttons, so its one
-                # line must ride the row's own middle -- the same middle the
-                # chip's number and the buttons' glyphs stand at, never the
-                # row's top edge.
+                # The caption stands on its own line under the stepper, the
+                # way every caption on this page does -- a sentence beside
+                # three boxes read as a fourth box, and a phone's width
+                # crushed it into a column of cramped lines. Its place is
+                # the very next child after the row it explains.
                 var pace_caption: RichTextLabel = settings.get_node_or_null(
-                        "Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/NewPerDay/Pace"
+                        "Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/Pace"
                 )
-                if pace_caption != null:
+                var stepper_row: Control = settings.get_node_or_null(
+                        "Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/NewPerDay"
+                )
+                if pace_caption != null and stepper_row != null:
                         _ok(
-                                pace_caption.vertical_alignment == VERTICAL_ALIGNMENT_CENTER
-                                        and absf(
-                                                pace_caption.size.y
-                                                        - pace_caption.get_parent_control().size.y
-                                        ) < 1.0,
-                                "the pace caption fills its row and rides the row's middle"
+                                pace_caption.get_parent() == stepper_row.get_parent()
+                                        and pace_caption.get_index() == stepper_row.get_index() + 1,
+                                "the pace caption stands on its own line under the stepper"
                         )
+                elif pace_caption == null:
+                        _ok(false, "the pace caption stands on its own line under the stepper")
         # The deck as one file: the backup card stands in Settings, the two
         # doors out of it are wired, and the whole journey -- the real deck
         # packed, joined back, its picker pressed -- runs against the real

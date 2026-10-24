@@ -581,13 +581,14 @@ func _deck_body() -> Control:
         less.name = "StepLess"
         less.tooltip_text = I18nScript.t("Offer one fewer new card a day")
         less.custom_minimum_size = Vector2(52, 44)
+        less.add_theme_font_size_override("font_size", ThemeScript.fs(22))
         less.pressed.connect(_step_new_per_day.bind(-1))
         stepper.add_child(less)
         var value_chip := PanelContainer.new()
         value_chip.name = "Chip"
         value_chip.custom_minimum_size = Vector2(72, 44)
         value_chip.add_theme_stylebox_override(
-                "panel", ThemeScript.soft_stylebox(ThemeScript.GOLD_SOFT, 14)
+                "panel", ThemeScript.soft_stylebox(ThemeScript.GOLD_SOFT, 22)
         )
         var value := Label.new()
         value.name = "StepValue"
@@ -601,19 +602,19 @@ func _deck_body() -> Control:
         more.name = "StepMore"
         more.tooltip_text = I18nScript.t("Offer one more new card a day")
         more.custom_minimum_size = Vector2(52, 44)
+        more.add_theme_font_size_override("font_size", ThemeScript.fs(22))
         more.pressed.connect(_step_new_per_day.bind(1))
         stepper.add_child(more)
-        var pace := _text(
-                I18nScript.t("How many new cards a day offers — 0 studies only reviews."),
-                ThemeScript.INK_SOFT, 12
+        # The caption stands on its own line under the stepper, the way the
+        # Display card's captions do -- a sentence beside three boxes read
+        # as a fourth box, and on a phone's width the row crushed it into a
+        # column of four cramped lines. One row for the hands, one line for
+        # the words: the pattern every stepper on this page speaks.
+        var pace := _caption_line(
+                I18nScript.t("How many new cards a day offers — 0 studies only reviews.")
         )
         pace.name = "Pace"
-        # The caption stands in the row of 44-tall buttons, so its one line
-        # rides the row's own middle -- the height the chip's number and
-        # the buttons' glyphs are centred at, not the row's top edge.
-        pace.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-        pace.size_flags_vertical = Control.SIZE_EXPAND_FILL
-        stepper.add_child(pace)
+        box.add_child(pace)
         return card
 
 ## A press on the stepper is the reader choosing their own pace: the number
@@ -649,9 +650,15 @@ func _reading_body() -> Control:
         _card_header(box, I18nScript.t("Reading"))
 
         box.add_child(_field_label(I18nScript.t("Ayah font")))
-        var faces := HBoxContainer.new()
+        # The row is a flow, not a line: three faces and their measured
+        # samples are wider than a phone's card, and a line that cannot
+        # bend overflows the card's own edge -- the third face was standing
+        # half outside the paper. A flow wraps the faces onto the next
+        # line when the width asks, and keeps the one line when it doesn't.
+        var faces := HFlowContainer.new()
         faces.name = "AyahFaces"
-        faces.add_theme_constant_override("separation", 8)
+        faces.add_theme_constant_override("h_separation", 8)
+        faces.add_theme_constant_override("v_separation", 8)
         box.add_child(faces)
         # The standing choices are read from the theme and the tongue it
         # speaks, not from the settings object: this page builds before its
@@ -924,13 +931,14 @@ func _scale_row(row_name: String, label_text: String, less_tip: String, more_tip
         less.name = "StepLess"
         less.tooltip_text = less_tip
         less.custom_minimum_size = Vector2(52, 44)
+        less.add_theme_font_size_override("font_size", ThemeScript.fs(22))
         less.pressed.connect(func() -> void: on_step.call(-1))
         stepper.add_child(less)
         var value_chip := PanelContainer.new()
         value_chip.name = "Chip"
         value_chip.custom_minimum_size = Vector2(72, 44)
         value_chip.add_theme_stylebox_override(
-                "panel", ThemeScript.soft_stylebox(ThemeScript.GOLD_SOFT, 14)
+                "panel", ThemeScript.soft_stylebox(ThemeScript.GOLD_SOFT, 22)
         )
         var value_label := Label.new()
         value_label.name = "StepValue"
@@ -945,6 +953,7 @@ func _scale_row(row_name: String, label_text: String, less_tip: String, more_tip
         more.name = "StepMore"
         more.tooltip_text = more_tip
         more.custom_minimum_size = Vector2(52, 44)
+        more.add_theme_font_size_override("font_size", ThemeScript.fs(22))
         more.pressed.connect(func() -> void: on_step.call(1))
         stepper.add_child(more)
         return wrap
