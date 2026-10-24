@@ -215,15 +215,17 @@ jobs:
             zip -d "$src" "META-INF/*.SF" "META-INF/*.RSA" "META-INF/*.DSA" "META-INF/*.EC" >/dev/null 2>&1 || true
             "$ZIPALIGN" -f -p 4 "$src" "$aligned"
             "$APKSIGNER" sign \
+              --v1-signing-enabled true \
+              --v2-signing-enabled true \
               --ks "${RUNNER_TEMP}/tathbit.keystore" \
               --ks-key-alias "$ANDROID_KEYSTORE_ALIAS" \
               --ks-pass "pass:$ANDROID_KEYSTORE_PASSWORD" \
               --key-pass "pass:$ANDROID_KEYSTORE_PASSWORD" \
               --out "$out" "$aligned"
             local verdict="${RUNNER_TEMP}/verify.log"
-            "$APKSIGNER" verify --verbose --print-certs "$out" > "$verdict"
+            "$APKSIGNER" verify --verbose --print-certs "$out" > "$verdict" || cat "$verdict"
             grep -q "Verified using APK Signature Scheme v2: true" "$verdict" \
-              || { echo "the signed APK carries no v2 scheme: $out"; exit 1; }
+              || { echo "the signed APK carries no v2 scheme: $out"; cat "$verdict"; exit 1; }
             rm -f "$src" "$aligned" "$verdict"
           }
           sign_one builds/android/QuranTathbit-unsigned.apk builds/android/QuranTathbit.apk
