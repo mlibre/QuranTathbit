@@ -42,6 +42,15 @@ static var _watched: Array = []
 static func watch(label: RichTextLabel) -> void:
         if label == null:
                 return
+        # The engine's drag-and-drop selection (press inside a chosen span and
+        # move it elsewhere) is a desk habit no reader of this page ever asked
+        # for, and it eats the very press the pins need: a pin re-anchors the
+        # choice by pressing on the chosen span's own edge, and with DnD on,
+        # that press reads as "lift the words and carry them" -- the lift at
+        # the end of the drag would then put the whole choice down. Off, the
+        # same press is what a hand has always meant it to be: extend or
+        # shrink the choice.
+        label.drag_and_drop_selection_enabled = false
         _watched.append(label)
 
 var _label: RichTextLabel = null  # whose choice the bar is standing over

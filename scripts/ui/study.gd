@@ -9,11 +9,13 @@ const MarkdownScript := preload("res://scripts/ui/markdown.gd")
 const I18nScript := preload("res://scripts/ui/i18n.gd")
 
 ## A session: one card at a time, question first, then the answer, then how
-## well it went. Nothing else is on screen while you study -- no counters
-## arguing for attention, no menus to wander into. The four answers carry
-## their own intervals, so the cost of each choice is plain before you make
-## it, and each answer moves the card itself: a card that returns swells and
-## fades, a card that moves on recedes, and the next one settles into place.
+## well it went. The page keeps the app's one foot bar, the way every page
+## does -- the four doors stand at the reader's thumb, and the session's
+## own words keep a breath above them. The four answers carry their own
+## intervals, so the cost of each choice is plain before you make it, and
+## each answer moves the card itself: a card that returns swells and
+## fades, a card that moves on recedes, and the next one settles into
+## place.
 ##
 ## The question rides along on the answer side, small and gold, so the verse
 ## is never read without knowing which one was asked for.
@@ -367,9 +369,10 @@ func _layout() -> void:
         # display keeps for itself, so the way back is never under a camera.
         var margin: MarginContainer = get_node("Margin")
         margin.add_theme_constant_override("margin_top", int(24.0 + ThemeScript.top_inset()))
-        # The way a thumb swipes the phone itself lives at the bottom edge:
-        # the answers and the footer stand above it.
-        margin.add_theme_constant_override("margin_bottom", int(24.0 + ThemeScript.bottom_inset()))
+        # The app's own foot stands here, the way it stands under every page:
+        # the session's answers and footer end a breath above its doors, and
+        # whatever the display keeps for itself rides below them both.
+        margin.add_theme_constant_override("margin_bottom", int(ThemeScript.foot_height() + 12.0))
         # A phone's card breathes with smaller margins: the words keep the
         # room the desktop's generous padding would have taken.
         var narrow := size.x < ThemeScript.NARROW

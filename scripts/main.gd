@@ -20,6 +20,7 @@ const FlavorScript := preload("res://scripts/data/flavor.gd")
 const TouchScrollScript := preload("res://scripts/ui/touch_scroll.gd")
 const RtlFieldScript := preload("res://scripts/ui/rtl_field.gd")
 const CopyChipScript := preload("res://scripts/ui/copy_chip.gd")
+const SelectHandlesScript := preload("res://scripts/ui/select_handles.gd")
 
 ## QuranTathbit: one deck, kept in folders and files, studied one card at
 ## a time. This root owns the small amount of state the app has -- settings,
@@ -145,6 +146,15 @@ func _ready() -> void:
         _copy_chip = CopyChipScript.new()
         _copy_chip.name = "CopyChip"
         get_window().add_child.call_deferred(_copy_chip)
+        # The choice's two pins, standing where the copy pill's own words
+        # stand: a hand that chose words on a phone can now mend the choice
+        # where it stands -- each pin draggable, the choice following the
+        # finger -- instead of drawing the whole choice again. They live on
+        # the window beside the pill, above every page, and show only while
+        # a choice does.
+        var handles := SelectHandlesScript.new()
+        handles.name = "SelectHandles"
+        get_window().add_child.call_deferred(handles)
         # The foot's bar: raised once here, before the first page stands,
         # and carried above every swap of pages from this breath on -- the
         # reader never watches it being built. A small clock keeps its
@@ -439,10 +449,11 @@ func _deliver_cards() -> void:
 ## they stand on -- the same nodes, the same row, the same words. The
 ## doors ring the root's own doors, the same hands the pages' own buttons
 ## ring; the library's door, behind a chapter's page, asks the library for
-## the one step only it knows. The session carries no foot -- a page
-## mid-answer has no place a thumb should wander to -- and a sheet opened
-## over a page (the pencil's page, the backup's) covers the reader's work,
-## so the bar steps aside while it stands.
+## the one step only it knows. The session carries the bar too, the way
+## every page does -- the study door's own press is answered by the page
+## that already stands (a session restarts only by leaving it first) --
+## and a sheet opened over a page (the pencil's page, the backup's)
+## covers the reader's work, so the bar steps aside while it stands.
 func _build_foot() -> void:
         var made := ThemeScript.foot_dock("", I18nScript.is_rtl())
         _foot = made["bar"]
@@ -475,18 +486,21 @@ func _lay_foot() -> void:
 
 ## What the bar says of the moment, wherever it is asked from: the door
 ## that names the screen on top wears the gold (moved in place, the bar
-## never rebuilt), and the bar itself stands down for a page mid-answer
-## and for a sheet standing over the page -- the pencil's page, the
-## backup's -- so it never crowds the work in hand.
+## never rebuilt), and the bar itself stands down only for a sheet
+## standing over the page -- the pencil's page, the backup's -- so it
+## never crowds the work in hand.
 func _update_foot() -> void:
         if _foot == null:
                 return
-        var hidden := _screen == null or _screen is StudyScript \
+        var hidden := _screen == null \
                 or (_screen is BrowseScript and _screen.get_node_or_null("Editor") != null) \
+                or (_screen is StudyScript and _screen.get_node_or_null("Editor") != null) \
                 or (_screen is SettingsScreenScript and _screen.get_node_or_null("BackupPicker") != null)
         var active := ""
         if _screen is HomeScript:
                 active = "home"
+        elif _screen is StudyScript:
+                active = "study"
         elif _screen is BrowseScript:
                 active = "library"
         elif _screen is SettingsScreenScript:

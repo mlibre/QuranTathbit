@@ -40,6 +40,7 @@ func _init() -> void:
         await _check_language_picker(main)
         await _check_the_foot(main)
         await _check_study_session(main)
+        await _check_select_pins(main)
         await _check_due_watch(main)
         _check_own_digits()
         await _check_settings(main)
@@ -2080,6 +2081,80 @@ func _check_the_empty_study(main: Node) -> void:
         await create_timer(0.4).timeout
 
 
+## The choice's two pins, sworn to headlessly: the window carries them, the
+## watched label cannot be dragged and dropped under them, and a choice
+## made stands with a pin at each of its ends -- the geometry a screenless
+## room can read. The mending itself (a pin taken, the choice following the
+## finger) is the screen's own story.
+func _check_select_pins(main: Node) -> void:
+        # The choice's two pins: they join the window, they stand at a
+        # choice's two ends, they hang at the lines' feet, and a
+        # right-reading line pins its start on the right. The mending itself
+        # (a pin taken, the choice following the finger) needs a hand and a
+        # screen -- the pinned geometry is what a headless room can swear to.
+        main._start_session()
+        await create_timer(0.4).timeout
+        var study: Control = main.get_node_or_null("Study")
+        _ok(study != null, "the pins' room opens a session")
+        if study == null:
+                return
+        study._reveal()
+        await create_timer(0.6).timeout
+        var view: Control = study.get_node("Margin/Column/Surface/Fill/CardPanel/Padding/View")
+        var verse: RichTextLabel = null
+        for found in view.find_children("*", "RichTextLabel", true, false):
+                if found.selection_enabled and found.is_visible_in_tree():
+                        if verse == null or found.get_parsed_text().length() > verse.get_parsed_text().length():
+                                verse = found
+        _ok(verse != null, "the answer side carries the label the pins stand over")
+        if verse == null:
+                study.closed.emit()
+                await create_timer(0.3).timeout
+                return
+        var handles: Control = root.get_node_or_null("SelectHandles")
+        _ok(handles != null, "the pins joined the window")
+        _ok(verse.drag_and_drop_selection_enabled == false, "the label's words cannot be dragged and dropped -- the pins press where they stand")
+        if handles == null:
+                study.closed.emit()
+                await create_timer(0.3).timeout
+                return
+        verse.select_all()
+        await create_timer(0.3).timeout
+        _ok(handles.visible, "a choice made, the pins are standing")
+        if not handles.visible:
+                verse.deselect()
+                study.closed.emit()
+                await create_timer(0.3).timeout
+                return
+        var from_pin: Control = handles.get_node("PinFrom")
+        var to_pin: Control = handles.get_node("PinTo")
+        var rect := verse.get_global_rect()
+        var from_tip := from_pin.position.x + 22.0
+        var to_tip := to_pin.position.x + 22.0
+        _ok(
+                from_tip >= rect.position.x - 1.0 and from_tip <= rect.end.x + 1.0
+                        and to_tip >= rect.position.x - 1.0 and to_tip <= rect.end.x + 1.0,
+                "both pins stand between the label's own edges (from=%.1f to=%.1f in [%d..%d])" % [
+                        from_tip, to_tip, int(rect.position.x), int(rect.end.x),
+                ]
+        )
+        _ok(
+                from_pin.position.y >= rect.position.y - 2.0 and from_pin.position.y <= rect.end.y + 2.0,
+                "the first pin hangs at the foot of its own line"
+        )
+        _ok(
+                to_pin.position.y >= rect.position.y - 2.0 and to_pin.position.y <= rect.end.y + 2.0,
+                "the last pin hangs at the foot of its own line"
+        )
+        if verse.horizontal_alignment == HORIZONTAL_ALIGNMENT_RIGHT:
+                _ok(from_tip > to_tip, "a right-reading line pins its start on the right")
+        verse.deselect()
+        await create_timer(0.3).timeout
+        _ok(not handles.visible, "the pins leave when the choice is let go")
+        study.closed.emit()
+        await create_timer(0.3).timeout
+
+
 ## A card that comes due while the reader sits on the page is said by the
 ## page itself: the watch reads the deck's numbers again, and when they
 ## have moved the page says them again -- no leaving and coming back, no
@@ -2229,15 +2304,28 @@ func _check_the_foot(main: Node) -> void:
                 main.get_node("Dock/Pad/Row/Library").pressed.emit()
                 await create_timer(0.4).timeout
                 _ok(main._screen is BrowseScript, "the library's door returns a chapter to its shelf")
-        # The session: a page mid-answer carries no foot at all.
+        # The session: the bar stands under it, the way it stands under
+        # every page -- the study door wears the gold while its own page is
+        # up, and the session's own words end a breath above the doors so
+        # the two never crowd each other.
         main.get_node("Dock/Pad/Row/Study").pressed.emit()
         await create_timer(0.5).timeout
         _ok(main.get_node_or_null("Study") != null, "the study door asks for the session")
-        _ok(not dock.visible, "the foot stands down while the session runs")
+        _ok(dock.visible, "the foot stands under the session, the way it stands under every page")
+        _is(
+                (main.get_node("Dock/Pad/Row/Study/Stack/Text") as Label).get_theme_color("font_color"),
+                ThemeScript.GOLD_DEEP,
+                "the study door wears the gold in its own session"
+        )
         var study: Control = main.get_node("Study")
+        var session_stack: Control = study.get_node("Margin/Column/Footer/Stack")
+        _ok(
+                session_stack.get_global_rect().end.y <= dock.get_global_rect().position.y + 1.0,
+                "the session's words end above the dock's doors"
+        )
         study.closed.emit()
         await create_timer(0.5).timeout
-        _ok(dock.visible, "the foot stands back when the session is done")
+        _ok(dock.visible, "the foot still stands when the session is done")
         # And the one bar: the very node raised at boot, whatever pages came
         # and went -- the reader never watched it being built.
         _ok(main.get_node("Dock") == dock, "the bar was never rebuilt -- one node, every page")
