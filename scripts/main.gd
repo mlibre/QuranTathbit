@@ -1274,14 +1274,18 @@ func _on_web_paste(args: Array) -> void:
                 var field := focus as LineEdit
                 if not field.editable:
                         return
+                # The engine's own delete and insert speak: text_changed says
+                # what a paste became, so whatever listens -- the shelf's
+                # narrowing, the pills -- hears it the way a keystroke is
+                # heard. A selection is replaced, never prepended to.
                 if field.has_selection():
-                        var from := field.get_selection_from_column()
-                        var to := field.get_selection_to_column()
-                        field.text = field.text.substr(0, from) + text + field.text.substr(to)
-                        field.caret_column = from + text.length()
-                        field.deselect()
-                else:
-                        field.insert_text_at_caret(text)
+                        field.delete_text(field.get_selection_from_column(), field.get_selection_to_column())
+                field.insert_text_at_caret(text)
+                # The engine's own edits say text_changed through their key
+                # hand; these low-level calls keep quiet. This hand speaks
+                # the word once, so the page's listeners -- the shelf's
+                # narrowing, the pills -- hear the paste like a keystroke.
+                field.text_changed.emit(field.text)
                 field.grab_focus()
                 # The page is told what its paste became -- length and a first look,
                 # never the whole secret -- so the live web test can prove the hand
@@ -1323,11 +1327,10 @@ func _on_web_cut(_args: Array) -> void:
                 var field := focus as LineEdit
                 if not field.editable or not field.has_selection():
                         return
-                var from := field.get_selection_from_column()
-                var to := field.get_selection_to_column()
-                field.text = field.text.substr(0, from) + field.text.substr(to)
-                field.caret_column = from
-                field.deselect()
+                # The engine's own delete says the cut; the shelf and the
+                # pills hear it the way they hear any edit.
+                field.delete_text(field.get_selection_from_column(), field.get_selection_to_column())
+                field.text_changed.emit(field.text)
                 field.grab_focus()
         elif focus is TextEdit:
                 var editor := focus as TextEdit

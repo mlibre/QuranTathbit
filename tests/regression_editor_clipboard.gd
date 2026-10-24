@@ -1,5 +1,6 @@
 extends SceneTree
 const CardEditorScript := preload("res://scripts/ui/card_editor.gd")
+const ThemeScript := preload("res://scripts/ui/theme.gd")
 
 ## The page's clipboard, proven end to end. The report: Ctrl+C and Ctrl+V
 ## did nothing on the edit-card page. The paste bridge knew only settings'
@@ -141,6 +142,34 @@ func _check_line_edit(main) -> void:
         field.select(0, 4)
         main._on_web_cut([])
         _is(field.text, "fresh", "a settings field lets its cut go")
+
+        # A bridge-delivered paste or cut speaks the field's own signal, the
+        # way a keystroke does: the shelf's narrowing and the pills listen
+        # to text_changed, so what the page hands over must narrow the shelf
+        # the same typed letters do. An edit that says nothing leaves the
+        # shelf wide while the field holds a question.
+        var said := {"changed": 0}
+        field.text_changed.connect(func(_t: String) -> void: said["changed"] += 1)
+        field.text = "abXd".replace("X", "c")
+        field.caret_column = 2
+        var heard: int = said["changed"]
+        main._on_web_paste(["X"])
+        _is(field.text, "abXcd", "a web paste lands at the caret")
+        _ok(said["changed"] > heard, "a web paste says text_changed")
+        heard = said["changed"]
+        field.select(1, 3)
+        main._on_web_cut([])
+        _is(field.text, "acd", "the web cut takes the chosen words")
+        _ok(said["changed"] > heard, "a web cut says text_changed")
+
+        # The keyboard's own cut -- the physical hand's Ctrl+X on a machine
+        # -- speaks the same voice.
+        heard = said["changed"]
+        field.text = "word"
+        field.select_all()
+        ThemeScript._line_delete_selection(field)
+        _is(field.text, "", "the keyboard's cut empties the field")
+        _ok(said["changed"] > heard, "the keyboard's cut says text_changed")
 
         field.text = "abcd"
         field.select(0, 2)

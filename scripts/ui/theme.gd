@@ -1740,18 +1740,20 @@ static func _on_field_key(event: InputEvent, field: Control) -> void:
 
 
 ## A one-line field's own cut: the words leave and the field keeps its
-## caret where they stood -- the same answer the web's cut gives.
+## caret where they stood -- the same answer the web's cut gives. The
+## engine's own delete does the taking, so whatever listens -- the shelf's
+## narrowing, the pills -- hears the cut the way it hears a keystroke.
 static func _line_delete_selection(line: LineEdit) -> void:
-        var from := line.get_selection_from_column()
-        var to := line.get_selection_to_column()
-        line.text = line.text.substr(0, from) + line.text.substr(to)
-        line.caret_column = from
+        line.delete_text(line.get_selection_from_column(), line.get_selection_to_column())
         line.deselect()
+        line.text_changed.emit(line.text)
 
 
 ## A one-line field's own paste: a selection is replaced, never prepended
 ## to, and a multi-line clipboard pastes its first line -- the way every
-## single-line field everywhere treats it. (The web page's own paste
+## single-line field everywhere treats it. The engine's own delete and
+## insert do the work, so text_changed says what happened -- a paste
+## narrows the shelf the same keystroke does. (The web page's own paste
 ## bridge answers pastes there; this hand serves the machine's keyboard,
 ## whose clipboard reads straight.)
 static func _line_paste(line: LineEdit) -> void:
@@ -1760,13 +1762,12 @@ static func _line_paste(line: LineEdit) -> void:
         if text.is_empty():
                 return
         if line.has_selection():
-                var from := line.get_selection_from_column()
-                var to := line.get_selection_to_column()
-                line.text = line.text.substr(0, from) + text + line.text.substr(to)
-                line.caret_column = from + text.length()
-                line.deselect()
-        else:
-                line.insert_text_at_caret(text)
+                line.delete_text(line.get_selection_from_column(), line.get_selection_to_column())
+        line.insert_text_at_caret(text)
+        # The engine's key hand says text_changed after every edit it makes;
+        # the low-level insert and delete keep quiet. Our hand speaks the
+        # same word, once, so the shelf hears the paste like a keystroke.
+        line.text_changed.emit(line.text)
 
 
 ## The page's foot, the way the design draws it on every page that has one:
