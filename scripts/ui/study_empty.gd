@@ -95,7 +95,14 @@ func _ready() -> void:
         close.pressed.connect(_close)
         row.add_child(close)
 
-        ThemeScript.appear(panel, 0.0, 18.0)
+        # The card fades in where the container put it -- a position tween
+        # would fight the CenterContainer's own layout: appear() reads the
+        # panel's y before the container's first sort has placed it, and the
+        # slide then drags the card off the vertical centre (it showed in
+        # Firefox, where no late resize came to lay the card straight again).
+        # settle_in is the helper written for exactly this: children of
+        # containers fade, and the container keeps the geometry.
+        ThemeScript.settle_in(panel, 0.0, 0.26)
 
 
 ## The question answered by the way back: the key, like the close button,

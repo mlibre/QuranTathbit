@@ -2008,6 +2008,21 @@ func _check_the_empty_study(main: Node) -> void:
                 return
         var body: Label = ask.find_child("Body", true, false) as Label
         _ok(body != null and not body.text.is_empty(), "the question says its words")
+        # The card stands on the page's own centre: the container places it,
+        # and the arrival's fade never argues with that placement (a position
+        # tween once dragged the card off the vertical centre, read before the
+        # container's first sort had said where the card lives).
+        await create_timer(0.6).timeout
+        var panel: Control = ask.find_child("Panel", true, false) as Control
+        if panel != null:
+                var card_mid: float = panel.global_position.y + panel.size.y * 0.5
+                var page_mid: float = ask.global_position.y + ask.size.y * 0.5
+                _ok(absf(card_mid - page_mid) <= 2.0, "the card stands on the page's vertical centre")
+                var card_x_mid: float = panel.global_position.x + panel.size.x * 0.5
+                var page_x_mid: float = ask.global_position.x + ask.size.x * 0.5
+                _ok(absf(card_x_mid - page_x_mid) <= 2.0, "the card stands on the page's own middle")
+        else:
+                _ok(false, "the card stands on the page's vertical centre")
         var close: Button = ask.find_child("Close", true, false) as Button
         _ok(close != null, "the question carries its quiet way back")
         if close != null:
