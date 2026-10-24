@@ -178,15 +178,20 @@ jobs:
         run: |
           printf '%s' "$ANDROID_KEYSTORE_B64" | base64 -d > "${RUNNER_TEMP}/tathbit.keystore"
           test -s "${RUNNER_TEMP}/tathbit.keystore"
-      # The export is asked for unsigned on purpose. Godot's own hand signs
-      # the way jarsigner does -- the v1 JAR scheme alone -- and an Android
-      # from 11 onward turns an APK away when it carries no v2 scheme; the
-      # reader paid for that refusal in uninstalls. So the engine lays the
-      # deck into the APK and hands it over unsigned, and apksigner, in the
-      # next step, gives it the signature the phone actually reads: zipaligned
-      # first, signed v1 and v2, every release from the same key -- the same
-      # key is what makes an update land as an update.
-      - name: Export Android builds (unsigned)
+      # The engine cannot lay the APK down bare: a release export without a
+      # keystore is refused outright ("Could not find release keystore"), so
+      # the export wears Godot's own first pass -- a v1 JAR signature from
+      # the same key the environment holds. But v1 alone is exactly what
+      # modern Android turns away, and what taught the reader to uninstall
+      # before every update. The next step strips that scaffold and signs
+      # the APK the way the phone actually reads: zipaligned, then v1 and
+      # v2 together, every release from the same key -- the same key is what
+      # makes an update land as an update.
+      - name: Export Android builds (Godot's v1 pass)
+        env:
+          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ runner.temp }}/tathbit.keystore
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           mkdir -p builds/android builds/android-persian
           touch builds/.gdignore
@@ -205,6 +210,9 @@ jobs:
           test -x "$ZIPALIGN" && test -x "$APKSIGNER"
           sign_one() {
             local src="$1" out="$2" aligned="${RUNNER_TEMP}/aligned.apk"
+            # The engine's v1 scaffold leaves with the scaffold: only the
+            # hand in this step signs the APK the reader installs.
+            zip -d "$src" "META-INF/*.SF" "META-INF/*.RSA" "META-INF/*.DSA" "META-INF/*.EC" >/dev/null 2>&1 || true
             "$ZIPALIGN" -f -p 4 "$src" "$aligned"
             "$APKSIGNER" sign \
               --ks "${RUNNER_TEMP}/tathbit.keystore" \
