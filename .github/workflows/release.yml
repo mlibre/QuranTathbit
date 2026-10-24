@@ -224,7 +224,7 @@ jobs:
               --out "$out" "$aligned"
             local verdict="${RUNNER_TEMP}/verify.log"
             "$APKSIGNER" verify --verbose --print-certs "$out" > "$verdict" || cat "$verdict"
-            grep -q "Verified using APK Signature Scheme v2: true" "$verdict" \
+            grep -Eq "Verified using (v2 scheme \(APK Signature Scheme v2\)|APK Signature Scheme v2): true" "$verdict" \
               || { echo "the signed APK carries no v2 scheme: $out"; cat "$verdict"; exit 1; }
             rm -f "$src" "$aligned" "$verdict"
           }
