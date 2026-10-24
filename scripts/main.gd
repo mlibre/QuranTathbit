@@ -11,6 +11,7 @@ const ConflictDialogScript := preload("res://scripts/ui/conflict_dialog.gd")
 const ThemeScript := preload("res://scripts/ui/theme.gd")
 const HomeScript := preload("res://scripts/ui/home.gd")
 const StudyScript := preload("res://scripts/ui/study.gd")
+const StudyEmptyScript := preload("res://scripts/ui/study_empty.gd")
 const SettingsScreenScript := preload("res://scripts/ui/settings_screen.gd")
 const BrowseScript := preload("res://scripts/ui/browse.gd")
 const I18nScript := preload("res://scripts/ui/i18n.gd")
@@ -536,6 +537,12 @@ func _handle_back() -> void:
         # sync is resumable by design, so the key is simply kept.
         if get_node_or_null("SyncOverlay") != null:
                 return
+        # A question standing over the page is answered first: back puts
+        # the caught-up day's question away, deciding nothing.
+        var standing := get_node_or_null("EmptyStudy")
+        if standing != null:
+                standing.queue_free()
+                return
         # The app's one first question stands over the page: back puts it
         # away, the app speaks its fallback tongue, and the question asks
         # itself again the next time the app opens (until it is answered,
@@ -564,7 +571,6 @@ func _go_home() -> void:
         _swap(home, true)
         _refresh_home()
         home.study_pressed.connect(_start_session)
-        home.sync_pressed.connect(_on_sync_pressed)
         home.settings_pressed.connect(_on_settings_pressed)
         home.update_pressed.connect(_apply_update)
         home.browse_pressed.connect(_on_browse_pressed)
@@ -580,6 +586,10 @@ func _start_session() -> void:
         # only the algorithm's default.
         var cards := SchedulerScript.queue(_deck, _now(), _settings.new_per_day)
         if cards.is_empty():
+                # A queue with nothing in it is an answer, not a silence:
+                # the door says so, and holds out the one thing a caught-up
+                # deck can still take -- a new card of the reader's own.
+                _ask_empty_study()
                 return
         _open_study(cards)
 
@@ -596,6 +606,31 @@ func _start_extra_new_session() -> void:
         if card == null:
                 return
         _open_study([card])
+
+
+## A caught-up day, answered: the study door said so and offered a new
+## card, and the reader took it. The way in is the library's -- a card
+## belongs beside its kin -- with the pencil already standing on the new
+## page, so the errand the message offered is the errand that begins.
+func _ask_empty_study() -> void:
+        if get_node_or_null("EmptyStudy") != null:
+                return
+        var ask := StudyEmptyScript.new()
+        ask.name = "EmptyStudy"
+        add_child(ask)
+        ask.new_card_requested.connect(_open_new_card_in_library)
+
+
+func _open_new_card_in_library() -> void:
+        var ask := get_node_or_null("EmptyStudy")
+        if ask != null:
+                ask.queue_free()
+        if _screen is BrowseScript:
+                (_screen as BrowseScript).open_new_card()
+                return
+        _on_browse_pressed()
+        if _screen is BrowseScript:
+                (_screen as BrowseScript).open_new_card()
 
 
 ## One session, one wiring: whatever queue a session is opened with -- the
@@ -709,6 +744,10 @@ func _on_settings_pressed() -> void:
         # words -- is heard by the bar at the foot, which says itself
         # again to match.
         screen.chrome_changed.connect(_rebuild_foot)
+        # The page opens speaking the deck's standing with the repo: last
+        # heard from, work waiting, or the quiet never-yet. The line lives
+        # under the sync it speaks of.
+        screen.say_sync_line(_sync_line())
 
 
 ## A travelling choice has settled -- the day's pace, the verses' face, the
@@ -939,9 +978,7 @@ func _run_sync(quiet := false, alternate := false, fresh := true) -> void:
         # it, so a promise that ran out is not a promise refused forever.
         if fresh:
                 _sync_attempts = 0
-        if _screen is HomeScript:
-                (_screen as HomeScript).set_syncing()
-        elif _screen is SettingsScreenScript:
+        if _screen is SettingsScreenScript:
                 (_screen as SettingsScreenScript).note_sync_result(I18nScript.t("Syncing…"))
         var overlay: Control = null
         if not quiet:
@@ -1007,12 +1044,10 @@ func _run_sync(quiet := false, alternate := false, fresh := true) -> void:
                 )
         else:
                 line = I18nScript.t("Sync could not finish — your cards are safe here. Try again.")
-        if _screen is HomeScript:
-                _refresh_home()
-        elif _screen is SettingsScreenScript:
-                (_screen as SettingsScreenScript).note_sync_result(line)
+        if _screen is SettingsScreenScript:
+                (_screen as SettingsScreenScript).say_sync_line(line)
                 # The settings screen keeps its own account of the moment; the
-                # home line recomputes when the user goes back to it.
+                # page's own line is said there, under the sync it speaks of.
 
         # The ask that waited behind this one goes now: one exchange at a
         # time, and none of them ever dropped.
@@ -1071,18 +1106,17 @@ func _maybe_schedule_sync_retry(result: Dictionary) -> bool:
         return true
 
 
-## Home is told the same five things every time it is refreshed -- from its
+## Home is told the same two things every time it is refreshed -- from its
 ## first arrival, from an account changing, from a sync finishing -- so one
-## hand says them, and no door into the screen can drift from another.
+## hand says them, and no door into the screen can drift from another. Sync
+## says nothing here: its whole story lives in Settings.
 func _refresh_home() -> void:
         if not _screen is HomeScript:
                 return
         var home: HomeScript = _screen
         home.setup(
                 _deck,
-                SchedulerScript.counts(_deck, _now(), _settings.new_per_day),
-                _sync_line(),
-                _sync_state()
+                SchedulerScript.counts(_deck, _now(), _settings.new_per_day)
         )
 
 
@@ -1129,29 +1163,6 @@ func _sync_line() -> String:
         if _settings.last_sync > 0:
                 return I18nScript.f("Last synced %s", [_ago(_now() - _settings.last_sync)])
         return I18nScript.t("Connected — not synced yet")
-
-
-## Which of the coin's states the page is in: switched off altogether (no
-## door on the page at all); on but with no account behind it yet; agreed
-## with the repo at least once; connected but never yet taken there;
-## holding work the repo has not seen; waiting to try a failed sync again;
-## or the last attempt could not finish.
-func _sync_state() -> String:
-        if not _settings.sync_enabled:
-                return "hidden"
-        if not _settings.has_token():
-                return "off"
-        if _syncing:
-                return "syncing"
-        if _sync_retrying:
-                return "pending"
-        if _pending_answers() > 0:
-                return "pending"
-        if _sync_failed:
-                return "error"
-        if _settings.last_sync > 0:
-                return "synced"
-        return "pending"
 
 
 ## Whether the deck's GitHub life is on at all: the door in Settings is

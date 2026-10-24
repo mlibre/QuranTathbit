@@ -129,6 +129,23 @@ const STRINGS := {
         "Study": {"fa": "مطالعه", "ar": "دراسة"},
         "Learn new cards": {"fa": "یادگیری کارت‌های تازه", "ar": "تعلّم البطاقات الجديدة"},
         "All caught up": {"fa": "امروز کارتی نمونده", "ar": "لا شيء بانتظارك اليوم"},
+        "Nothing to review right now": {
+                "fa": "الان چیزی برای مرور نیست",
+                "ar": "لا شيء للمراجعة الآن",
+        },
+        "There is no card waiting — not a review, not a new one. You can add a new card to your deck.": {
+                "fa": "کارتی در انتظار نیست — نه مروری، نه تازه. می‌توانی کارت تازه‌ای به مجموعه‌ات اضافه کنی.",
+                "ar": "لا بطاقة بانتظار — لا مراجعة ولا جديدة. يمكنك إضافة بطاقة جديدة إلى مجموعتك.",
+        },
+        "New card": {"fa": "کارت تازه", "ar": "بطاقة جديدة"},
+        "Add a new card to your deck": {
+                "fa": "افزودن کارت تازه‌ای به مجموعه",
+                "ar": "أضف بطاقة جديدة إلى مجموعتك",
+        },
+        "Back to the page you came from": {
+                "fa": "بازگشت به صفحه‌ای که از آن آمده‌ای",
+                "ar": "عد إلى الصفحة التي أتيت منها",
+        },
         "Learn one more card": {"fa": "یک کارت تازهٔ دیگر", "ar": "تعلّم بطاقة أخرى"},
         "One more new card, beyond the day's own offer": {
                 "fa": "یک کارت تازهٔ دیگر، فراتر از سهمِ امروز",
@@ -255,6 +272,7 @@ const STRINGS := {
         "reveal": {"fa": "نمایش", "ar": "إظهار"},
         "answer": {"fa": "پاسخ", "ar": "جواب"},
         "close": {"fa": "بستن", "ar": "إغلاق"},
+        "Close": {"fa": "بستن", "ar": "إغلاق"},
         # --- shared chrome -----------------------------------------------------------
         "Back to home": {"fa": "بازگشت به خانه", "ar": "العودة إلى الرئيسية"},
         "Edit this card": {"fa": "ویرایش این کارت", "ar": "تعديل هذه البطاقة"},
@@ -326,6 +344,7 @@ const STRINGS := {
         "%d cards": {"fa": "%d کارت", "ar": "%d بطاقة"},
         "%d in review": {"fa": "%d در مرور", "ar": "%d في المراجعة"},
         "Edit card": {"fa": "ویرایش کارت", "ar": "تعديل البطاقة"},
+        "The card could not be saved.": {"fa": "کارت ذخیره نشد.", "ar": "تعذّر حفظ البطاقة."},
         "due now": {"fa": "الان", "ar": "الآن"},
         "due today": {"fa": "امروز", "ar": "اليوم"},
         "in %s": {"fa": "تا %s دیگر", "ar": "بعد %s"},
@@ -428,6 +447,10 @@ const STRINGS := {
         },
         "Sync now": {"fa": "همگام‌سازی", "ar": "زامِن الآن"},
         "Sync with GitHub": {"fa": "همگام‌سازی با GitHub", "ar": "المزامنة مع GitHub"},
+        "Keep your deck and its progress on your own GitHub repo — every device stays in step.": {
+                "fa": "مجموعه‌ات و پیشرفتش روی ریپوی گیت‌هاب خودت می‌مانَد — همهٔ دستگاه‌ها هم‌قدم می‌مانند.",
+                "ar": "تحتفظ بمجموعتك وتقدمها على مستودعك في GitHub — تبقى كل الأجهزة متزامنة.",
+        },
         "New cards each day": {"fa": "کارت‌های تازه در روز", "ar": "بطاقات جديدة كل يوم"},
         "Offer one fewer new card a day": {
                 "fa": "یک کارت تازه کمتر در روز",

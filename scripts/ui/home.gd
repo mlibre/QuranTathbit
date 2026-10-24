@@ -9,16 +9,14 @@ const I18nScript := preload("res://scripts/ui/i18n.gd")
 ## The only front door: the deck's name, what is waiting today, and the one
 ## button that matters. The foot below is the app's one bar -- raised once
 ## by the root, carried above every swap of pages, only the gold moving --
-## so this page never builds it and never watches it being built. The
-## deck's other life on GitHub says its state from the corner it has always
-## kept, a coin standing only while sync is on -- a deck with no GitHub
-## life keeps its corner to the update coin's place -- and saying its
-## state in its tone and its own tooltip while it stands.
+## so this page never builds it and never watches it being built. Sync's
+## whole story lives in Settings -- the switch, the account, the syncing
+## itself -- and this page says nothing of it: the corner keeps only the
+## update coin, for the one news from outside that is this page's to give.
 ## The page itself is dressed in a still lattice of stars, the way a book's
 ## margins are.
 
 signal study_pressed
-signal sync_pressed
 signal settings_pressed
 signal update_pressed
 signal browse_pressed
@@ -69,13 +67,11 @@ func _layout() -> void:
         pad.add_theme_constant_override("margin_left", 20 if narrow else 30)
         pad.add_theme_constant_override("margin_right", 20 if narrow else 30)
         deck.custom_minimum_size = Vector2(minf(324.0, size.x - 2.0 * side), 138.0)
-        # The corner's coins -- the sync one when sync is on, the gold one
-        # when a version waits -- keep their ride below whatever the
-        # display keeps for itself.
-        for coin_name in ["SyncCoin", "UpdateCoin"]:
-                var coin: Button = get_node(coin_name)
-                coin.offset_top = 22.0 + inset
-                coin.offset_bottom = 70.0 + inset
+        # The corner's one coin -- the gold one, when a version waits --
+        # keeps its ride below whatever the display keeps for itself.
+        var coin: Button = get_node("UpdateCoin")
+        coin.offset_top = 22.0 + inset
+        coin.offset_bottom = 70.0 + inset
         var avail := size.x - 2.0 * side  # the margin on each side
         var gap := 12.0
         var pill_w := clampf((avail - 2.0 * gap) / 3.0, 64.0, 116.0)
@@ -87,7 +83,7 @@ func _layout() -> void:
         var extra: Button = get_node("Margin/Column/ExtraNew")
         extra.custom_minimum_size = Vector2(minf(340.0, avail), 50.0)
 
-func setup(deck: DeckScript, counts: Dictionary, sync_line: String, sync_state := "off") -> void:
+func setup(deck: DeckScript, counts: Dictionary) -> void:
         if not is_node_ready():
                 await ready
         _deck_of_last_setup = deck
@@ -95,7 +91,6 @@ func setup(deck: DeckScript, counts: Dictionary, sync_line: String, sync_state :
         title.text = deck.name
 
         _apply_counts(counts)
-        _set_sync_state(sync_line, sync_state)
         _say_next_reference()
 
 ## The three numbers and the one button, said once: setup() and refresh()
@@ -137,48 +132,6 @@ func _apply_counts(counts: Dictionary) -> void:
                 study.text = I18nScript.t("Study") if counts["due"] > 0 else I18nScript.t("Learn new cards")
                 study.disabled = false
                 extra.visible = false
-
-## The corner's own coin says the sync state before any words do: green
-## when the deck and the repo last agreed, gold while answers still wait
-## to travel or the promise is unkept, a turning green mark while the
-## exchange is actually happening, red when it could not finish, and a
-## quiet ink one when the account has still to arrive. The state is worn
-## twice at once -- the wash the coin's own tone gives it, and the tint
-## the mark shares -- and the words live in the coin's own tooltip. A
-## coin that leads nowhere yet does not stand at all: a reader who has
-## not switched sync on finds the corner keeping only the update coin's
-## place, and the page says nothing of GitHub they never asked to hear.
-func _set_sync_state(text: String, state: String) -> void:
-        var coin: Button = get_node("SyncCoin")
-        var mark: ThemeScript.SyncMark = coin.get_node("Mark/SyncMark")
-        coin.visible = state != "hidden"
-        coin.tooltip_text = text
-        var tone := ThemeScript.INK
-        var mark_tone := ThemeScript.INK_SOFT
-        match state:
-                "synced":
-                        tone = ThemeScript.GREEN
-                        mark_tone = ThemeScript.GREEN_DEEP
-                "pending":
-                        tone = ThemeScript.GOLD
-                        mark_tone = ThemeScript.GOLD_DEEP
-                "syncing":
-                        tone = ThemeScript.GREEN
-                        mark_tone = ThemeScript.GREEN_DEEP
-                "error":
-                        tone = ThemeScript.DANGER
-                        mark_tone = ThemeScript.DANGER
-        ThemeScript.apply_mark_styles(coin, ThemeScript.mark_button_styles(tone, true))
-        mark.color = mark_tone
-        mark.set_working(state == "syncing")
-        mark.queue_redraw()
-
-
-## The coin turns while a sync runs quietly under the page: the one honest
-## thing between "you answered" and "it is safe on GitHub".
-func set_syncing() -> void:
-        _set_sync_state(I18nScript.t("Syncing…"), "syncing")
-
 
 ## The one line that answers "what am I about to study?": the next card's
 ## own heading, read from its front, dressed for its script. Said at setup
@@ -277,27 +230,16 @@ func _build() -> void:
         column.add_child(_study_button())
         column.add_child(_extra_new_button())
 
-        # The sleeping coins go on last, not first: children added later
+        # The sleeping coin goes on last, not first: children added later
         # sit above earlier ones in both drawing and hit-testing, and a
-        # full-rect container added after them was covering the corner, so
-        # the click that opened a coin landed on the page instead. On top
-        # is where floating controls belong. The foot below is the root's
-        # own bar -- the page raises no dock of its own.
-        # The sync coin sleeps beside the update coin's place until the
-        # reader switches sync on; then it is the corner's word for the
-        # deck's other life, green or gold or red by how it stands.
-        var sync_coin := _corner_coin(
-                "SyncCoin",
-                Vector2(-132.0, -84.0),
-                ThemeScript.SyncMark.new(ThemeScript.INK_SOFT),
-                I18nScript.t("Sync"),
-                func() -> void: sync_pressed.emit()
-        )
-        sync_coin.visible = false
-        add_child(sync_coin)
-        # The one coin sleeps until the page hears that a newer version
-        # waits outside; then it is the gold way to take it, alone in the
-        # corner where the app's gold has always arrived.
+        # full-rect container added after it was covering the corner, so
+        # the click that opened the coin landed on the page instead. On top
+        # is where a floating control belongs. The foot below is the root's
+        # own bar -- the page raises no dock of its own. Sync's story lives
+        # in Settings; the corner keeps only the update coin.
+        # The coin sleeps until the page hears that a newer version waits
+        # outside; then it is the gold way to take it, alone in the corner
+        # where the app's gold has always arrived.
         var update := _corner_coin(
                 "UpdateCoin",
                 Vector2(-76.0, -28.0),

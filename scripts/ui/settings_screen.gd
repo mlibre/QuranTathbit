@@ -62,6 +62,7 @@ var _polling := false
 var _flow_uri := ""  # where "Open GitHub" sends the user while a flow is live
 var _choice_push: Timer  # one ask, once the hand stops choosing
 var _zip_callback: Variant = null  # the page's backup hook, held while this screen stands
+var _sync_standing := ""  # the deck's standing with the repo, said under the Sync button
 
 func _ready() -> void:
         _build()
@@ -338,6 +339,12 @@ func _github_body() -> Control:
         )
         var sync_row: Button = master_parts[0]
         box.add_child(sync_row)
+        # What the switch is for, said where the page says everything else:
+        # a quiet line under the row, never inside it -- the row keeps one
+        # height, and the line wraps as the window asks it to.
+        box.add_child(_caption_line(
+                I18nScript.t("Keep your deck and its progress on your own GitHub repo — every device stays in step.")
+        ))
         sync_row.toggled.connect(func(on: bool) -> void:
                 _settings.sync_enabled = on
                 _settings.save()
@@ -540,6 +547,11 @@ func _github_body() -> Control:
         var sync := ThemeScript.primary_button(I18nScript.t("Sync now"), 46)
         sync.name = "Sync"
         sync.tooltip_text = I18nScript.t("Sync with GitHub")
+        # The press is only answered when there is something to exchange
+        # with: without the account behind it, sync has nowhere to go -- the
+        # button rests until the account arrives, instead of taking a press
+        # and saying nothing. The rest state is said by _refresh(), which
+        # owns the settings the button reads.
         sync.pressed.connect(func() -> void: sync_requested.emit())
         box.add_child(sync)
 
@@ -1193,7 +1205,9 @@ func _about() -> Control:
 ## each session -- so the two read as kin wherever they stand. Returns the
 ## row and its switch; the caller owns the wiring. The row is dressed for
 ## its off state; say the on state through _dress_promise_row when it
-## arrives.
+## arrives. (A row's explanation, when one is wanted, is the caller's:
+## a caption line under the row, the way the Display card explains its
+## steppers -- the row itself keeps one height, whatever the words.)
 func _promise_row(row_name: String, pad_name: String, line_name: String, label_text: String) -> Array:
         var row := Button.new()
         row.name = row_name
@@ -1270,10 +1284,22 @@ func _dress_promise_row(row: Button, on: bool) -> void:
 
 ## The main screen reports how a sync went while Settings is the screen on
 ## top; the note sits under the Sync button and clears when asked again.
+## The note also carries the page's standing line -- where the deck and the
+## repo last agreed, what still waits -- so the state is always visible
+## under the button that speaks of it, whether or not a sync just ran.
 func note_sync_result(text: String) -> void:
         var note: RichTextLabel = get_node_or_null("Margin/Scroll/Wrap/Column/GitHub/Padding/Box/SyncNote")
         if note != null:
                 note.text = text
+
+
+## The deck's standing with the repo, said by the one page that owns sync:
+## the line under the Sync button carries it, and a refresh says it again
+## rather than clearing it -- a page that erases its own news on a toggle
+## is a page that forgets.
+func say_sync_line(text: String) -> void:
+        _sync_standing = text
+        note_sync_result(text)
 
 func _refresh() -> void:
         var box: Control = get_node("Margin/Scroll/Wrap/Column/GitHub/Padding/Box")
@@ -1316,11 +1342,19 @@ func _refresh() -> void:
                 state.text = I18nScript.t("Not connected. Sync keeps your progress on your own GitHub repo.")
         connect.visible = not _settings.has_token()
         disconnect.visible = _settings.has_token()
+        # The Sync button rests while there is nothing to exchange with:
+        # the account is the other side of the table, and without it a
+        # press would be taken and answered with silence.
+        var sync_button: Button = box.get_node("Sync")
+        sync_button.disabled = on and not _settings.has_token()
         # The day's offer is said here too, not only on a press: a reader
         # returning to this page reads their pace off the chip.
         var pace_value: Label = get_node("Margin/Scroll/Wrap/Column/DeckInfo/Padding/Box/NewPerDay/Chip/StepValue")
         pace_value.text = I18nScript.num(_settings.new_per_day)
-        note_sync_result("")
+        # The standing line is said again, not cleared: whatever the deck
+        # and the repo last said to each other is the page's own news, and
+        # a toggle elsewhere must not erase it.
+        note_sync_result(_sync_standing)
 
 # --- the device flow ------------------------------------------------------------
 

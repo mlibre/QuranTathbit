@@ -92,7 +92,7 @@ func _test_home_offer() -> void:
 
         # Reviews alone, nothing started: the day says it is done while the
         # deck holds three unseen cards -- the offer stands.
-        home.setup(deck, SchedulerScript.counts(deck, now, 0), "", "off")
+        home.setup(deck, SchedulerScript.counts(deck, now, 0))
         var study: Button = home.get_node("Margin/Column/Study")
         var extra: Button = home.get_node("Margin/Column/ExtraNew")
         _is(study.disabled, true, "a day of reviews alone rests the study button")
@@ -111,19 +111,19 @@ func _test_home_offer() -> void:
         # The reader's own word about today: a deferred card is not offered
         # back by the button either.
         deck.cards[0].state = SchedulerScript.deferred_state(now)
-        home.setup(deck, SchedulerScript.counts(deck, now, 0), "", "off")
+        home.setup(deck, SchedulerScript.counts(deck, now, 0))
         _is(extra.visible, true, "the offer still stands for the cards after the deferred one")
         _is(home._next_fresh_card().id, "002", "the offer skips the card deferred today")
 
         # Nothing left to take: the offer goes away with its reason.
         deck.cards[1].state = SchedulerScript.suspended_state(now)
         deck.cards[2].state = SchedulerScript.apply(SchedulerScript.id_seed("003"), deck.cards[2].state, "good", now)
-        home.setup(deck, SchedulerScript.counts(deck, now, 0), "", "off")
+        home.setup(deck, SchedulerScript.counts(deck, now, 0))
         _is(extra.visible, false, "no unseen card, no offer")
 
         # A day with waiting work is the day's own button's business.
         deck.cards[2].state["due_ts"] = now - 10
-        home.setup(deck, SchedulerScript.counts(deck, now, 0), "", "off")
+        home.setup(deck, SchedulerScript.counts(deck, now, 0))
         _is(study.disabled, false, "a card waiting is the study button's business")
         _is(extra.visible, false, "the offer stands only on a caught-up day")
 

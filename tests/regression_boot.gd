@@ -48,6 +48,7 @@ func _init() -> void:
         _check_settings_round_trip()
         _check_sync_retrying(main)
         await _check_sync_retries_the_other_road(main)
+        await _check_the_empty_study(main)
 
         if _failures > 0:
                 print("boot: %d FAILURE(S)" % _failures)
@@ -171,8 +172,9 @@ func _check_home_numbers(home: Control, main: Node) -> void:
         )
         # A fresh install has no GitHub life yet, and neither the foot nor
         # the page says anything of it: the session's door keeps the foot's
-        # mid place whatever sync's standing, and the corner's coin waits,
-        # unwoken, until the reader switches sync on in Settings.
+        # mid place whatever sync's standing, and the corner keeps no sync
+        # coin at all -- sync's whole story lives in Settings now, and the
+        # page says nothing of GitHub the reader never asked to hear.
         _ok(
                 main.get_node_or_null("Dock/Pad/Row/Sync") == null,
                 "the foot carries no sync door -- sync's own words live in Settings"
@@ -181,27 +183,18 @@ func _check_home_numbers(home: Control, main: Node) -> void:
                 main.get_node_or_null("Dock/Pad/Row/Study") != null,
                 "the session's door keeps the foot's mid place"
         )
-        var sync_coin: Button = home.get_node_or_null("SyncCoin")
-        _ok(sync_coin != null and not sync_coin.visible,
-                "the corner's sync coin waits, unwoken, while sync is off")
-        # A turning sync mark stays inside its place: the turn is about the
-        # mark's own centre, and a mark that swings out of its coin is the
-        # mark that once left the outer circle. The switch is raised first
-        # -- the mark turns only for a reader who switched sync on.
+        _ok(
+                home.get_node_or_null("SyncCoin") == null,
+                "the corner keeps no sync coin while sync is off"
+        )
+        # The coin does not wake with the switch either: the corner's one
+        # tenant is the update coin, whatever sync's standing.
         main._settings.sync_enabled = true
         main._refresh_home()
-        sync_coin = home.get_node("SyncCoin")
-        _ok(sync_coin.visible, "the corner's sync coin stands once sync is switched on")
-        var sync_mark: ThemeScript.SyncMark = sync_coin.get_node("Mark/SyncMark")
-        sync_mark.set_working(true)
-        await process_frame
-        await process_frame
         _ok(
-                absf(sync_mark.pivot_offset.x - sync_mark.size.x / 2.0) < 0.5
-                        and absf(sync_mark.pivot_offset.y - sync_mark.size.y / 2.0) < 0.5,
-                "the turning mark pivots at its own centre"
+                home.get_node_or_null("SyncCoin") == null,
+                "the corner keeps no sync coin once sync is switched on either"
         )
-        sync_mark.set_working(false)
 
 
 ## The app's very first question, asked exactly once: a fresh install has
@@ -1992,6 +1985,83 @@ func _check_sync_retries_the_other_road(main: Node) -> void:
         _remove_tree("user://sync_manifest.json")
 
 
+## A caught-up day is an answer, not a silence: the study door asked with
+## nothing to bring says so plainly, and holds out the one thing a deck
+## with nothing waiting can still take -- a new card of the reader's own.
+## The offer's way in is the library, with the pencil already standing on
+## the new page; the card it saves joins the deck in memory and on disk,
+## and the world is put back exactly as the check found it.
+func _check_the_empty_study(main: Node) -> void:
+        if main.get_node_or_null("Home") == null:
+                main._go_home()
+                await create_timer(0.5).timeout
+        var before: int = main._deck.cards.size()
+        var pace: int = main._settings.new_per_day
+        main._settings.new_per_day = 0  # a day of reviews only, and no reviews waiting
+        main._start_session()
+        await create_timer(0.4).timeout
+        var ask: Control = main.get_node_or_null("EmptyStudy")
+        _ok(ask != null, "a caught-up day is answered with the caught-up question")
+        _ok(main.get_node_or_null("Study") == null, "no session opens behind an empty queue")
+        if ask == null:
+                main._settings.new_per_day = pace
+                return
+        var body: Label = ask.find_child("Body", true, false) as Label
+        _ok(body != null and not body.text.is_empty(), "the question says its words")
+        var close: Button = ask.find_child("Close", true, false) as Button
+        _ok(close != null, "the question carries its quiet way back")
+        if close != null:
+                close.pressed.emit()
+                await create_timer(0.3).timeout
+                _ok(main.get_node_or_null("EmptyStudy") == null, "the quiet way back decides nothing")
+                main._start_session()
+                await create_timer(0.4).timeout
+                ask = main.get_node_or_null("EmptyStudy")
+                _ok(ask != null, "the door asks again the next time it is rung")
+        if ask == null:
+                main._settings.new_per_day = pace
+                return
+        var add: Button = ask.find_child("AddCard", true, false) as Button
+        _ok(add != null, "the question carries the offer it stands for")
+        if add == null:
+                main._settings.new_per_day = pace
+                ask.queue_free()
+                return
+        add.pressed.emit()
+        await create_timer(0.5).timeout
+        _ok(main.get_node_or_null("EmptyStudy") == null, "the question leaves once answered")
+        var browse: Control = main.get_node_or_null("Browse")
+        _ok(browse != null, "the library stands under the pencil")
+        var editor: Control = browse.get_node_or_null("Editor") if browse != null else null
+        _ok(editor != null, "the pencil stands on a new page")
+        if editor == null:
+                main._settings.new_per_day = pace
+                return
+        var title: Label = editor.get_node_or_null("Margin/Column/TopBar/Title")
+        _ok(title != null and title.text == "New card", "a card the deck has never met is said so")
+        # The words are written and saved: the folder is the pencil's own
+        # doing, the deck's next number is the card's own name.
+        editor._front.set_text("آزمون - ۱:۱\nسورهٔ آزمون")
+        editor._back.set_text("پاسخ آزمون")
+        editor._save()
+        await create_timer(0.5).timeout
+        _ok(browse.get_node_or_null("Editor") == null, "the pencil leaves once the card is saved")
+        _is(main._deck.cards.size(), before + 1, "the deck in memory holds the new card")
+        var added = main._deck.cards[main._deck.cards.size() - 1]
+        var folder: String = main._deck.folder.path_join(str(added.id))
+        _ok(FileAccess.file_exists(folder.path_join("front.md")), "the question is written to the card's own files")
+        _ok(FileAccess.file_exists(folder.path_join("back.md")), "the answer is written beside it")
+        # The world is put back the way the check found it: the card leaves
+        # the deck and its folder leaves the deck's folder.
+        main._deck.cards.erase(added)
+        DirAccess.remove_absolute(folder.path_join("front.md"))
+        DirAccess.remove_absolute(folder.path_join("back.md"))
+        DirAccess.remove_absolute(folder)
+        main._settings.new_per_day = pace
+        main._go_home()
+        await create_timer(0.4).timeout
+
+
 ## A card that comes due while the reader sits on the page is said by the
 ## page itself: the watch reads the deck's numbers again, and when they
 ## have moved the page says them again -- no leaving and coming back, no
@@ -2032,33 +2102,26 @@ func _check_due_watch(main: Node) -> void:
         await create_timer(0.7).timeout
 
 
-## The page's own flow says nothing of sync: the corner's coin is the whole
-## story while it stands -- its tone, its turning mark, and its words in
-## its own tooltip -- and the foot keeps the design's four doors, named in
-## words, the session's own in the mid place. No second badge beside the
-## mark: the mark is the coin's one figure, as the reader asked.
+## The page's own flow says nothing of sync, and neither does the corner:
+## Settings is the whole story -- the switch, the account, the standing
+## line under its own button -- and the foot keeps the design's four doors,
+## named in words, the session's own in the mid place.
 func _check_home_says_sync_by_the_coin_alone(main: Node) -> void:
         var home: Control = main.get_node("Home")
         _ok(
                 home.get_node_or_null("Margin/Column/SyncLine") == null,
-                "the page's own flow says nothing of sync -- the corner's coin is the whole story"
+                "the page's own flow says nothing of sync -- Settings is the whole story"
         )
         _ok(
                 home.get_node_or_null("SettingsCorner") == null,
                 "the settings coin has left the corner for the dock"
         )
-        # The check before this one raised the sync coin (sync switched on
-        # for the mark's turn): once it is wanted, the coin stands in the
-        # corner and the foot keeps its four standing doors.
-        var sync_coin: Button = home.get_node("SyncCoin")
-        _ok(sync_coin.visible, "the corner's sync coin stands while sync stands")
+        # Sync's story left the page for Settings, for good: the corner
+        # keeps no sync coin in any state of the switch, and the foot keeps
+        # its four standing doors.
         _ok(
-                sync_coin.tooltip_text.length() > 0,
-                "the sync coin carries its state in its own words"
-        )
-        _ok(
-                sync_coin.get_node_or_null("Dot") == null,
-                "the sync coin says its state by tone alone -- no second badge beside the mark"
+                home.get_node_or_null("SyncCoin") == null,
+                "the corner keeps no sync coin in any state of the switch"
         )
         # The foot is the one foot: four doors, named in words, the
         # session's own in the mid place.
@@ -2087,6 +2150,17 @@ func _check_home_says_sync_by_the_coin_alone(main: Node) -> void:
                 ThemeScript.INK_SOFT,
                 "the study door waits in ink"
         )
+        # The doors themselves stand still under the hand: the bar is the
+        # app's own furniture, and furniture does not flinch -- no door
+        # grows at a hover, no door settles at a press. The wash a dress
+        # gives is the whole answer.
+        for item_name in ["Home", "Study", "Library", "Settings"]:
+                var door: Button = main.get_node("Dock/Pad/Row/" + item_name)
+                _is(
+                        door.scale,
+                        Vector2.ONE,
+                        "the dock's %s door keeps its own size under the hand" % item_name.to_lower()
+                )
 
 
 ## The foot is one bar for the whole app: raised once, carried above every

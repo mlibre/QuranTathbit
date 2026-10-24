@@ -1864,7 +1864,12 @@ static func _foot_door(door_name: String, mark: Control, label_text: String, sta
         door.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         door.tooltip_text = label_text
         apply_mark_styles(door, dock_button_styles(tone))
-        pressable(door)
+        # The bar's doors stand still under the hand: no growth on a hover,
+        # no settle on a press -- the wash the dress gives is the whole
+        # answer. Furniture does not flinch; a bar whose doors breathe at
+        # every passing cursor reads as restless, and the reader asked for
+        # the stillness outright.
+        pressable(door, 1.0, 1.0)
         var stack := VBoxContainer.new()
         stack.name = "Stack"
         stack.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

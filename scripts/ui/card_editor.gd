@@ -92,8 +92,12 @@ func _ready() -> void:
 func _build_top_bar() -> Control:
         # The bar answers the reading's own direction: under a right-reading
         # tongue the way back points right from the right corner, the way the
-        # settings page already reads, so every page answers alike.
-        var bar: Dictionary = ThemeScript.top_bar(I18nScript.t("Edit card"), I18nScript.is_rtl())
+        # settings page already reads, so every page answers alike. A page
+        # holding a card the deck has never met says so: a new card is a
+        # different errand from a fix, and the title is where the page says
+        # which one the reader is on.
+        var title := "New card" if (_card.front.is_empty() and _card.back.is_empty()) else "Edit card"
+        var bar: Dictionary = ThemeScript.top_bar(I18nScript.t(title), I18nScript.is_rtl())
         var row: HBoxContainer = bar["row"]
         var back: Button = bar["back"]
         back.tooltip_text = I18nScript.t("Back without saving")
@@ -453,6 +457,15 @@ func _save() -> void:
         if front == _card.front.strip_edges() and back == _card.back.strip_edges():
                 _close()
                 return
+        # A card the app itself is adding has no folder yet: the folder is
+        # made the moment its first words are saved, so a page walked away
+        # from leaves nothing behind -- no folder, no ghost for the deck's
+        # next reading to stumble over.
+        if not DirAccess.dir_exists_absolute(_card.folder):
+                var made := DirAccess.make_dir_recursive_absolute(_card.folder)
+                if made != OK:
+                        _warn.text = I18nScript.t("The card could not be saved.")
+                        return
         if not _write(_card.folder.path_join("front.md"), front + "\n"):
                 _warn.text = I18nScript.t("The question could not be saved.")
                 return

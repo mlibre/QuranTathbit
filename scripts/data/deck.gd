@@ -87,7 +87,12 @@ static func load(path: String):
         for id in ids:
                 var card := _load_card(path, str(id))
                 if card == null:
-                        return null
+                        # A folder without both its pages is not a card -- a
+                        # stray or half-written folder must never stand
+                        # between the reader and their whole deck. It is
+                        # passed over with its own word in the log, and the
+                        # deck stands on the cards that are whole.
+                        continue
                 deck.cards.append(card)
         if deck.cards.is_empty():
                 push_error("Deck.load: %s has no cards" % path)
@@ -102,7 +107,7 @@ static func _load_card(deck_path: String, id: String) -> CardScript:
         var front_path := folder.path_join("front.md")
         var back_path := folder.path_join("back.md")
         if not FileAccess.file_exists(front_path) or not FileAccess.file_exists(back_path):
-                push_error("Deck: card %s is missing front.md or back.md" % id)
+                push_error("Deck: card %s is missing front.md or back.md -- passed over" % id)
                 return null
         card.front = FileAccess.get_file_as_string(front_path)
         card.back = FileAccess.get_file_as_string(back_path)
@@ -113,6 +118,29 @@ static func _load_card(deck_path: String, id: String) -> CardScript:
                         continue
                 card.media[entry] = folder.path_join(entry)
         return card
+
+
+## A card the reader adds by hand, in the app: the next free number in the
+## deck's own numbering, and a card object wearing it. Nothing lands on
+## disk here -- the pencil's page writes front.md and back.md the moment
+## the reader saves, and a page walked away from leaves no folder behind,
+## so the deck never meets a card that was never finished.
+func create_card() -> CardScript:
+        var top := 0
+        for entry in DirAccess.get_directories_at(folder):
+                if entry.is_valid_int():
+                        top = maxi(top, int(entry))
+        var id := "%03d" % (top + 1)
+        return CardScript.new(id, folder.path_join(id))
+
+
+## A finished card joins the deck in memory: the folder's own order, after
+## every card the deck already holds. The files are already on disk when
+## this is called -- the pencil wrote them -- and the deck's other lives
+## (the library's list, the day's counts, the next sync) read the deck that
+## holds the new card from this breath on.
+func add_card(card: CardScript) -> void:
+        cards.append(card)
 
 func _load_progress() -> void:
         if not FileAccess.file_exists(progress_path):

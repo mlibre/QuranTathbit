@@ -1529,13 +1529,31 @@ func _open_editor(card: CardScript) -> void:
         add_child(editor)
         editor.saved.connect(_on_editor_saved)
 
+
+## A card the reader adds by hand, from the library's own door: the deck's
+## next free number, an empty page, and the pencil already standing on it.
+## Nothing is written until the reader saves -- a page walked away from
+## leaves the deck exactly as it was.
+func open_new_card() -> void:
+        if _deck == null or get_node_or_null("Editor") != null:
+                return
+        _open_editor(_deck.create_card())
+
+
 ## A saved edit re-opens the row's page with the words as they now are, and
-## the row's own reference follows its question's first line.
+## the row's own reference follows its question's first line. A card the
+## deck has never met arrives here too -- the pencil's first save -- and
+## its arrival is the deck's to hear: it joins the deck, and the page says
+## the shelf again so the new card stands where its own words put it.
 func _on_editor_saved(card: CardScript) -> void:
-        edited.emit(card)
         var entry: VBoxContainer = get_node_or_null("Margin/Column/Scroll/Wrap/Column/Entry" + card.id)
         if entry == null:
+                if not _deck.cards.has(card):
+                        _deck.add_card(card)
+                        edited.emit(card)
+                _rebuild()
                 return
+        edited.emit(card)
         (entry.get_node("Row/Pad/Line/Words/Meta/Ref") as Label).text = _reference_of(card)
         var detail: VBoxContainer = entry.get_node("Detail")
         if detail.visible:
