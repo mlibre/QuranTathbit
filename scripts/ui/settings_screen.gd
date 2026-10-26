@@ -49,8 +49,13 @@ signal deck_imported
 ## on: the switch hides them together, and the card folds to the switch
 ## and the one line that says where things stand. State stays out of the
 ## list -- it speaks in both worlds, saying what is and what is not yet.
+## Flow stays out of it too, and for its own reason: the flow's words (the
+## code, the hint, its two buttons) belong to a sign-in that is running,
+## not to a switch that is on -- a refresh that tied them to the switch
+## would stand an empty code ticket under a connected reader's name, the
+## photograph the report was made of. _refresh() says the flow's own law.
 const SYNC_ONLY := [
-        "Flow", "Buttons", "TokenLabel", "Token", "TokenRow", "Sep",
+        "Buttons", "TokenLabel", "Token", "TokenRow", "Sep",
         "RepoLabel", "Repo", "RepoHint", "AutoRow", "Sync", "SyncNote",
 ]
 
@@ -396,17 +401,20 @@ func _github_body() -> Control:
         hint.name = "Hint"
         flow.add_child(hint)
 
-        # The flow's two ways onward, side by side: the way to GitHub, and
-        # the code on the clipboard for the walk there. Copying is what a
-        # person does with a code; the app does it for them.
+        # The flow's two ways onward, side by side, wearing the same
+        # grammar the Buttons row beneath them wears: full width, one
+        # height (46), one solid and one outline -- the row's one decision
+        # (go to GitHub) stands solid, the kindness beside it (the code on
+        # the clipboard) stands hollow. Two hairline pills of different
+        # widths floating mid-card was the photograph's other complaint.
         var actions := HBoxContainer.new()
         actions.name = "Actions"
-        actions.alignment = BoxContainer.ALIGNMENT_CENTER
         actions.add_theme_constant_override("separation", 10)
         flow.add_child(actions)
 
-        var open := ThemeScript.ghost_button(I18nScript.t("Open GitHub"), ThemeScript.GREEN, 44)
+        var open := ThemeScript.primary_button(I18nScript.t("Open GitHub"), 46)
         open.name = "Open"
+        open.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         open.tooltip_text = I18nScript.t("Open the sign-in page")
         open.pressed.connect(func() -> void:
                 if not _flow_uri.is_empty():
@@ -414,8 +422,9 @@ func _github_body() -> Control:
         )
         actions.add_child(open)
 
-        var copy := ThemeScript.ghost_button(I18nScript.t("Copy code"), ThemeScript.GREEN, 44, 22)
+        var copy := ThemeScript.ghost_button(I18nScript.t("Copy code"), ThemeScript.GREEN, 46)
         copy.name = "Copy"
+        copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         copy.tooltip_text = I18nScript.t("Copy the code to the clipboard")
         copy.pressed.connect(func() -> void:
                 var code_text: RichTextLabel = flow.get_node("Code/Pad/CodeText")
@@ -1332,6 +1341,13 @@ func _refresh() -> void:
                 var child: Control = box.get_node_or_null(child_name)
                 if child != null:
                         child.visible = on
+        # The flow's law, said where the switch's rows are said: its words
+        # stand only under a sign-in that is running -- the device flow's
+        # wait (_polling) or either flow's open door (_flow_uri, the web
+        # path never polls). A connected reader reads their name and the
+        # card's own rows, never a code ticket that has nothing to say.
+        var flow: VBoxContainer = box.get_node("Flow")
+        flow.visible = on and (not _flow_uri.is_empty() or _polling)
         repo.text = _settings.repo
         # No signal: this is the settings being said, not the settings being
         # changed -- a refresh that toggled its own switch would overwrite
@@ -1422,6 +1438,12 @@ func _begin_device_flow() -> void:
                 return
         _polling = false
         _flow_uri = ""
+        # The wait ended without a verdict -- the code's own nine minutes
+        # ran out, or the switch above was turned off mid-flow. The flow's
+        # words fold and the way back in is said again: a Connect left
+        # disabled here would wall the reader off from trying once more.
+        connect.disabled = false
+        flow.visible = false
 
 func _pretty_code(code: String) -> String:
         if code.length() > 4 and code.contains("-"):

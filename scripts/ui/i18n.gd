@@ -406,7 +406,7 @@ const STRINGS := {
                 "fa": "این کد را در github.com/login/device بنویسید، سپس این‌جا منتظر بمانید.",
                 "ar": "اكتب هذا الرمز في github.com/login/device ثم انتظر هنا.",
         },
-        "Open GitHub": {"fa": "گشودن GitHub", "ar": "فتح GitHub"},
+        "Open GitHub": {"fa": "باز کردن GitHub", "ar": "فتح GitHub"},
         "Copy code": {"fa": "رونوشت کد", "ar": "نسخ الرمز"},
         "Copy": {"fa": "رونوشت", "ar": "نسخ"},
         "Copied": {"fa": "رونوشت شد", "ar": "تم النسخ"},
@@ -414,7 +414,7 @@ const STRINGS := {
                 "fa": "رونوشت واژه‌های برگزیده",
                 "ar": "نسخ الكلمات المحددة",
         },
-        "Open the sign-in page": {"fa": "گشودن صفحهٔ ورود", "ar": "فتح صفحة تسجيل الدخول"},
+        "Open the sign-in page": {"fa": "باز کردن صفحهٔ ورود", "ar": "فتح صفحة تسجيل الدخول"},
         "Copy the code to the clipboard": {
                 "fa": "رونوشت کد در کلیپ‌بورد",
                 "ar": "نسخ الرمز إلى الحافظة",
