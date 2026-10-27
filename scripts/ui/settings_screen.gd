@@ -11,6 +11,7 @@ const VersionScript := preload("res://scripts/data/version.gd")
 const I18nScript := preload("res://scripts/ui/i18n.gd")
 const CopyChipScript := preload("res://scripts/ui/copy_chip.gd")
 const FlavorScript := preload("res://scripts/data/flavor.gd")
+const UpdateCardScript := preload("res://scripts/ui/update_card.gd")
 
 ## The two ladders a size is stepped along: the interface in wider steps
 ## (it moves everything, so a small step is a big step) and the words in
@@ -175,6 +176,12 @@ func _build() -> void:
         # source, both of them about the deck rather than the machine.
         column.add_child(_backup_body())
         column.add_child(_source_body())
+        # The update card stands with the version it asks about: after where
+        # the words come from, before the colophon that says which self is
+        # running. It is the phone's own question -- the web build updates
+        # by reloading, so the card stands on the phone alone.
+        if UpdateCardScript.wanted_on_this_platform():
+                column.add_child(UpdateCardScript.new())
         column.add_child(_about())
         # The last card gets the same breath under it the page gives above:
         # a scroll that ends hard against its content reads as cut off.

@@ -206,6 +206,22 @@ func _init() -> void:
         if not fa_internet:
                 push_error("the Persian preset must ask for the INTERNET permission; without it GitHub connect and sync die on every phone it reaches")
                 failures += 1
+        # The update card hands the downloaded APK to the phone's own
+        # installer; on every Android 8+ phone the installer refuses that
+        # handoff unless the app declared REQUEST_INSTALL_PACKAGES (the
+        # reader's "install unknown apps" blessing is asked through it).
+        # Both Android presets must carry it, next to the INTERNET one --
+        # the same law that saved sync from silent death.
+        for preset_i in [3, 4]:
+                var perms: Variant = cfg.get_value("preset.%d.options" % preset_i, "permissions/custom_permissions", null)
+                var said := false
+                if typeof(perms) == TYPE_PACKED_STRING_ARRAY or typeof(perms) == TYPE_ARRAY:
+                        for perm in perms:
+                                if str(perm).contains("REQUEST_INSTALL_PACKAGES"):
+                                        said = true
+                if not said:
+                        push_error("preset.%d must declare android.permission.REQUEST_INSTALL_PACKAGES; without it the update card's install handoff is refused on Android 8+" % preset_i)
+                        failures += 1
         print("export_presets.cfg: %s (guard at %d of %d chars; android code %d)" % [
                 "OK" if failures == 0 else "BROKEN", guard_at, include.length(), code,
         ])
