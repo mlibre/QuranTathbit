@@ -167,6 +167,17 @@ func _edge_of(label: RichTextLabel, char_index: int, after: bool) -> Dictionary:
                 "bottom": line_top + line_h,
         }
 
+## Where a choice's boundary stands on the page, in window coordinates:
+## the same edge the pins hang from, said to whoever else needs to speak a
+## press at a choice's end -- the finger's own steering after a long-press
+## does. An empty answer (the character off the laid-out page) reads as
+## the point at infinity, which no caller will mistake for a place.
+func edge_global(label: RichTextLabel, char_index: int, after: bool) -> Vector2:
+        var edge := _edge_of(label, char_index, after)
+        if edge.is_empty():
+                return Vector2.INF
+        return label.get_global_rect().position + edge["local"]
+
 ## The line's first strong letter: Arabic, Persian's own letters, Hebrew and
 ## friends read from the right; anything else from the left. Marks, vowel
 ## signs and the neutral marks of punctuation are skipped, the way a base

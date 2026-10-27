@@ -1,6 +1,8 @@
 extends SceneTree
 const ThemeScript := preload("res://scripts/ui/theme.gd")
 const TouchScrollScript := preload("res://scripts/ui/touch_scroll.gd")
+const CopyChipScript := preload("res://scripts/ui/copy_chip.gd")
+const SelectHandlesScript := preload("res://scripts/ui/select_handles.gd")
 
 ## A phone's finger, replayed event by event through the engine's own
 ## input path: the page under a shelf of buttons must scroll, a tap must
@@ -9,13 +11,27 @@ const TouchScrollScript := preload("res://scripts/ui/touch_scroll.gd")
 ## real touch (a device the engine does not reserve for emulation), so
 ## the mouse echo the engine makes from it -- the echo that clicks
 ## buttons on a phone -- rides along exactly as it does in a hand.
+##
+## The ink has manners too, and they are sworn to here: a finger dragging
+## on the app's own selectable words is a scroll and chooses nothing (the
+## report that began this -- a scroll met a wash of chosen words); a
+## finger resting on the words chooses the word under it; the resting
+## finger's drag widens the choice while the page holds still; a lift
+## leaves the choice standing; a tap on the ink lets it go; and a desk's
+## mouse still draws a choice the old way, press and drag.
 
 var _failures := 0
 
 func _init() -> void:
+        # The desk's mouse must not breed phantom fingers: these laws push
+        # raw touches of their own, and the mouse laws at the end need a
+        # mouse that stays a mouse.
+        Input.emulate_touch_from_mouse = false
         _fresh_install()
         await _check_own_page()
         await _check_real_shelf()
+        await _check_the_ink_answers_a_finger()
+        await _check_the_real_session_ink()
         if _failures > 0:
                 print("touch-scroll: %d FAILURE(S)" % _failures)
                 quit(1)
@@ -273,6 +289,254 @@ func _check_real_shelf() -> void:
         )
 
 
+# --- the ink answers a finger ------------------------------------------------------
+
+
+## A page of the app's own selectable words in a scroller, the shapes the
+## manners live on: a finger dragging on the ink scrolls and chooses
+## nothing, a resting finger chooses the word under it, the resting
+## finger's drag widens the choice while the page holds still, a lift
+## leaves the choice standing, a tap lets it go, and a desk's mouse keeps
+## its own press-and-drag manners.
+func _check_the_ink_answers_a_finger() -> void:
+        # The library's own hand goes home first: the manners are judged on
+        # a page of their own, and a second TouchScroll alive behind this
+        # one would answer the same finger twice.
+        for child in root.get_children():
+                if child.get_script() == load("res://scripts/main.gd"):
+                        child.free()
+        await process_frame
+        var page := Control.new()
+        page.name = "InkPage"
+        page.set_anchors_preset(Control.PRESET_FULL_RECT)
+        root.add_child(page)
+
+        var scroll := ScrollContainer.new()
+        scroll.name = "Scroll"
+        scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+        ThemeScript.style_scroll(scroll)
+        page.add_child(scroll)
+
+        var column := VBoxContainer.new()
+        column.name = "Column"
+        column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        scroll.add_child(column)
+
+        var ink := RichTextLabel.new()
+        ink.name = "Ink"
+        ink.fit_content = true
+        ink.scroll_active = false
+        ink.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        ink.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        ink.selection_enabled = true
+        CopyChipScript.watch(ink)
+        ink.text = "The words a reader may want to carry away live here. ".repeat(80)
+        column.add_child(ink)
+
+        var more := RichTextLabel.new()
+        more.name = "More"
+        more.fit_content = true
+        more.scroll_active = false
+        more.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        more.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        more.selection_enabled = true
+        CopyChipScript.watch(more)
+        more.text = "A second page of words, far below the first, where a tap can land. ".repeat(30)
+        column.add_child(more)
+
+        var touch := TouchScrollScript.new()
+        touch.name = "TouchScroll"
+        page.add_child(touch)
+
+        # The choice's own caretaker, on the window where the real one
+        # lives, so the finger's steering after a rest has its edge math.
+        var handles: Control = SelectHandlesScript.new()
+        handles.name = "SelectHandles"
+        root.add_child(handles)
+
+        await process_frame
+        await process_frame
+        _ok(scroll.get_v_scroll_bar().max_value > 500.0, "the ink's page is long enough to scroll")
+
+        # A finger dragging on the words is a scroll, and chooses nothing:
+        # the report that began the manners. The scroll is moved first, so
+        # the drag has room either way.
+        scroll.scroll_vertical = 120.0
+        await process_frame
+        await _drag_finger(ink.get_global_rect().get_center(), Vector2(0, 80.0), 4, 0.25)
+        await process_frame
+        _ok(_no_choice_anywhere(), "a finger dragging on the ink chose no words")
+        _ok(
+                scroll.scroll_vertical < 70.0 and scroll.scroll_vertical > 20.0,
+                "that same finger scrolled the page (%.1f from 120)" % scroll.scroll_vertical
+        )
+
+        # A finger that rests on the words means to choose: the word under
+        # it is chosen, by the engine's own word-breaks. The page is settled
+        # back to its top first (the drag above moved it), and the band
+        # stands on a line the window can actually see -- a band above the
+        # page's own top edge answers nothing, and that is the engine being
+        # honest about a finger that is not on the page either.
+        scroll.scroll_vertical = 0.0
+        await process_frame
+        var band := _on_the_line(ink, 1, 0.3)
+        _press(band)
+        await create_timer(0.7).timeout
+        var from_i := ink.get_selection_from()
+        var to_i := ink.get_selection_to()
+        _ok(
+                from_i >= 0 and to_i > from_i and not ink.get_selected_text().strip_edges().is_empty(),
+                "a resting finger chose the word under it (from=%d to=%d)" % [from_i, to_i]
+        )
+        _ok(handles.visible, "the choice made, the pins are standing")
+
+        # The resting finger now travels: the choice follows it and the
+        # page holds still.
+        var scroll_at_rest := scroll.scroll_vertical
+        await _drag_by(band, band + Vector2(-24.0, 56.0))
+        await _drag_by(band + Vector2(-24.0, 56.0), band + Vector2(-40.0, 120.0))
+        await create_timer(0.2).timeout
+        var grown_from := ink.get_selection_from()
+        var grown_to := ink.get_selection_to()
+        _ok(
+                grown_from >= 0 and grown_to > grown_from
+                        and (grown_from != from_i or grown_to != to_i),
+                "the finger's drag widened the choice (from=%d to=%d)" % [grown_from, grown_to]
+        )
+        _ok(
+                absf(scroll.scroll_vertical - scroll_at_rest) < 3.0,
+                "the steering finger held the page still (%.1f at %.1f)" % [scroll.scroll_vertical, scroll_at_rest]
+        )
+
+        # The lift leaves the choice standing; a tap on the ink lets it go
+        # -- a tap on a line the window sees, a little below the choice.
+        _release(band + Vector2(-40.0, 120.0))
+        await process_frame
+        _ok(ink.get_selection_from() >= 0, "the lift leaves the choice standing")
+        var tap_at := _on_the_line(ink, 5, 0.6)
+        _press(tap_at)
+        await process_frame
+        _release(tap_at)
+        await process_frame
+        await process_frame
+        _ok(_no_choice_anywhere(), "a tap on the ink let the choice go")
+        _ok(not handles.visible, "the choice gone, the pins left with it")
+
+        # The desk's mouse keeps its own manners: press and drag still
+        # draws a choice, character by character, the way it always has --
+        # and a mouse drag never scrolls the page (the wheel's work).
+        var mouse_at := _on_the_line(ink, 2, 0.4)
+        _mouse_press(mouse_at)
+        var last := mouse_at
+        for step in 5:
+                last = mouse_at + Vector2(90.0 * (step + 1) / 5.0, 12.0 * (step + 1))
+                _mouse_drag(last)
+                await create_timer(0.07).timeout
+        await create_timer(0.15).timeout
+        _mouse_release(last)
+        await process_frame
+        _ok(ink.get_selection_from() >= 0, "a desk's mouse press-and-drag still chooses words")
+        _ok(
+                absf(scroll.scroll_vertical - scroll_at_rest) < 3.0,
+                "a mouse drag never scrolls the page"
+        )
+
+        page.queue_free()
+        handles.queue_free()
+        await process_frame
+
+
+## The real session, the room the report came from: a finger dragged
+## across the verse card must scroll or rest -- never choose -- and a
+## finger resting on the verse must choose its word.
+func _check_the_real_session_ink() -> void:
+        var main = (load("res://scripts/main.gd") as GDScript).new()
+        main.set_anchors_preset(Control.PRESET_FULL_RECT)
+        root.add_child(main)
+        if not main.is_node_ready():
+                await main.ready
+        await create_timer(0.9).timeout
+        var asking: Node = main.get_node_or_null("LanguagePicker")
+        if asking != null:
+                main._on_language_chosen("en")
+                await process_frame
+        main._start_session()
+        await create_timer(0.6).timeout
+        var study: Control = main.get_node_or_null("Study")
+        if study == null:
+                _ok(false, "the session opens for the ink's manners")
+                return
+        study._reveal()
+        await create_timer(1.0).timeout
+        var view: Control = study.get_node("Margin/Column/Surface/Fill/CardPanel/Padding/View")
+        var verse: RichTextLabel = null
+        for found in view.find_children("*", "RichTextLabel", true, false):
+                if found.selection_enabled and found.is_visible_in_tree():
+                        if verse == null or found.get_parsed_text().length() > verse.get_parsed_text().length():
+                                verse = found
+        if verse == null:
+                _ok(false, "the answer side carries the ink the finger meets")
+                study.closed.emit()
+                await create_timer(0.3).timeout
+                return
+
+        # The report itself: a finger dragged down the verse card is a
+        # scroll, and no wash of chosen words appears under it.
+        await _drag_finger(verse.get_global_rect().get_center(), Vector2(0, 70.0), 4, 0.25)
+        await process_frame
+        _ok(_no_choice_anywhere(), "a finger dragged down the real verse card chose no words")
+
+        # The resting finger: the word under it is chosen, the pins stand.
+        var band := _on_the_line(verse, 0, 0.5)
+        _press(band)
+        await create_timer(0.7).timeout
+        _ok(
+                verse.get_selection_from() >= 0
+                        and not verse.get_selected_text().strip_edges().is_empty(),
+                "a finger resting on the verse chose the word under it"
+        )
+        var handles: Control = root.get_node_or_null("SelectHandles")
+        _ok(handles != null and handles.visible, "the pins stand over the real verse's choice")
+        _release(band)
+        await process_frame
+
+        study.closed.emit()
+        await create_timer(0.3).timeout
+
+
+## A point on a label's laid-out line `line`, at `frac` of the line's own
+## inked width: the line's offset and height, its shaped width and the
+## label's one alignment say where its words actually stand -- the box's
+## own top sliver is nobody's guess to make.
+func _on_the_line(label: RichTextLabel, line: int, frac: float) -> Vector2:
+        var rect := label.get_global_rect()
+        var line_w := label.get_line_width(line)
+        var line_h := float(label.get_line_height(line))
+        var origin := 0.0
+        match label.horizontal_alignment:
+                HORIZONTAL_ALIGNMENT_CENTER:
+                        origin = (label.size.x - line_w) * 0.5
+                HORIZONTAL_ALIGNMENT_RIGHT:
+                        origin = label.size.x - line_w
+        return Vector2(
+                rect.position.x + origin + line_w * frac,
+                rect.position.y + label.get_line_offset(line) + line_h * 0.5)
+
+
+## No watched label anywhere holds a choice: the wash the report was
+## made of can never quietly stand again.
+func _no_choice_anywhere() -> bool:
+        for entry in CopyChipScript._watched:
+                if not is_instance_valid(entry):
+                        continue
+                var label := entry as RichTextLabel
+                if label.get_selection_from() >= 0 \
+                        and not label.get_selected_text().strip_edges().is_empty():
+                        return false
+        return true
+
+
 # --- the finger, said in events ----------------------------------------------------
 
 ## The chapter's own account of how many of its rows stand.
@@ -329,6 +593,43 @@ func _release(canvas_pos: Vector2) -> void:
         ev.pressed = false
         ev.position = _win(canvas_pos)
         ev.index = 0
+        ev.device = 0
+        Input.parse_input_event(ev)
+        _flush()
+
+
+## A desk mouse, said in events: a press, motions carrying the held
+## button, a release -- device zero, the device a real mouse holds. With
+## the touch emulation hushed for this suite, a mouse event breeds no
+## phantom finger, so these speak for the desk alone.
+func _mouse_press(canvas_pos: Vector2) -> void:
+        var ev := InputEventMouseButton.new()
+        ev.button_index = MOUSE_BUTTON_LEFT
+        ev.pressed = true
+        ev.button_mask = MOUSE_BUTTON_MASK_LEFT
+        ev.position = _win(canvas_pos)
+        ev.global_position = _win(canvas_pos)
+        ev.device = 0
+        Input.parse_input_event(ev)
+        _flush()
+
+
+func _mouse_drag(canvas_pos: Vector2) -> void:
+        var ev := InputEventMouseMotion.new()
+        ev.position = _win(canvas_pos)
+        ev.global_position = _win(canvas_pos)
+        ev.button_mask = MOUSE_BUTTON_MASK_LEFT
+        ev.device = 0
+        Input.parse_input_event(ev)
+        _flush()
+
+
+func _mouse_release(canvas_pos: Vector2) -> void:
+        var ev := InputEventMouseButton.new()
+        ev.button_index = MOUSE_BUTTON_LEFT
+        ev.pressed = false
+        ev.position = _win(canvas_pos)
+        ev.global_position = _win(canvas_pos)
         ev.device = 0
         Input.parse_input_event(ev)
         _flush()
