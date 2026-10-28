@@ -16,10 +16,9 @@ A calm app for memorising the Quran. Each day it shows you the cards that
 are due — a verse, its Persian translation, and its recitation — and asks
 how it went. Cards you found hard come back sooner, easy ones later.
 
-It ships with 151 cards from Al-Fātiḥah and Al-Baqarah (through 2:145) —
-the original 99, joined additively by Al-Baqarah 94-145, transcribed from
-the same source the deck has always recorded. Everything is in
-Arabic and Persian, set in proper Quranic typefaces.
+It ships with **151 cards**: all of Al-Fātiḥah (7 verses) and Al-Baqarah
+1–145. Each card shows the verse in Arabic with its Persian translation,
+set in proper Quranic typefaces.
 
 No streaks, no notifications, no account needed. The app invites; it never
 pushes.
