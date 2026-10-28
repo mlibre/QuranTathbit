@@ -16,6 +16,7 @@ func _init() -> void:
         _test_learning_steps()
         _test_lapse_and_relearn()
         _test_counts_and_queue()
+        _test_learned_never_drains()
         _test_defer()
         _test_suspend()
         if _failures > 0:
@@ -183,6 +184,38 @@ func _test_counts_and_queue() -> void:
         _is(first_review.state.status, "review", "easy graduates to review")
         var counts3 := SchedulerScript.counts(deck, tomorrow)
         _ok(counts3.learned >= 1, "a graduated card counts as learned")
+
+
+## The number the reader trusts: learned is what was learned, not what
+## happens to be waiting. A review card whose day has come still counts
+## as learned -- it speaks in the Due pill without ever leaving the
+## Learned one -- so a few quiet days never drain the count on their
+## own, and only an answer moves it.
+func _test_learned_never_drains() -> void:
+        var now := 1792000000
+        var deck = load("res://scripts/data/deck.gd").new()
+        deck.name = "tiny"
+        for i in range(2):
+                var card = load("res://scripts/data/card.gd").new(str(i), "")
+                deck.cards.append(card)
+        # A card learned the day before: two Goods carry it through the
+        # steps and out, at the one-day graduating interval.
+        var learned_card = deck.cards[0]
+        learned_card.state = SchedulerScript.apply(SchedulerScript.id_seed(learned_card.id), learned_card.state, "good", now)
+        learned_card.state = SchedulerScript.apply(SchedulerScript.id_seed(learned_card.id), learned_card.state, "good", now + 60)
+        _is(learned_card.state.status, "review", "two goods graduate the card")
+        _is(learned_card.state.ivl, 1, "the graduating interval is one day")
+        # Tomorrow the card's day has come: it is due, and it is still
+        # learned. The count the reader remembers did not move on its own.
+        var tomorrow := now + SchedulerScript.DAY
+        var counts := SchedulerScript.counts(deck, tomorrow)
+        _is(counts.due, 1, "the graduated card is due the next day")
+        _is(counts.learned, 1, "a due review card is still learned")
+        # And once answered, it rests learned with a longer wait.
+        deck.cards[0].state = SchedulerScript.apply(SchedulerScript.id_seed(learned_card.id), learned_card.state, "good", tomorrow)
+        var after := SchedulerScript.counts(deck, tomorrow)
+        _is(after.due, 0, "an answered card is not due")
+        _is(after.learned, 1, "an answered card rests learned")
 
 
 ## The reader's own move, not the algorithm's: a card put back in the

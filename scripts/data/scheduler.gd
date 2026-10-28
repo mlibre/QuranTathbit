@@ -211,10 +211,20 @@ static func counts(deck, now: int, new_per_day := NEW_PER_DAY) -> Dictionary:
                                 if int(state["due_ts"]) <= now:
                                         due += 1
                         "review":
+                                # Learned is what the reader has, not what
+                                # happens to be waiting: a card in review
+                                # counts as learned whether its day has come
+                                # or not. The day it comes due it speaks in
+                                # the Due pill as well -- the two numbers
+                                # overlap on purpose, each answering its own
+                                # question -- so a few quiet days never drain
+                                # the Learned count the reader remembers.
+                                # Only an answer moves it: a lapse sends the
+                                # card back to relearning, and it returns the
+                                # hour it graduates again.
                                 if int(state["due_day"]) <= today_idx:
                                         due += 1
-                                else:
-                                        learned += 1
+                                learned += 1
                         _:
                                 # The queue and the counts agree on what the
                                 # day offers: a deferred card is not among it.
