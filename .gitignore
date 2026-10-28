@@ -1,5 +1,7 @@
 # Godot 4+ specific ignores
 .godot/
+.env
+
 /android/
 
 # Only written if you run godot --dump-extension-api yourself (it always dumps
